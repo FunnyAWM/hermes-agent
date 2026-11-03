@@ -1,0 +1,111 @@
+"""Secure, profile-scoped Markdown note scanning and summary rendering."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
+
+CATEGORY_DISPLAY_NAMES: Final[dict[str, str]] = {
+    "work": "工作",
+    "study": "学习",
+    "life": "生活",
+    "health": "健康",
+    "finance": "财务",
+    "people": "人际",
+    "other": "其他",
+}
+MAX_INDEX_ENTRIES: Final[int] = 64
+_MAX_SUMMARY_CHARS: Final[int] = 40
+_FRONT_MATTER_RE: Final[re.Pattern[str]] = re.compile(r"^---\s*\n(?P<body>.*?)(?:\n---\s*\n|\Z)", re.DOTALL)
+_FIELD_RE: Final[re.Pattern[str]] = re.compile(r"^(name|description|updated):\s*(.*?)\s*$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class NoteEntry:
+    category: str
+    name: str
+    summary: str
+    path: Path
+    updated: str = ""
+
+    @property
+    def display_line(self) -> str:
+        return f"{CATEGORY_DISPLAY_NAMES[self.category]}/{self.name} — {self.summary}"
+
+
+class NotesStore:
+    """Read and validate notes beneath one Hermes home."""
+
+    def __init__(self, home: Path, *, max_entries: int = MAX_INDEX_ENTRIES) -> None:
+        self.home = home
+        self.root = home / "notes"
+        if max_entries <= 0:
+            raise ValueError("max_entries must be positive")
+        self.max_entries = max_entries
+
+    def validate_category(self, category: str) -> str:
+        if category not in CATEGORY_DISPLAY_NAMES:
+            allowed = ", ".join(CATEGORY_DISPLAY_NAMES)
+            raise ValueError(f"invalid note category {category!r}; choose one of: {allowed}")
+        return category
+
+    def note_path(self, category: str, topic: str) -> Path:
+        self.validate_category(category)
+        if not topic or Path(topic).name != topic or topic in {".", ".."}:
+            raise ValueError("note topic must be a single file name")
+        filename = topic if topic.endswith(".md") else f"{topic}.md"
+        return self.root / category / filename
+
+    def list_entries(self) -> list[NoteEntry]:
+        return self._scan()[1]
+
+    def omitted_count(self) -> int:
+        """Notes beyond the index cap — the PRD §7.4 rule is “截断必须明示,不静默丢弃”."""
+        total, capped = self._scan()
+        return len(total) - len(capped)
+
+    def _scan(self) -> tuple[list[NoteEntry], list[NoteEntry]]:
+        if not self.root.is_dir():
+            return [], []
+        entries: list[NoteEntry] = []
+        for path in sorted(self.root.rglob("*.md")):
+            if not path.is_file():
+                continue
+            try:
+                relative = path.relative_to(self.root)
+                category = relative.parts[0] if len(relative.parts) > 1 else "other"
+                if category not in CATEGORY_DISPLAY_NAMES:
+                    category = "other"
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError, ValueError):
+                continue
+            fields = self._front_matter_fields(text)
+            name = fields.get("name") or path.stem
+            summary = fields.get("description") or ""
+            summary = " ".join(summary.split())[:_MAX_SUMMARY_CHARS]
+            if not summary:
+                continue
+            entries.append(NoteEntry(category, name, summary, path, fields.get("updated", "")))
+        entries.sort(key=lambda entry: (entry.updated, entry.path.as_posix()), reverse=True)
+        return entries, entries[: self.max_entries]
+
+    def render_index(self) -> str:
+        entries = self.list_entries()
+        if not entries:
+            return ""
+        lines = ["NOTES INDEX (names and summaries only)"]
+        lines.extend(f"- {entry.display_line}" for entry in entries)
+        omitted = self.omitted_count()
+        if omitted > 0:
+            lines.append(f"(-{omitted} older notes beyond this index's {self.max_entries}-entry cap; "
+                         "list notes/<category>/ to read one)")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _front_matter_fields(text: str) -> dict[str, str]:
+        match = _FRONT_MATTER_RE.match(text)
+        if not match:
+            return {}
+        return {key: value for key, value in _FIELD_RE.findall(match.group("body"))}

@@ -126,8 +126,12 @@ def _no_match_error(entries: list[str], old_text: str, verb: str, **extra) -> di
                   **({"closest_entries": closest} if closest else {}), **extra)
 
 
-def _over_limit(new_total: int, limit: int) -> str:
-    return f"would put memory at {new_total:,}/{limit:,} chars: free at least {new_total - limit:,} chars"
+def _over_limit(new_total: int, limit: int, current_total: int) -> str:
+    # 'free at least' keeps the actionable shortfall; the headroom is what the
+    # caller can still use today, which the batch hint needs to size a trim.
+    available = max(0, limit - current_total)
+    return (f"would put memory at {new_total:,}/{limit:,} chars: free at least {new_total - limit:,} chars "
+            f"({available:,} chars remain available)")
 
 
 # Patch content cannot be empty, and 'remove' would drop the sibling facts in the entry.
@@ -330,9 +334,11 @@ class MemoryStore:
         """A lone add over budget, legacy or one-item batch: the model has not consolidated yet,
         so the live entries come back (its prompt snapshot may predate other sessions' writes)."""
         over = len(ENTRY_DELIMITER.join(self._entries_for(target) + [content])) - limit
+        available = max(0, limit - self._char_count(target))
         return self._failure_with_entries(target, (
             f"Memory at {self._char_count(target):,}/{limit:,} chars; adding this entry ({len(content)} chars) "
-            f"would exceed the limit by {over:,} chars. Retry as ONE 'operations' batch that "
+            f"would exceed the limit by {over:,} chars; {available:,} chars remain available. "
+            f"Retry as ONE 'operations' batch that "
             f"removes or shortens (patch) stale entries from current_entries below to free at least "
             f"{over:,} chars AND adds this entry — the limit is checked only on the batch result."))
 
@@ -454,7 +460,7 @@ class MemoryStore:
             new_total = len(ENTRY_DELIMITER.join(patched))
             if new_total > limit:
                 return self._failure_with_entries(target, (
-                    f"Patch would put memory at {new_total:,}/{limit:,} chars. Shorten the new "
+                    f"Patch {_over_limit(new_total, limit, len(ENTRY_DELIMITER.join(entries)))}. Shorten the new "
                     f"text, or 'remove' other stale or less important entries to make room "
                     f"(see current_entries below), then retry — all in this turn."))
             return patched, "Entry patched.", {
@@ -505,7 +511,7 @@ class MemoryStore:
             new_total = len(ENTRY_DELIMITER.join(replaced))
             if new_total > limit:
                 return self._failure_with_entries(target, (
-                    f"Replacement {_over_limit(new_total, limit)}. Shorten the new content, or retry as ONE "
+                    f"Replacement {_over_limit(new_total, limit, len(ENTRY_DELIMITER.join(entries)))}. Shorten the new content, or retry as ONE "
                     f"'operations' batch with this replace plus removes/shortenings of other stale entries "
                     f"(see current_entries below) — the limit is checked only on the batch result."))
             return replaced, "Entry replaced.", {"replaced_entry": entries[idx]}
@@ -624,7 +630,7 @@ class MemoryStore:
                 if len(ops) == 1 and ops[0].get("action") == "add":  # the advertised single add
                     return self._add_overflow(target, (ops[0].get("content") or ops[0].get("new_text") or "").strip(), limit)
                 return self._batch_failure(target, (
-                    f"Applying all {len(operations)} operations {_over_limit(new_total, limit)} more. Add "
+                    f"Applying all {len(operations)} operations {_over_limit(new_total, limit, len(ENTRY_DELIMITER.join(entries)))}. Add "
                     f"removes or shortening patches of other stale entries to the same batch, then retry."),
                     "over_budget")
             if not commit:

@@ -532,6 +532,14 @@ def _memory_parts(agent: Any) -> list[str]:
     # External memory provider system prompt block (additive to built-in). Gated on the same check
     # ``inject_memory_provider_tools`` uses so we never advertise provider tools that the agent's toolset
     # configuration has already gated off (#81014).
+    try:
+        from hermes_notes import NotesStore
+        from hermes_constants import get_hermes_home
+        notes_index = NotesStore(get_hermes_home()).render_index()
+    except (ImportError, OSError, ValueError):
+        notes_index = ""
+    if notes_index:
+        parts.append(notes_index)
     if agent._memory_manager:
         try:
             from agent.memory_manager_tools import memory_provider_tools_exposed as _mem_exposed
@@ -784,7 +792,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # ── Volatile tier (most likely to differ on a rebuild; kept last so the stable prefix stays reusable) ──
     # Skills are runtime-mutable, so the index leads the volatile band: on a longest-prefix
     # backend an unchanged index stays inside the reused prefix; a changed one re-prefills from here.
-    volatile_parts: list[str] = [skills_prompt, *_memory_parts(agent)]
+    volatile_parts: list[str] = [*_memory_parts(agent), skills_prompt]
     # Plugin sections are confined to one coarse anchor in the volatile tail so
     # a resumed process can reconstruct the stable prefix without re-running plugins.
     volatile_parts.extend(_plugin_section_blocks(_frozen_plugin_prompt_sections(agent), "after_memory"))

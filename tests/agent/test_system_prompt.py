@@ -266,6 +266,22 @@ class TestCodingContextBlock:
         assert "coding agent" not in _stable_prompt(agent)
 
 
+def test_memory_blocks_precede_skills_in_volatile_prompt(monkeypatch):
+    memory = SimpleNamespace(format_for_system_prompt=lambda target: {
+        "memory": "MEMORY_MARKER",
+        "user": "USER_MARKER",
+    }.get(target))
+    agent = _make_agent(
+        valid_tool_names=["skills_list"],
+        _memory_store=memory,
+        _memory_enabled=True,
+        _user_profile_enabled=True,
+    )
+    with patch("agent.system_prompt._skills_prompt", return_value="SKILLS_MARKER"):
+        volatile = build_system_prompt_parts(agent)["volatile"]
+    assert volatile.index("MEMORY_MARKER") < volatile.index("USER_MARKER") < volatile.index("SKILLS_MARKER")
+
+
 def test_shared_project_context_precedes_worktree_bytes(monkeypatch, tmp_path):
     import os
 
