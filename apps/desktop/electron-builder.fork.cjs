@@ -14,7 +14,7 @@
 'use strict'
 
 const base = require('./electron-builder.config.cjs')
-const { store } = require('./product-identity.cjs')
+const { store, artifactNamePascal } = require('./product-identity.cjs')
 
 module.exports = {
   ...base,
@@ -33,10 +33,19 @@ module.exports = {
   },
 
   nsis: {
+    // NSIS and portable are one `win.target` list, and both would otherwise
+    // resolve the shared `${artifactName}` and write release/<same>.exe — the
+    // portable pass then silently overwrites the installer. Per-target names
+    // keep both artifacts, which is what §5.5 asks for.
+    artifactName: `${artifactNamePascal}-\${version}-\${os}-\${arch}-setup.\${ext}`,
     // Per-user install: no administrator prompt, and the install tree stays out
     // of Program Files. Application data lives in HERMES_HOME, not here, so an
     // overwrite install never touches memories/ or notes/ (T-12's criterion).
     oneClick: true,
     perMachine: false
+  },
+
+  portable: {
+    artifactName: `${artifactNamePascal}-\${version}-\${os}-\${arch}-portable.\${ext}`
   }
 }
