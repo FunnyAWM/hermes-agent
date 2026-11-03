@@ -534,7 +534,11 @@ def check_for_updates(*, install_root: Path | None = None, home: Path | None = N
     if unsupported:
         return {**result, **unsupported}
     config = require_readable_config_before_write(home / "config.yaml")
-    if passive and (config.get("updates") or {}).get("check") is False:
+    # Passive (banner) checks are opt-in for this fork: PRD §8.1 隐 02 allows one
+    # outbound link, the model endpoint. Absence of the key means off, so a
+    # fresh install never phones GitHub; `updates.check: true` restores the
+    # upstream behaviour and `hermes update --check` (not passive) is untouched.
+    if passive and (config.get("updates") or {}).get("check") is not True:
         return {**result, "reason": "disabled"}
     channel = resolve_update_channel(config, root) if channel is None else validate_name(channel)
     forward_only = rides_default_channel(channel_record(config, root), channel, root)

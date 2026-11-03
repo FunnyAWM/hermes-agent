@@ -1704,12 +1704,15 @@ DEFAULT_CONFIG = {
         # skipped with the reason "load timed out" and the rest keep loading; the stuck worker thread is
         # abandoned. 0 = no deadline (load inline). Max 600.
         "load_timeout_seconds": 10,
-        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables). Applying stays
-        # explicit: `hermes plugins update <name>`, or auto_apply below (catalog and tracked git
-        # plugins, scan-gated by that same pipeline).
-        "auto_update_check_hours": 24,
-        # Opt-in unattended apply (`hermes plugins auto-update on`, Desktop's Plugins tab): catalog +
-        # tracked git plugins, same scan/consent pipeline as the manual update (never a widened pin).
+        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables).
+        # Fork policy (PRD §8.1 隐 02): off unless the user opts in; applying
+        # stays explicit (`hermes plugins update <name>` / `check-updates`), or
+        # auto_apply below (catalog and tracked git plugins, scan-gated by the
+        # same pipeline).
+        "auto_update_check_hours": 0,
+        # Opt-in unattended apply for the cadence check. Git-plugin rows ONLY; every apply runs the
+        # same security scan / consent pipeline as the manual update command.
+        "auto_apply": False,
         "auto_apply": False,
         # Where third-party Python plugins run. in_process: imported into Hermes (default).
         # host: one plugin-host process per profile runs them and they reach Hermes only through
@@ -2335,8 +2338,8 @@ DEFAULT_CONFIG = {
     },
 
     "updates": {
-        # Passive version/banner checks only; explicit `hermes update --check` remains enabled.
-        "check": True,
+        # Fork privacy (PRD §8.1): passive checks opt in; explicit `hermes update --check` stays enabled.
+        "check": False,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
         # config.yaml, .env, auth.json, profile DBs) into <HERMES_HOME>/state-snapshots/, skipping
         # files >1 GiB; restore via ``/snapshot``. full = quick PLUS a ``hermes backup`` zip in
