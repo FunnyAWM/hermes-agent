@@ -59,7 +59,8 @@ Python `pyproject.toml` = `0.22.5+fork1`（PEP 440 本地版本写法，同义�
 在此之前默认**不同步**——基座是冻结的，所有开发在基座之上向前走。
 
 - 本地私有路径（合并上游时保留本地版本，不随上游覆盖）：`AGENTS_PYTHON.md`、`AGENTS_FRONTEND.md`、
-  `AGENTS_PROJECT.md`、`PRD.md`、`TODO.md`、`.workbuddy/`，以及根 `AGENTS.md` 的 `## Working constraints` 节。
+  `AGENTS_PROJECT.md`、`PRD.md`、`TODO.md`、`UPSTREAM_UPGRADE_CHECKLIST.md`、`evidence/`、`.workbuddy/`，
+  以及根 `AGENTS.md` 的 `## Working constraints` 节。
 - 上游改到 `AGENTS*.md` 时：保留本文件的 §4 例外表与本地私有路径，其余可接受上游版本。
 
 ### 2.1 历史重写的安全网
