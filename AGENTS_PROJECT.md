@@ -28,7 +28,7 @@
 | --- | --- |
 | 远程 | `origin` = `https://github.com/FunnyAWM/hermes-agent.git`（个人 fork，非上游 `nousresearch/hermes-agent`） |
 | 分支 | `main`，跟踪 `origin/main` |
-| 基座提交 | `bf0203a794a07aac3ff764972ab9087baa4e4f4e`（2026-10-22，`fix(launchers): a Python repin republishes hermes.exe, not a .cmd`） |
+| 基座提交 | `f5e0dd8e9b097a9052e3c8ecdcd0c6d6ac49dc7`（2026-11-03，已从 origin/main 同步并完成 rebase） |
 | 对应版本 | **v0.22.5 Release**（由使用者确认；仓库内无 tag 可校验，见下） |
 | 历史状态 | 2026-10-28 已 `reset --hard` 到基座并 `--force-with-lease` 覆盖远程，**`3f058ad593` 之后的 1,860 个提交已从 `main` 线上移除** |
 
