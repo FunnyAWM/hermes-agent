@@ -335,3 +335,5 @@ apps/desktop/.dist-build*
 .idea
 .ruff_cache
 .workbuddy
+
+/evidence/*.log
