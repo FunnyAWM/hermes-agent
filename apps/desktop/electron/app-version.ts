@@ -87,11 +87,14 @@ export function appVersionInfo(
   }
 
   const build = stamp.channelBuild
+  // A headless artifact's runtime is the machine's own install, so its version
+  // comes from there exactly like a bootstrap artifact's.
+  const localRuntimeArtifact = stamp.payload === 'bootstrap' || stamp.payload === 'headless'
 
   return {
     appVersion: build
       ? `${build.sourceVersion} (${build.channel} #${build.sequence}, ${build.commit.slice(0, 8)})`
-      : stamp.payload === 'bootstrap'
+      : localRuntimeArtifact
         ? firstRealVersion([runtimeVersion, stamp.displayVersion, stamp.baseVersion, packageVersion])
         : firstRealVersion([stamp.displayVersion, stamp.baseVersion, packageVersion, runtimeVersion]),
     baseVersion: build?.sourceVersion ?? stamp.baseVersion ?? undefined,
@@ -114,7 +117,7 @@ export function assertSourceUpdateChannel(stamp: Readonly<InstallStamp> | null):
     throw new Error(COMMIT_BUILD_UPDATE_MESSAGE)
   }
 
-  if (stamp && stamp.payload !== 'bootstrap') {
+  if (stamp && stamp.payload !== 'bootstrap' && stamp.payload !== 'headless') {
     throw new Error('This package has a fixed update channel. Install the other package to change channels.')
   }
 }

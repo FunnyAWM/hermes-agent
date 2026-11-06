@@ -58,6 +58,7 @@ test('bundled launch paths come from build metadata without filesystem access', 
     assert.equal(probe.mock.calls.length, 0)
     assert.equal(read.mock.calls.length, 0)
     assert.equal(bundledPayload('/resources', stamp(runtime, 'light')), null)
+    assert.equal(bundledPayload('/resources', stamp(runtime, 'headless')), null)
     assert.equal(bundledPayload('/resources', stamp(runtime, 'bootstrap')), null)
     assert.equal(bundledPayload('/resources', null), null)
   } finally {

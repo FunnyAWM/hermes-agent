@@ -16,9 +16,12 @@
  *    local install (the default; also what non-desktop stamps carry).
  *  - 'bundled': the agent runtime ships inside the artifact resources.
  *  - 'light': no runtime at all; remote connections only.
+ *  - 'headless': no runtime in the artifact and never installs one; it resolves
+ *    the machine's existing Hermes (checkout, managed install, launcher) and
+ *    fails with guidance when there is none.
  * Selected at build time by HERMES_DESKTOP_VARIANT (unset = bootstrap).
  */
-export type ArtifactKind = 'bootstrap' | 'bundled' | 'light'
+export type ArtifactKind = 'bootstrap' | 'bundled' | 'light' | 'headless'
 
 /** Relative paths declared by the PM bundle builder, below agent-payload. */
 export interface PayloadRuntime {
@@ -89,6 +92,8 @@ export interface InstallStamp {
   payload: ArtifactKind
   /** Present on bundled artifacts. Validated at build time, never discovered at boot. */
   runtime?: PayloadRuntime
+  /** Present on headless artifacts: the local runtime root the builder drove. */
+  localRuntimeRoot?: string
   /** Complete channel inputs, absent on legacy releases and one-off builds. */
   channelBuild?: Readonly<ChannelBuildRequest>
   /** Cross-application receiver shipped in this artifact, absent on older builds. */

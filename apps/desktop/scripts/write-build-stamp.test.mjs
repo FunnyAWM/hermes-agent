@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import { test } from 'vitest'
 
 import {
@@ -113,6 +114,32 @@ test('source builds declare the same artifact schema, without a payload', () => 
   assert.equal(stamp.runtime, undefined)
   assert.equal(stamp.tag, null)
   assert.equal(stamp.commit, baseStamp.commit)
+})
+
+test('headless stamps record the local checkout and never carry a payload', () => {
+  const localRoot = path.resolve('some-checkout')
+  const stamp = buildStampPayload(
+    baseStamp,
+    { HERMES_DESKTOP_VARIANT: 'headless', HERMES_DESKTOP_LOCAL_ROOT: localRoot },
+    'win32',
+    { runtime }
+  )
+  assert.equal(stamp.payload, 'headless')
+  assert.equal(stamp.updateMechanism, 'external')
+  assert.equal(stamp.runtime, undefined)
+  assert.equal(stamp.localRuntimeRoot, localRoot)
+  // No record is allowed: the artifact then relies on the resolution ladder.
+  assert.equal(buildStampPayload(baseStamp, { HERMES_DESKTOP_VARIANT: 'headless' }, 'win32').localRuntimeRoot, undefined)
+  assert.throws(
+    () => buildStampPayload(
+      baseStamp,
+      { HERMES_DESKTOP_VARIANT: 'headless', HERMES_DESKTOP_LOCAL_ROOT: 'relative/checkout' },
+      'win32'
+    ),
+    /absolute/
+  )
+  // Only the headless variant consumes the record.
+  assert.equal(buildStampPayload(baseStamp, { HERMES_DESKTOP_LOCAL_ROOT: localRoot }, 'win32').localRuntimeRoot, undefined)
 })
 
 test('buildStampPayload keeps schemaVersion + provenance in the staged shape', () => {

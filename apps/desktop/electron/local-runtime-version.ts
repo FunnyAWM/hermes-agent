@@ -139,7 +139,9 @@ export async function resolveDesktopClientVersion(
   hermesHome: string,
   packageVersion: string
 ): Promise<string> {
-  if (stamp?.payload && stamp.payload !== 'bootstrap') {
+  // Headless artifacts have no baked version to report: their runtime is the
+  // machine's install, so ask it (same rule as a bootstrap artifact).
+  if (stamp?.payload && stamp.payload !== 'bootstrap' && stamp.payload !== 'headless') {
     return appVersionInfo(stamp, '', packageVersion).appVersion
   }
 

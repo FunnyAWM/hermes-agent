@@ -19,12 +19,17 @@ const variants = {
     display: 'Hermes Agent',
     kebab: 'hermes-bundled',
     pascal: 'HermesBundled'
+  },
+  headless: {
+    display: 'Hermes Headless',
+    kebab: 'hermes-headless',
+    pascal: 'HermesHeadless'
   }
 }
 
 const variant = process.env.HERMES_DESKTOP_VARIANT || ''
-if (!['', 'light', 'bundled', 'store'].includes(variant)) {
-  throw new Error(`Unknown HERMES_DESKTOP_VARIANT ${variant}. expected one of (empty), light, bundled, store`)
+if (!['', 'light', 'bundled', 'headless', 'store'].includes(variant)) {
+  throw new Error(`Unknown HERMES_DESKTOP_VARIANT ${variant}. expected one of (empty), light, bundled, headless, store`)
 }
 
 // 'store' is a Store-submission packaging identity layered on the bundled

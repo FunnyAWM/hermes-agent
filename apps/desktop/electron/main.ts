@@ -312,6 +312,7 @@ import {
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from './hardening'
+import { explicitSourceBackend, headlessRuntimeRoot, refuseBootstrap } from './headless-runtime'
 import { assertNotPassiveSpawn } from './host-backend-singleton'
 import { HERMES_HUB_FALLBACK_ORIGIN, HERMES_HUB_ORIGIN, isHermesHubClipboardWrite } from './hub-iframe-policy'
 import { requestHudClose } from './hud-close'
@@ -568,7 +569,12 @@ import {
 } from './session-windows'
 import { ensureLoginShellPath } from './shell-path'
 import { removeStaleSingletonLock } from './singleton-lock'
-import { createSourcePythonBackend, resolveSourceInstallationBackend, type SourceBackend } from './source-backend'
+import {
+  isHermesSourceRoot,
+  resolveSourceInstallationBackend,
+  type SourceBackend,
+  sourceBackendAt
+} from './source-backend'
 import { resolveSourcePython } from './source-python'
 import { registerSpellcheckDictionaryIpc } from './spellcheck-dictionary-ipc'
 import { resolveSshBinary } from './ssh-binary'
@@ -2968,10 +2974,6 @@ function looksLikeDesktopAppBinary(commandPath) {
   )
 }
 
-function isHermesSourceRoot(root) {
-  return directoryExists(root) && fileExists(path.join(root, 'hermes_cli', 'main.py'))
-}
-
 async function findPythonForRoot(root: string): Promise<string | null> {
   return resolveSourcePython(root, {
     override: process.env.HERMES_DESKTOP_PYTHON,
@@ -4836,21 +4838,13 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
     }
   }
 
-  // 1. Explicit override -- HERMES_DESKTOP_HERMES_ROOT points at a developer
-  //    checkout. Honour it as-is (no bootstrap; the user is driving).
-  const overrideRoot: string | undefined =
-    process.env.HERMES_DESKTOP_HERMES_ROOT && path.resolve(process.env.HERMES_DESKTOP_HERMES_ROOT)
+  // 1-1b. Explicit override, then the checkout a headless build recorded; later rungs recover.
+  const explicitBackend: SourceBackend | null = await explicitSourceBackend(INSTALL_STAMP, process.env, {
+    backendFor: (root) => sourceBackendAt(root, backendArgs, findPythonForRoot), log: rememberLog
+  })
 
-  if (overrideRoot && isHermesSourceRoot(overrideRoot)) {
-    const backend: SourceBackend | null = createSourcePythonBackend(
-      overrideRoot,
-      await findPythonForRoot(overrideRoot),
-      backendArgs
-    )
-
-    if (backend) {
-      return backend
-    }
+  if (explicitBackend) {
+    return explicitBackend
   }
 
   // 2. Development source -- when running `npm run dev` from a checkout, the
@@ -4858,11 +4852,7 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
   //    installed `hermes` on PATH so local Python edits are actually exercised.
   //    (In dev with no checkout, SOURCE_REPO_ROOT won't pass isHermesSourceRoot.)
   if (!IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT)) {
-    const backend: SourceBackend | null = createSourcePythonBackend(
-      SOURCE_REPO_ROOT,
-      await findPythonForRoot(SOURCE_REPO_ROOT),
-      backendArgs
-    )
+    const backend: SourceBackend | null = await sourceBackendAt(SOURCE_REPO_ROOT, backendArgs, findPythonForRoot)
 
     if (backend) {
       return backend
@@ -4985,6 +4975,9 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
   //    resolveHermesBackend was the old "no payload" path and forced the
   //    user into a dead end. With the bootstrap protocol, "no install yet"
   //    is a recoverable state the GUI can drive through.
+  // A headless artifact never installs a runtime: no local install is a hard stop.
+  refuseBootstrap(INSTALL_STAMP)
+
   return {
     kind: 'bootstrap-needed',
     label: 'Hermes Agent not installed yet; bootstrap required',
@@ -17217,6 +17210,13 @@ function resolveHermesRuntime() {
 
   if (stamp?.payload === 'bundled') {
     return { type: 'embedded' }
+  }
+
+  const headlessRoot = headlessRuntimeRoot(stamp, resolveUpdateRoot)
+
+  if (headlessRoot) {
+    // The runtime is this machine's own checkout, not code this artifact ships.
+    return { type: 'external', source: { type: 'source', root: headlessRoot } }
   }
 
   const root = resolveUpdateRoot()

@@ -120,7 +120,8 @@ test('nonstable runtime pins userData before the app name can change', async ():
 test.each([
   [undefined, 'Hermes', 'hermes', 'latest', 'canary'],
   ['bundled', 'Hermes Agent', 'hermes', 'latest', 'canary'],
-  ['light', 'Hermes Light', 'hermes-light', 'light', 'light-canary']
+  ['light', 'Hermes Light', 'hermes-light', 'light', 'light-canary'],
+  ['headless', 'Hermes Headless', 'hermes', 'latest', 'canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (
@@ -184,7 +185,7 @@ test.each([
 test('light and bundled retain distinct OS markers from the full client', async (): Promise<void> => {
   const full: ProductIdentity = await identityForVariant(undefined)
 
-  for (const variant of ['bundled', 'light']) {
+  for (const variant of ['bundled', 'light', 'headless']) {
     const other: ProductIdentity = await identityForVariant(variant)
 
     for (const field of ['displayName', 'appId', 'appNamePascal'] as const) {

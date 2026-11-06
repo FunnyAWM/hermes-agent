@@ -22,6 +22,20 @@ interface SourceOptions {
   env?: NodeJS.ProcessEnv
 }
 
+/** A checkout the desktop may drive: the CLI entry point proves the tree. */
+export function isHermesSourceRoot(root: string): boolean {
+  return existsSync(path.join(root, 'hermes_cli', 'main.py'))
+}
+
+export async function sourceBackendAt(
+  root: string,
+  args: string[],
+  findPython: (root: string) => Promise<string | null>,
+  options: SourceOptions = {}
+): Promise<SourceBackend | null> {
+  return createSourcePythonBackend(root, await findPython(root), args, options)
+}
+
 /** Keep the validated command. PM owns interpreter and generation selection. */
 export async function resolveSourceInstallationBackend(
   root: string,
