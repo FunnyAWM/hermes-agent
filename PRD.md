@@ -173,6 +173,7 @@
 | `hermes_notes/store.py`、`tools/file_tools_write_guards.py` | 新增 `notes/docs/` 固定例外类别：只读、一层放平、计入清单、不参与摘要/合并；对 `notes/docs/**` 的写入/替换拒绝，读取放行 | 记 04 / 05、§7.1、D8 | 低：独立类别与路径守卫；需与其他写路径分开测试 |
 | `apps/desktop/src/themes/presets.ts` | 五个内置主题去掉 `typography.fontUrl`：主题加载器会把它作为远程样式表注入，默认配置的桌面因此访问 `fonts.googleapis.com`（隐 02）。内置 mono 栈本就不引用这些远程字族，删除后仅去掉外联、不改渲染；导入的第三方主题仍可携带（显式用户行为） | 隐 02、§8.1、T-11 | 低：只删内置预设字段；上游新增同名字段时按行 rebase，`presets.test.ts` 拦住回归 |
 | `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
+| `agent/prompt_builder.py`、`agent/system_prompt.py` | 任务分派路由提示：记录/跟踪任务 → `todo_list`，指定时间/周期/提醒 → `cronjob_manage`；仅在两个工具都启用时注入，不改动既有 guidance 顺序 | §5.5、桌面单机器人与任务分派、T-21 | 低：新增一个常量与一个工具门控分支；上游改动 guidance 清单时按行 rebase |
 
 每条补丁的底线要求：
 
@@ -206,8 +207,9 @@
 - **安装目录与数据目录分离。** 应用数据在 `HERMES_HOME`，覆盖安装只换程序，不动 `memories/`、`notes/`——这是 §9.3 回归的判据。
 - **优先复用本机环境（T-16，2026-11-03 使用者确认）。** 安装与开发初始化先检查本机已有的 Python、uv、Git、Node/npm 等所需软件；符合版本与运行要求就直接使用，后续 PM 不重复安装同类基础环境。Python 须符合 PM 所需的主次版本与本机架构；Node/npm 须满足项目要求；其余工具按锁定版本作兼容下限。缺失、不兼容或无法运行时才获取锁定版本。Hermes 的项目依赖仍安装到独立环境，不向用户全局 Python 写依赖；重复执行复用已有依赖环境。本机工具只读使用，不写入受管制品校验记录；密封发行包和跨平台产物继续按锁文件制作。版本比较只在锁文件写的是纯数字版本时进行，写成通道名或测试值时按不兼容处理，直接获取锁定版本。用户声明的 MCP stdio 命令 `uv`/`uvx` 不受本机复用影响，始终使用受管副本，保证与用户全局环境隔离。验收覆盖「兼容时无工具下载」「不兼容时回退」「后续 PM 沿用」「重复执行不重复安装」。
 - **发行变体分两种（2026-11-06 新增）。** `HERMES_DESKTOP_VARIANT=bundled` 出**完整版**：运行时随包，安装即离线可用；受管制品必须按 `pm/lock.json` 制作，宿主已装工具不被复用。`HERMES_DESKTOP_VARIANT=headless` 出**headless 版**：包里不带运行时，按本机阶梯解析（`HERMES_DESKTOP_HERMES_ROOT` → 构建期记录的 `localRuntimeRoot` → `HERMES_DESKTOP_HERMES` → `%LOCALAPPDATA%\hermes\hermes-agent` → 已发布 launcher），找不到时报错并给出下一步，**永不进入 bootstrap 安装**。两种身份独立（显示名、appId、userData、产物名互不重叠），可并存安装；构建期记录的本机根是数据，不是探测。上游 `light` 变体保持原语义（无运行时、仅远程），不在此列。
-- **品牌标识未定。** `appId` 仍是 `com.nousresearch.*`、`productName` 仍是上游显示名。若与上游版装在同一账户下，
-  per-user 安装目录会相互覆盖。自用可接受；**对外分发前必须先定**，否则升级和卸载会互相踩。
+- **机器人板块只有一个助手（2026-11-06 使用者确认）。** 对齐手机端「聊 03 单一会话 + 设 07 自定义名称」：桌面机器人板块只展示 default profile 一行，其他 profile 继续运行但不再列出；工具栏不提供新建机器人/群聊/分组/筛选，行菜单只保留「打开对话」与「编辑资料」（名称在编辑资料里由用户设定）。机器人只有唯一的主会话，不再从机器人板块创建侧聊或跳转最近会话。板块之外的全局会话侧栏不属于本条约束。
+- **任务分派按语义路由（2026-11-06 使用者确认）。** 「记录 / 跟踪 / 指派一件事」写入 Hermes 内置任务列表（`todo_list`，会话级任务面板）；「指定时间 / 周期 / 提醒」创建定时任务（`cronjob_manage`）。两者都启用时才注入路由提示；`delegate_task` 子代理仍在核心工具集内，不需要新 UI。任务列表是会话级的，定时任务跨会话持久——语义路由不改变这一点。
+- **品牌改为 KouriChat Next（2026-11-06 使用者确认）。** 可见名称按变体为 `KouriChat Next` / `KouriChat Next Light` / `KouriChat Next Agent` / `KouriChat Next Headless`，图标统一来自 `apps/desktop/assets/logo.svg`。内部的 `appId`（`com.nousresearch.hermes*`）、`appNamePascal`、userData 键与 CLI 名 `hermes` 保持不变，避免覆盖安装、更新通道与用户数据换目录；因此安装包文件名仍以 `Hermes*` 开头。对外分发前仍需单独定 `appId` 与安装包标识。
 
 **Windows 验证进展（v0.11）**：已产出不同文件名的 NSIS 与 portable 包，产品版本均保留 `0.22.5-fork.1`，
 日志、大小和散列见 `evidence/t15.md`。构建戳为脏工作区，当前仅作打包验证；
