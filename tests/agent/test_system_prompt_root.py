@@ -57,6 +57,15 @@ def test_memory_order_is_memory_user_notes_after_root(tmp_path, monkeypatch):
     assert full.index(MEMORY_ROOT_PROMPT) < full.index("MEMORY_MARKER") < full.index("USER_MARKER") < full.index("NOTES INDEX")
 
 
+def test_task_routing_guidance_needs_both_task_tools():
+    both = build_system_prompt_parts(_agent(valid_tool_names=["todo_list", "cronjob_manage"]))["stable"]
+    assert "session task list" in both
+    assert "cronjob_manage" in both
+
+    only_tasks = build_system_prompt_parts(_agent(valid_tool_names=["todo_list"]))["stable"]
+    assert "session task list" not in only_tasks
+
+
 def test_stable_prefix_is_byte_stable_across_calls():
     agent = _agent(load_soul_identity=False, skip_context_files=True)
     first = build_system_prompt(agent)

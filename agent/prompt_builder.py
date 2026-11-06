@@ -392,6 +392,16 @@ TASK_COMPLETION_GUIDANCE = (
     "produce. Reporting a blocker honestly is always better than inventing a result."
 )
 
+# Task routing (desktop Bot Mode): one assistant owns both the session task list and scheduled
+# jobs, so it must pick by what the user asked for rather than defaulting to either tool.
+TASK_ROUTING_GUIDANCE = (
+    "# Task routing\n"
+    "When the user asks you to record, track or assign something to do, put it in the session task "
+    "list with todo_list. When the user names a time, a recurrence or a reminder, create a scheduled "
+    "job with cronjob_manage. Do not turn a plain request into a scheduled job, and claim something "
+    "is scheduled only after the job was created."
+)
+
 # Universal parallel-tool-call guidance (ALL models): the runtime already executes independent calls
 # concurrently. Supersedes the former Google-only bullet so no model receives the steer twice.
 # Why this matters for cost: every assistant turn resends the entire accumulated conversation (and, on

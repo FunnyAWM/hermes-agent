@@ -22,7 +22,8 @@ from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS, KANBAN_GUIDANCE,
     PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE,
-    SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
+    SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TASK_ROUTING_GUIDANCE,
+    TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
 )
 from agent import prompt_builder as _pb
@@ -608,6 +609,8 @@ def _guidance_parts(agent: Any) -> list[str]:
     parts.append(_tool_guidance_block(agent))  # None/empty entries are dropped by _join_tier
     if not agent.valid_tool_names:
         return parts
+    if {"todo_list", "cronjob_manage"} <= set(agent.valid_tool_names):
+        parts.append(TASK_ROUTING_GUIDANCE)
     # Steering only lands inside tool results, so only reachable with tools; a one-shot has nobody to steer it.
     from agent.oneshot_footprint import agent_is_oneshot
     if not agent_is_oneshot(agent):
