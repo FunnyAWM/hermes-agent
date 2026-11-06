@@ -1,71 +1,93 @@
 #!/usr/bin/env python3
 """Check the cross-client memory contract before accepting an upstream release.
 
-This is a read-only review aid, not a migration. It reports the current parser,
-limits and entry-counting rules that must be compared with the upstream diff.
+Read-only review aid, not a migration: it compares the running code with the shared fixture
+(``evidence/fixtures/memory-contract.json``) and, with ``--tag``, shows the candidate release's
+declared version. It never fetches tags, edits files, or declares an upgrade passed.
 """
+
 from __future__ import annotations
 
 import argparse
-import re
+import json
 import subprocess
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-MEMORY_STORE = ROOT / "tools" / "memory_tool_store.py"
-PROJECT = ROOT / "pyproject.toml"
-MEMORY = ROOT / "memories" / "MEMORY.md"
-USER = ROOT / "memories" / "USER.md"
-DELIMITER = "\n§\n"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+import memory_contract
+
+DELIMITER = memory_contract.load_fixture()["entry_delimiter"]
 
 
-def _project_version() -> str:
-    match = re.search(r'^version\s*=\s*["\']([^"\']+)', PROJECT.read_text(encoding="utf-8-sig"), re.MULTILINE)
-    return match.group(1) if match else "unknown"
-
-
-def _limits() -> tuple[int, int]:
-    source = MEMORY_STORE.read_text(encoding="utf-8-sig")
-    match = re.search(r"def __init__\(self, memory_char_limit: int = (\d+), user_char_limit: int = (\d+)", source)
-    if not match:
-        raise RuntimeError("Could not locate memory defaults in tools/memory_tool_store.py")
-    return int(match.group(1)), int(match.group(2))
-
-
-def _count(path: Path) -> int:
+def _count_entries(path: Path) -> int:
     if not path.exists():
         return 0
     text = path.read_text(encoding="utf-8-sig")
-    entries = [entry.strip() for entry in text.split(DELIMITER) if entry.strip()]
-    return len(DELIMITER.join(entries))
+    return len([entry for entry in text.split(DELIMITER) if entry.strip()])
 
 
 def _tracked_version(tag: str) -> str:
     result = subprocess.run(
-        ["git", "show", f"{tag}:pyproject.toml"], cwd=ROOT,
+        ["git", "show", f"{tag}:pyproject.toml"], cwd=REPO_ROOT,
         text=True, encoding="utf-8", capture_output=True, check=False, timeout=30,
     )
     if result.returncode:
         return "unavailable"
-    match = re.search(r'^version\s*=\s*["\']([^"\']+)', result.stdout, re.MULTILINE)
-    return match.group(1) if match else "unknown"
+    for line in result.stdout.splitlines():
+        if line.strip().startswith("version"):
+            return line.split("=", 1)[1].strip().strip('"\'')
+    return "unknown"
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tag", help="upstream stable tag admitted for this review")
-    args = parser.parse_args()
-    memory_limit, user_limit = _limits()
-    print(f"current pyproject version: {_project_version()}")
-    print(f"current memory limits: MEMORY.md={memory_limit}, USER.md={user_limit} characters")
-    print(f"current entry delimiter: {DELIMITER.encode('unicode_escape').decode('ascii')}")
-    print(f"current count: MEMORY.md={_count(MEMORY)}, USER.md={_count(USER)} characters")
-    if args.tag:
-        print(f"candidate tag pyproject version: {_tracked_version(args.tag)}")
-    print("Review the candidate diff for: Markdown/UTF-8 preservation; limits (2200/1375 by PRD);")
-    print("character counting excluding render banners; full-delimiter entry splitting; reject-without-write behavior.")
-    print("This script does not fetch tags, edit files, or declare the review passed.")
-    return 0
+def build_report(tag: str | None) -> dict:
+    report = memory_contract.report()
+    memories = REPO_ROOT / "memories"
+    report["local_counts"] = {
+        "MEMORY.md": _count_entries(memories / "MEMORY.md"),
+        "USER.md": _count_entries(memories / "USER.md"),
+    }
+    if tag:
+        report["candidate"] = {"tag": tag, "pyproject_version": _tracked_version(tag)}
+    return report
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--tag", help="candidate tag to read the declared version from (no fetch)")
+    parser.add_argument("--json", action="store_true", help="emit the report as JSON")
+    args = parser.parse_args(argv)
+    report = build_report(args.tag)
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report["ok"] else 1
+
+    live = report["live"]
+    print(f"fixture: {report['fixture']}")
+    print(f"delimiter: {live['entry_delimiter']!r}")
+    print(f"limits: MEMORY.md={live['memory_char_limit']} (0=unlimited), "
+          f"USER.md={live['user_char_limit']} (0=unlimited), combined=none")
+    print("categories: " + ", ".join(live["categories"]))
+    print("read-only: " + ", ".join(live["readonly_categories"]))
+    print("char_count probes: " + ", ".join(
+        f"{name}={count}" for name, count in live["counting"]["expected_counts"].items()))
+    print("root prompt present: " + str(live["root_prompt_present"]))
+    print(f"local entries: MEMORY.md={report['local_counts']['MEMORY.md']}, "
+          f"USER.md={report['local_counts']['USER.md']}")
+    if "candidate" in report:
+        print(f"candidate tag: {report['candidate']['tag']} "
+              f"(pyproject version: {report['candidate']['pyproject_version']})")
+    for drift in report["drifts"]:
+        print(f"DRIFT {drift}")
+    print("Review the candidate diff for: Markdown/UTF-8 preservation; 3,000-char MEMORY.md cap "
+          "(0 = unlimited) and uncapped USER.md; cluster-tail counting; full-delimiter entries; "
+          "read-only notes/docs; root prompt first in the stable tier; reject-without-write.")
+    print("RESULT: " + ("contract aligned" if report["ok"] else "drift detected"))
+    return 0 if report["ok"] else 1
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@
 
 ## 2. Rebase 与定制审查
 
+- [ ] 先运行 `python scripts/check_upstream_upgrade.py --tag vX.Y.Z --json`：`ok` 为真才进入本步；`blocked_reason` 非空时按条目处理，不得跳过。
 - [ ] 对照 `PRD.md` §5.4 受控补丁登记表逐项 rebase；冲突逐处人工解决并运行对应行为测试，不以“取其一”处理。
 - [ ] 保留 `AGENTS_PYTHON.md`、`AGENTS_FRONTEND.md`、`AGENTS_PROJECT.md`、`PRD.md`、`TODO.md`、`.workbuddy/` 等本地私有路径，以及 `AGENTS.md` 的本地 Working constraints。
 - [ ] 检查上游是否已实现本地补丁；若需求已满足或接口变化令补丁失效，删除本地补丁及对应死代码，并更新登记表。
@@ -18,13 +19,15 @@
 
 ## 3. 记忆兼容性（T-13）
 
-运行 `python scripts/check_upstream_memory.py --tag vX.Y.Z`，并检查上游候选 diff：
+运行 `python scripts/check_upstream_memory.py --tag vX.Y.Z --json`（共享契约见 `evidence/fixtures/memory-contract.json`），并检查上游候选 diff：
 
-- [ ] `MEMORY.md`、`USER.md` 仍是 UTF-8 Markdown 纯文本，PRD 上限仍为 2,200 / 1,375 字符。
-- [ ] 字符计数口径未变：只计记忆条目，不把 system-prompt 横幅、标题或百分比计入。
+- [ ] `MEMORY.md`、`USER.md` 仍是 UTF-8 Markdown 纯文本；`MEMORY.md` 仅约束模型写入、默认 3,000 字符且 `0` 表示不限；`USER.md` 不设上限；不存在合并上限。
+- [ ] 字符计数口径未变：码点 + 簇尾归并（组合符、emoji 修饰符、ZWJ、国旗对、标签序列各算 1），只计记忆条目，不把 system-prompt 横幅、标题或百分比计入。
 - [ ] 条目分隔格式仍可解析；当前格式是完整分隔符 `\n§\n`，不是裸 `§`。
-- [ ] 超限写入仍拒绝，返回剩余可用字符数，且不截断/改写原文件。
-- [ ] 若上游改变格式、字符口径或拒绝语义：停止升级，先评估 PC/Android 两端兼容性、固定样本和迁移/回滚方案；不得只更新版本号。
+- [ ] 超限写入仍拒绝，返回实际字符数、上限与剩余可用字符数，且不截断/改写原文件；手动编辑、历史恢复与导入不受模型上限限制。
+- [ ] `notes/` 仍为七类可写 + `docs/` 只读；`docs/` 一层放平、文件名取来源、计入清单、不参与摘要与合并，模型写入被拒。
+- [ ] 根提示词仍位于 stable 层首位（先于 `SOUL`），内容与 Android `ROOT_PROMPT` 语义一致。
+- [ ] 若上游改变格式、字符口径、类别或拒绝语义：停止升级，先评估 PC/Android 两端兼容性、固定样本和迁移/回滚方案；不得只更新版本号。
 - [ ] 保存该次检查输出、tag/SHA、审查人/日期及结论到 `evidence/t13-<tag>.md`。
 
 ## 4. 门禁与回归
