@@ -1,0 +1,50 @@
+{
+  "observed_at": "2026-11-03T07:45:37.612949+00:00",
+  "scope": "Python passive updates and standalone serve TCP only",
+  "reports": [
+    {
+      "setting": "missing",
+      "probe_reason": "disabled",
+      "samples": 28,
+      "seconds_after_ready": 10.005075999999463,
+      "tcp_rows": [
+        "TCP    127.0.0.1:55214        0.0.0.0:0              LISTENING       42476",
+        "TCP    127.0.0.1:55288        127.0.0.1:55289        ESTABLISHED     42476",
+        "TCP    127.0.0.1:55289        127.0.0.1:55288        ESTABLISHED     42476"
+      ],
+      "remote_tcp": [],
+      "python_connects": [
+        {
+          "event": "socket.connect",
+          "address": [
+            "127.0.0.1",
+            55288
+          ]
+        }
+      ],
+      "remote_python_connects": []
+    },
+    {
+      "setting": "false",
+      "probe_reason": "disabled",
+      "samples": 29,
+      "seconds_after_ready": 10.131871399999909,
+      "tcp_rows": [
+        "TCP    127.0.0.1:55380        0.0.0.0:0              LISTENING       2944",
+        "TCP    127.0.0.1:55440        127.0.0.1:55441        ESTABLISHED     2944",
+        "TCP    127.0.0.1:55441        127.0.0.1:55440        ESTABLISHED     2944"
+      ],
+      "remote_tcp": [],
+      "python_connects": [
+        {
+          "event": "socket.connect",
+          "address": [
+            "127.0.0.1",
+            55440
+          ]
+        }
+      ],
+      "remote_python_connects": []
+    }
+  ]
+}

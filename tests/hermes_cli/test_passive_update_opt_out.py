@@ -1,5 +1,9 @@
 """Passive opt-out keeps explicit update checks available."""
+import asyncio
+import json
 import subprocess
+
+import pytest
 
 from hermes_constants import get_hermes_home
 
@@ -44,3 +48,53 @@ def test_explicit_check_fetches_local_origin_despite_passive_opt_out(tmp_path, m
     output = capsys.readouterr().out
     assert "Fetching from origin" in output
     assert "1 commit" in output
+
+
+@pytest.mark.parametrize("setting", [None, False, True])
+def test_desktop_probe_requires_opt_in_or_a_forced_check(tmp_path, monkeypatch, capsys, setting):
+    from hermes_cli.source_check import main
+
+    local = _checkout_with_ahead_origin(tmp_path)
+    home = get_hermes_home()
+    if setting is not None:
+        (home / "config.yaml").write_text(f"updates:\n  check: {str(setting).lower()}\n", encoding="utf-8")
+    argv = ["source_check", "--install-root", str(local), "--home", str(home)]
+    monkeypatch.setattr("sys.argv", argv)
+    main()
+    passive = json.loads(capsys.readouterr().out)
+    if setting is True:
+        assert passive["updateAvailable"] is True
+    else:
+        assert passive["reason"] == "disabled"
+        assert not (home / "source-checks").exists()
+
+    monkeypatch.setattr("sys.argv", [*argv, "--force"])
+    main()
+    explicit = json.loads(capsys.readouterr().out)
+    assert explicit["updateAvailable"] is True
+
+
+@pytest.mark.parametrize("setting", [None, False, True])
+def test_dashboard_poll_requires_opt_in_or_a_forced_check(tmp_path, monkeypatch, setting):
+    from hermes_cli import config, web_server
+    from hermes_cli.web_routers import actions
+
+    local = _checkout_with_ahead_origin(tmp_path)
+    home = get_hermes_home()
+    if setting is not None:
+        (home / "config.yaml").write_text(f"updates:\n  check: {str(setting).lower()}\n", encoding="utf-8")
+    monkeypatch.setattr(web_server, "PROJECT_ROOT", local)
+    monkeypatch.setattr(config, "get_project_root", lambda: local)
+
+    passive = asyncio.run(actions.check_hermes_update())
+    if setting is True:
+        assert passive["update_available"] is True
+    else:
+        assert passive["update_available"] is False
+        assert passive["behind"] is None
+        assert passive["reason"] == "disabled"
+        assert passive["message"] == "Automatic update checks are disabled."
+        assert not (home / "source-checks").exists()
+
+    explicit = asyncio.run(actions.check_hermes_update(force=True))
+    assert explicit["update_available"] is True

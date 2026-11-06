@@ -1684,6 +1684,7 @@ export interface BackendUpdateCheckResponse {
   install_method: string
   current_version: string
   behind: number | null
+  reason?: null | string
   update_available: boolean
   /** A stable release this build already contains: applying it moves back. */
   rollback_to?: null | string

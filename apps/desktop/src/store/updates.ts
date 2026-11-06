@@ -547,10 +547,11 @@ export function mapBackendCheck(res: BackendUpdateCheckResponse): DesktopUpdateS
   // that actually ran may claim there is nothing to update. Backends that
   // cannot self-update also answer `behind: null`, but `can_apply: false`
   // renders the unsupported copy first — those must not become failures.
-  const checkFailed = res.can_apply && res.behind === null
+  const checkFailed = res.can_apply && res.behind === null && res.reason !== 'disabled'
 
   return {
     supported: res.can_apply,
+    reason: res.reason ?? undefined,
     error: checkFailed ? 'check-failed' : undefined,
     message: res.message ?? undefined,
     updateAvailable: res.update_available,
