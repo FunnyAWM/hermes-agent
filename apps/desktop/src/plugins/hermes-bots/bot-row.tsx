@@ -92,6 +92,15 @@ import {
 
 // ── bot row ──────────────────────────────────────────────────────────────────
 
+/** The one-line preview under a row: a bot-to-bot delivery drops its prefix. */
+function rowPreview(preview: string | undefined | null, fromBot: boolean): string {
+  if (fromBot) {
+    return (preview || '').replace(A2A_PREFIX_RE, '').trim() || '…'
+  }
+
+  return preview || ''
+}
+
 interface BotRowProps {
   bot: RosterRow
   onDelete: (bot: RosterRow) => void
@@ -181,9 +190,7 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
   const { fromBot } = previewKind(previewSession?.preview, $lastRoster.get(), bot.connectionId)
 
   // DM previews read like DMs: strip the delivery prefix, keep the message.
-  const displayPreview = stripPreviewMarkdown(
-    fromBot ? (previewSession?.preview || '').replace(A2A_PREFIX_RE, '').trim() || '…' : previewSession?.preview || ''
-  )
+  const displayPreview = stripPreviewMarkdown(rowPreview(previewSession?.preview, fromBot))
 
   const handle = botHandle(bot.name, bot)
   const gatewayLabel = bot.connectionLabel || (bot.connectionId === 'local' ? b.bot.thisDevice : '')
