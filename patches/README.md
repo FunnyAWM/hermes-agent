@@ -4,6 +4,8 @@
 
 - 基线：`f5e0dd8e9b097a9052e3c8ecdcd0c6d6ac49dc7`（v0.22.5）
 - 覆盖到 `d3c6d52c7e` 为止的 48 个提交（导出本目录的提交自身不在列）
+- 末尾 `0049-*.patch` 补上两个未提交的交付物：`INSTALL.md` 与
+  `scripts/download-managed-tools.ps1`
 - 应用后重建的提交历史与 `main` 逐条同主题、同作者
 
 ## 应用
@@ -34,9 +36,9 @@ Get-Content patches/assets-excluded.txt | ForEach-Object {
 
 ## 验证
 
-在基线处新建干净 worktree，`git am --3way` 48 个补丁全部成功；重放后的提交主题
-与 `main` 完全一致；与 `main`（`d3c6d52c7e`）对比，仅上面 82 个二进制素材不同，
-文本文件零差异。
+在基线处新建干净 worktree，`git am --3way` 49 个补丁全部成功；重放后的提交主题
+与 `main` 完全一致；与 `main`（`d3c6d52c7e`）对比，仅上面 82 个二进制素材，
+外加 `0049` 引入的 `INSTALL.md`、`scripts/download-managed-tools.ps1` 不同。
 
 ## 重新生成
 
@@ -48,4 +50,5 @@ git format-patch --no-binary --no-signature \
 
 `--no-binary` 必须显式给出：默认会内嵌二进制，单个补丁可到 4 MB，过不了
 `scripts/check` 的体积门禁。生成后仍需剔除 `Binary files ... differ` 段
-（整段 `diff --git` 块）。
+（整段 `diff --git` 块）。`0049-*.patch` 是单独为两个未提交文件生成的，
+重新生成 0001–0048 时不要覆盖它。
