@@ -1,8 +1,9 @@
 /**
- * The Bots pane with only its gateway transport mocked. The bot list
- * (`profiles.list` / `host.agents`) failing must not hide gateway Group Chats
- * that `groups.list` returned: rooms are part of the list, so the pane shows
- * them instead of the bot-list error, with no Refresh button.
+ * The Bots pane with only its gateway transport mocked.
+ *
+ * Fork rule (PRD §5.5 单机器人): the pane drives one assistant, so the gateway
+ * Group Chats `groups.list` returns are never offered here — a failing bot list
+ * is not masked by a room list this pane cannot act on.
  */
 
 import type * as HermesSdk from '@hermes/plugin-sdk'
@@ -38,7 +39,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-it('shows gateway Group Chats when the bot list fails', async () => {
+it('keeps gateway Group Chats out of the single-bot pane', async () => {
   request.mockRejectedValue(new Error('profiles.list exploded'))
   requestProfile.mockImplementation(async (_route: unknown, method: string) => {
     if (method === 'groups.list') {
@@ -54,7 +55,6 @@ it('shows gateway Group Chats when the bot list fails', async () => {
     </QueryClientProvider>
   )
 
-  expect(await screen.findByRole('button', { name: 'Launch crew' })).toBeTruthy()
-  expect(screen.queryByText(/exploded/)).toBeNull()
-  expect(screen.queryByRole('button', { name: /refresh/i })).toBeNull()
+  expect(await screen.findByText(/Roster unavailable/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Launch crew' })).toBeNull()
 })
