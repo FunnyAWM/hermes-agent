@@ -337,3 +337,6 @@ apps/desktop/.dist-build*
 .workbuddy
 
 /evidence/*.log
+
+# Local agent state (repo wiki cache and session metadata)
+/.qoder/
