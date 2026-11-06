@@ -3,9 +3,9 @@
 本 fork 相对上游 **v0.23.0** 基线的全部改动，按提交拆成可重放的补丁列。
 
 - 基线：`2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19`（本地 annotated tag `v0.23.0`）
-- `0001`–`0055`：v0.23.0 之上的 55 个 fork 提交（3 个导出本目录的 `docs(patches)`
-  提交自身不入列）
-- `0056`：补上两个未跟踪的交付物文件 `INSTALL.md`、`scripts/download-managed-tools.ps1`
+- `0001`–`0056`：v0.23.0 之上的 56 个 fork 提交。导出本目录的提交与只改 `TODO.md`
+  的进度记录提交（合计 5 个）不入列——它们改的就是本目录，或改的行由导出提交引入
+- `0057`：补上两个未跟踪的交付物文件 `INSTALL.md`、`scripts/download-managed-tools.ps1`
 - `fork-side-of-merge-conflicts.patch`：不是提交补丁，是再往上合并时的冲突素材，
   不参与 `git am`
 
@@ -57,16 +57,16 @@ git apply -3 patches/fork-side-of-merge-conflicts.patch
 
 ## 验证
 
-在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 56 个全部成功；
+在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 57 个全部成功；
 重放后的工作树与本分支只差三类内容：这些补丁文件本身（导出提交不入列）、上面 82 个
 二进制素材、以及 `0056` 新引入的两个未跟踪文件。
 
 ## 重新生成
 
-导出提交不进补丁列，所以逐提交生成并跳过它们：
+导出提交与 TODO 进度记录不进补丁列，所以逐提交生成并跳过它们：
 
 ```bash
-EXCL="$(git rev-parse <export-sha-1> <export-sha-2> <export-sha-3>)"
+EXCL="$(git rev-parse <export-or-bookkeeping-sha> ...)"
 n=1
 for c in $(git rev-list --reverse v0.23.0..HEAD); do
   case " $EXCL " in *" $c "*) continue ;; esac
@@ -77,4 +77,4 @@ done
 
 `--no-binary` 必须显式给出：默认会内嵌二进制，单个补丁可到 4 MB，过不了体积门禁。
 生成后仍需剔除 `Binary files ... differ` 所在的整段 `diff --git` 块。未跟踪的交付物按
-同样办法单独生成一个补丁号（当前是 `0056`）。
+同样办法单独生成一个补丁号（当前是 `0057`）。

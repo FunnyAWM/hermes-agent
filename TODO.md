@@ -2,7 +2,7 @@
 
 > **范围**：本文件只覆盖 PC 端——Windows / Linux 上的 Hermes 桌面客户端与它依赖的内核。
 > **Android 客户端、同步中转不在本文件**，另有工作区。
-> **事实源**：`PRD.md` v0.18（2026-11-06）。功能范围与验收判据以 PRD 为准，本文件只把它拆成可执行项。
+> **事实源**：`PRD.md` v0.19（2026-11-06）。功能范围与验收判据以 PRD 为准，本文件只把它拆成可执行项。
 > **统一验收入口**：`scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py`
 > （结构校验恒跑，`--run` 跑每条完成项命令；受阻项必须带 `blocked_reason` 与 `evidence/handoff/` 交接物）。
 > **跨端口径对齐（2026-11-06）**：以 `D:\AndroidProjects\kourichat-next\docs\PRD_ANDROID.md`、
@@ -70,7 +70,8 @@ PC 端一部分活是「验证它确实生效」，而不是「实现它」—�
 | T-21 | §5.5 | 桌面机器人板块收敛为单一 default 机器人：只保留主会话，名称由用户设定；任务请求按语义分派到任务列表或定时任务 | 已完成 | — | `npx vitest run --project ui src/plugins/hermes-bots/{single-bot,roster-pane-derivation,bot-row}.test.*`（18 项）+ `HERMES_PYTHON=<venv> scripts/run_tests.sh tests/agent/test_system_prompt_root.py`（5 项）+ `scripts/check --only health` ok → [evidence/t21.md](./evidence/t21.md) |
 | T-22 | §5.5 | 品牌改为 KouriChat Next：`assets/logo.svg` 生成全平台图标，可见名称改为 KouriChat Next（变体带后缀），内部 appId/userData/CLI 不变 | 已完成 | — | `npx vitest run --project electron electron/product-identity.test.ts scripts/{write-build-stamp,msix-shared,side-by-side-launchers}.test.mjs`（26 项）+ `node -e "require('./apps/desktop/product-identity.cjs')"` → [evidence/branding.md](./evidence/branding.md)；2026-11-06 产物元数据改 `FunnyAWM` / `Rosmontis` / `funnyawm@qq.com`，PE 字段实测 → [evidence/t15-headless.md](./evidence/t15-headless.md) |
 | T-23 | §5.5 | 托盘驻留与网关生命周期：桌面端默认驻留托盘；关闭窗口不停网关；真正退出时停本机 gateway，远程/Cloud 不受影响 | 已完成 | — | `npx vitest run --project electron electron/{gateway-quit,quit-guard,minimize-to-tray}.test.ts`（34 通过）+ `tsc --noEmit` + eslint + `scripts/check` 14 checks ok；实机：关闭窗口后应用与 gateway 存活，真正 Quit 后应用进程归零且 `hermes gateway status` = not running；干净构建 `0dad8e3edb`，安装包哈希 → [evidence/t23-gateway-lifecycle.md](./evidence/t23-gateway-lifecycle.md) |
-| T-24 | §5.5 | 交付物：fork 相对基线的改动导出为 `patches/` 可重放补丁列（49 个补丁：48 个提交 + 未提交的 `INSTALL.md`、`scripts/download-managed-tools.ps1`），二进制图标按体积门禁剔除并附清单 | 已完成 | — | 基线 worktree `git am --3way patches/*.patch` 49 个全过，提交主题与 `main` 一致，仅清单内 82 个二进制素材不同；`scripts/check` 14 checks ok → [patches/README.md](./patches/README.md) |
+| T-24 | §5.5 | 交付物：fork 改动导出为 `patches/` 可重放补丁列（v0.22.5 基线上的 49 个补丁）——已被 T-25 的新基线补丁列取代，旧列仍可按 `git show v0.22.5-fork.1:patches/` 取回 | 已完成 | — | 旧基线验证记录见本行历史；新基线验证 → T-25 |
+| T-25 | §5.5 | 上游基座迁到 v0.23.0（`2bd378ed1b`）：`origin/main` 硬回退 → `main` 复位打 tag → fork 55 个提交正向重放到 `patches-v0.23.0` → 版本号 re-anchor `0.23.0-fork.1` / `0.23.0+fork1` → 补丁列重导出 56 个 | 已完成 | — | `git am --3way patches/00*.patch` 在 v0.23.0 干净 worktree 全过；`npx tsc --noEmit` 0 错误 + hermes-bots 1059 项（仅上游 `cron-detail` 一条在本机失败，纯 v0.23.0 同样失败）+ electron 45 项 + `scripts/run_tests.sh tests/pm/test_local_tools.py tests/agent/test_system_prompt_root.py tests/agent/test_notes_prompt.py`（26 通过）+ `verify_version_anchor.py --commit v0.23.0-fork.1` ok + `scripts/check` 14 checks ok → [evidence/t25-v0.23.0-port.md](./evidence/t25-v0.23.0-port.md) |
 
 **已完成项的回归提示**：T-03 / T-04 状态保持已完成，但 T-18 会改变提示词首段与笔记类别集合，
 批次实施后须重跑 `tests/agent/test_notes_prompt.py`、`tests/agent/test_system_prompt.py` 并刷新证据。
