@@ -1,0 +1,430 @@
+From 338195f7f8ed56a25937627c57b11bc08da17309 Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Fri, 6 Nov 2026 19:52:09 +0800
+Subject: [PATCH] docs(install): carry the headless install guide and offline
+ tool downloader
+
+---
+ INSTALL.md                         | 157 ++++++++++++++++++++++++
+ scripts/download-managed-tools.ps1 | 188 +++++++++++++++++++++++++++++
+ 2 files changed, 345 insertions(+)
+ create mode 100644 INSTALL.md
+ create mode 100644 scripts/download-managed-tools.ps1
+
+diff --git a/INSTALL.md b/INSTALL.md
+new file mode 100644
+index 0000000000..2be79df883
+--- /dev/null
++++ b/INSTALL.md
+@@ -0,0 +1,157 @@
++# KouriChat Next Headless 安装清单
++
++适用对象：`apps/desktop/release-headless/` 下的安装包（NSIS 安装版 / portable 便携版）。
++「headless」指**不携带 Python 运行时的桌面变体**，不是无界面程序——它照常打开 Electron 窗口，
++只是把运行时交给本机的 Hermes 源码树。
++
++## 0. 它如何找到运行时
++
++启动时按顺序解析：
++
++1. `HERMES_DESKTOP_HERMES_ROOT` 环境变量
++2. 构建时烘焙的 `localRuntimeRoot`（本包为 `D:\VSCodeProjects\hermes-agent`）
++3. `HERMES_DESKTOP_HERMES` 环境变量
++4. `%LOCALAPPDATA%\hermes\hermes-agent`
++5. 已发布的 launcher
++6. 报错退出
++
++解释器只认该源码树自己的 `.venv`：`<root>\.venv\Scripts\python.exe`，其次
++`<root>\venv\Scripts\python.exe`；也可用 `HERMES_DESKTOP_PYTHON` 指定。**不回退 PATH 上的
++Python，也不会自动进入 bootstrap 安装。**
++
++实现见 [source-python.ts](apps/desktop/electron/source-python.ts) 与
++[headless-runtime.ts](apps/desktop/electron/headless-runtime.ts)。
++
++## 1. 必需项（缺一项后端起不来）
++
++- [ ] **Hermes 源码树**位于烘焙路径，且包含 `hermes_cli\main.py`
++  - 换路径时设 `HERMES_DESKTOP_HERMES_ROOT`，不要只移动安装包
++- [ ] **Python 3.11–3.14 的 venv**（`pyproject.toml`：`>=3.11,<3.15`）
++- [ ] **Python 依赖已装齐**
++- [ ] **模型凭据**：在 `%LOCALAPPDATA%\hermes\.env` 配置 API Key 或 OAuth，不要写进仓库
++- [ ] **Electron 运行时**：随安装包自带，无需另装
++
++在源码树内执行：
++
++```bat
++cd /d D:\VSCodeProjects\hermes-agent
++uv sync --all-extras --no-extra kittentts
++```
++
++若没有 `.venv`，先建一个真实的 CPython 环境（不要用 Microsoft Store 的 python stub）：
++
++```bat
++uv venv .venv --python 3.14
++uv sync --all-extras --no-extra kittentts
++```
++
++`kittentts` 是显式 opt-in，不装不影响其他能力；需要时单独 `uv sync --extra kittentts`。
++
++核心必需模块：`openai`、`rich`、`python-dotenv`、`ruamel.yaml`、`httpx`。缺失时
++`hermes doctor` 会报 Required Packages 失败。
++
++## 2. 基础宿主工具（建议全装）
++
++headless 不密封这些工具；缺失只让对应能力不可用，聊天、终端、文件、任务列表、定时任务、
++子代理仍可用。
++
++| 工具 | 用途 | 检查 |
++|---|---|---|
++| `git`（含 Git for Windows Bash） | 工作区、git 工具 | `git --version` |
++| `ripgrep`（`rg`） | 代码搜索；缺失时降级 grep | `rg --version` |
++| `uv` | PM 安装、修复、锁依赖 | `uv --version` |
++| `node` + `npm` | npx 型 MCP、部分技能与工具 | `node -v` / `npm -v` |
++| `ffmpeg` | 音视频处理与转码 | `ffmpeg -version` |
++| `gh` | GitHub 操作 | `gh --version` |
++
++```bat
++.venv\Scripts\python.exe -m hermes_cli.main pm install git ripgrep node npm ffmpeg gh uv
++```
++
++PM 下载源多为 GitHub release；网络不通时改用系统包管理器或官方安装包。
++
++## 3. 按能力选装
++
++| 能力 | 需要的包 | 说明 |
++|---|---|---|
++| 浏览器工具 | `chromium` | 约 170 MB；也可在 `config.yaml` 设 `browser.executable_path` 指向已有 Chromium |
++| Bitwarden Secrets | `bws` | 仅使用 Bitwarden 密钥注入时 |
++| 桌面操作（computer-use） | `cua-driver` | 仅使用桌面控制时 |
++| 本地语音转写 | `whispercpp-cpu` | 仅使用本地 STT 时 |
++| 本地模型推理 | `llamacpp-cpu` 或 GPU 变体 | NVIDIA → `llamacpp-cuda`；AMD → `llamacpp-vulkan` / `llamacpp-hip`；纯 CPU → `llamacpp-cpu`。只装一个 |
++
++```bat
++.venv\Scripts\python.exe -m hermes_cli.main pm install chromium
++.venv\Scripts\python.exe -m hermes_cli.main pm install bws cua-driver whispercpp-cpu llamacpp-cpu
++```
++
++云端模型、消息平台、语音、文档解析等 Python extras 由 `uv sync --all-extras` 覆盖；平台账号
++凭据仍在 `%LOCALAPPDATA%\hermes\.env`。
++
++## 4. 安装后自检
++
++- [ ] 版本可执行：
++
++  ```bat
++  .venv\Scripts\python.exe -m hermes_cli.main --version
++  ```
++
++- [ ] 诊断全绿（无 FAIL）：
++
++  ```bat
++  .venv\Scripts\python.exe -m hermes_cli.main doctor
++  ```
++
++  重点看 Required Packages、External Tools、Tool Availability 三节。
++
++- [ ] 启动 `KouriChat Next Headless.exe`（改名前构建的包为 `Hermes Headless.exe`）后，
++  `%LOCALAPPDATA%\hermes\logs\desktop.log` 出现：
++
++  ```
++  [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
++  [gateway-route win=main] published connection=local
++  ```
++
++- [ ] 设置 → About → Runtime 显示 `external/source`，而不是 bootstrap。
++
++headless 使用独立的产品身份与 userData（appId `com.nousresearch.hermes-headless`），可与正式版
++并存，不会覆盖正式版的会话与配置。
++
++## 5. 换机与离线
++
++- [ ] 源码树放在同一路径，**或**设 `HERMES_DESKTOP_HERMES_ROOT` 指向实际位置
++- [ ] venv 不在默认位置时，设 `HERMES_DESKTOP_PYTHON` 指向该解释器
++- [ ] 目标解释器必须已装完整依赖；headless 不会替你补
++- [ ] `pm install` 失败且网络不可用时，从同平台、同架构的机器复制
++  `%LOCALAPPDATA%\hermes\tools\` 后再试
++
++## 6. 与 bundled 完整版的区别
++
++bundled 版把 Python、Node、Chromium 等受管工具密封进安装包，因此体积大、开箱即用；当前该变体
++仍因缺少 11 个受管包而受阻（`bws`、`chromium`、`cua-driver`、`gh`、`git`、`llamacpp-cpu/cuda/hip/vulkan`、
++`npm`、`python`）。headless 版反过来：包小，但要求目标机器的源码树与宿主工具齐备。
++
++## 7. 常见故障
++
++| 现象 | 原因 | 处理 |
++|---|---|---|
++| 启动提示找不到 Hermes 运行时 | 烘焙路径不存在，或没有可用 venv | 设 `HERMES_DESKTOP_HERMES_ROOT` / `HERMES_DESKTOP_PYTHON`，或重建 `.venv` |
++| `ModuleNotFoundError` | 依赖未装齐或装到了别的解释器 | 在目标 venv 内重跑 `uv sync --all-extras --no-extra kittentts` |
++| 浏览器工具报 Chromium 缺失 | 未装 PM Chromium，也未配置路径 | `pm install chromium` 或设 `browser.executable_path` |
++| `pm install` 卡住 / 下载失败 | GitHub release 不可达 | 放通网络，或离线复制 `%LOCALAPPDATA%\hermes\tools\` |
++| 用 Store 版 Python 建 venv 失败 | Microsoft Store 的 python 是重定向 stub | 安装真实 CPython 3.11–3.14，再 `uv venv` |
++
++## 8. 参考环境（2026-11-06 验证）
++
++| 项 | 版本 |
++|---|---|
++| Python（`.venv`） | 3.14.2 |
++| uv | 0.13.7 |
++| git | 2.56.0 |
++| ripgrep | 15.0.0 |
++| node / npm | 26.13.0 / 11.21.0 |
++| ffmpeg | 8.0.1 |
++| gh | 2.102.0 |
++
++构建与打包流程见 [BUILDING.md](apps/desktop/BUILDING.md)，headless 变体的实现与实测记录见
++[evidence/t15-headless.md](evidence/t15-headless.md)。
+diff --git a/scripts/download-managed-tools.ps1 b/scripts/download-managed-tools.ps1
+new file mode 100644
+index 0000000000..99c80bdb34
+--- /dev/null
++++ b/scripts/download-managed-tools.ps1
+@@ -0,0 +1,188 @@
++#Requires -Version 5.1
++<#
++.SYNOPSIS
++    Download every managed tool package the Windows x64 desktop payload needs.
++
++.DESCRIPTION
++    Resumes into a build-owned store; re-running verifies existing entries and
++    skips them. The default store is outside user state, so this script does not
++    touch %LOCALAPPDATA%\hermes application data.
++
++    Package selection comes from pm/lock.json for the current target. Packages
++    that declare the target unsupported (for example iron-proxy on Windows) are
++    skipped automatically.
++
++.PARAMETER Store
++    Destination tool store. Default: <repo>\.cache\desktop-inputs\tools
++
++.PARAMETER StageToPayload
++    After a complete download, copy the verified tools into
++    apps\desktop\build\agent-payload\tools so `npm run payload` can reuse them
++    without downloading the tool layer again.
++
++.PARAMETER ListOnly
++    Print the resolved package set and exit without downloading.
++
++.PARAMETER Retries
++    Number of full passes after the first one when network failures occur.
++    Default: 3.
++
++.EXAMPLE
++    powershell -ExecutionPolicy Bypass -File .\scripts\download-managed-tools.ps1 -ListOnly
++
++.EXAMPLE
++    powershell -ExecutionPolicy Bypass -File .\scripts\download-managed-tools.ps1
++
++.EXAMPLE
++    powershell -ExecutionPolicy Bypass -File .\scripts\download-managed-tools.ps1 -StageToPayload
++#>
++[CmdletBinding()]
++param(
++    [string]$Store = "",
++    [string]$Python = "",
++    [switch]$StageToPayload,
++    [switch]$ListOnly,
++    [int]$Retries = 3
++)
++
++Set-StrictMode -Version Latest
++$ErrorActionPreference = "Stop"
++
++$repo = Split-Path -Parent $PSScriptRoot
++if (-not $Store) {
++    $Store = Join-Path $repo ".cache\desktop-inputs\tools"
++}
++$Store = [System.IO.Path]::GetFullPath($Store)
++$payloadStore = [System.IO.Path]::GetFullPath((Join-Path $repo "apps\desktop\build\agent-payload\tools"))
++$logDir = Split-Path -Parent $Store
++$log = Join-Path $logDir "download-managed.log"
++New-Item -ItemType Directory -Force -Path $logDir | Out-Null
++
++if (-not $Python) {
++    $candidates = @(
++        (Join-Path $repo ".venv\Scripts\python.exe"),
++        (Join-Path $repo "venv\Scripts\python.exe")
++    )
++    $Python = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
++}
++if (-not $Python -or -not (Test-Path -LiteralPath $Python)) {
++    throw "No Python interpreter found. Create .venv first (uv sync --all-extras --no-extra kittentts) or pass -Python <path>."
++}
++$Python = (Resolve-Path -LiteralPath $Python).Path
++
++$env:PYTHONUTF8 = "1"
++$env:PYTHONIOENCODING = "utf-8"
++
++$worker = @'
++import sys
++from pathlib import Path
++
++from pm import prepare_tools, stage_tools
++from pm.install import _lockfile
++from pm.lock import Facts
++from pm.registry import get_package
++from pm.store import Store, current_target
++
++mode = sys.argv[1]
++store = Path(sys.argv[2]).resolve()
++payload = Path(sys.argv[3]).resolve()
++stage = sys.argv[4] == "1"
++target = current_target()
++lock = _lockfile()
++
++names = [name for name in lock.names() if not get_package(name).internal or name == "uv"]
++if "python" not in names:
++    names.append("python")
++names = [name for name in names if get_package(name).missing_reason(target) is None]
++
++print(f"target={target} packages={len(names)} store={store}", flush=True)
++for name in names:
++    print(f"  - {name} {lock.version(name)}", flush=True)
++if mode == "list":
++    raise SystemExit(0)
++
++store.mkdir(parents=True, exist_ok=True)
++store_handle = Store(store)
++failures = []
++for index, name in enumerate(names, 1):
++    print(f"[{index}/{len(names)}] {name} {lock.version(name)}", flush=True)
++    try:
++        prepare_tools([name], out=store, target=target)
++    except Exception as exc:
++        failures.append((name, str(exc)))
++        print(f"  FAIL {name}: {exc}", flush=True)
++        continue
++    fact = Facts(store / "facts.json").get(name)
++    entry = fact.get("entry") if fact else None
++    if not entry:
++        print(f"  WARN {name}: facts entry is missing", flush=True)
++        failures.append((name, "facts entry is missing"))
++        continue
++    root = store_handle.entry(entry)
++    size = sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
++    print(f"  OK {entry} ({size / (1024 * 1024):.1f} MiB)", flush=True)
++
++if failures:
++    print(f"FAILED {len(failures)} package(s):", flush=True)
++    for name, reason in failures:
++        print(f"  - {name}: {reason}", flush=True)
++    raise SystemExit(1)
++
++print(f"DONE {len(names)} package(s) verified in {store}", flush=True)
++if stage:
++    print(f"staging verified tools into {payload}", flush=True)
++    stage_tools(names, source_store=store, out=payload, target=target)
++    print(f"STAGED {payload}", flush=True)
++else:
++    print("Next: re-run with -StageToPayload to populate apps\\desktop\\build\\agent-payload\\tools.", flush=True)
++'@
++
++Write-Host "Repository : $repo"
++Write-Host "Interpreter: $Python"
++Write-Host "Store      : $Store"
++Write-Host "Log        : $log"
++Write-Host ""
++
++Push-Location -LiteralPath $repo
++try {
++    $mode = if ($ListOnly) { "list" } else { "download" }
++    $stageFlag = if ($StageToPayload -and -not $ListOnly) { "1" } else { "0" }
++    $attempts = [Math]::Max(1, $Retries)
++    $exit = 1
++    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
++        if (-not $ListOnly) {
++            Write-Host "=== pass $attempt / $attempts ==="
++        }
++        $previous = $ErrorActionPreference
++        $ErrorActionPreference = "Continue"
++        try {
++            $worker | & $Python -u - $mode $Store $payloadStore $stageFlag 2>&1 |
++                Tee-Object -FilePath $log -Append
++            $exit = $LASTEXITCODE
++        }
++        finally {
++            $ErrorActionPreference = $previous
++        }
++        if ($exit -eq 0) { break }
++        if ($attempt -lt $attempts) {
++            $delay = [Math]::Min(30, 5 * $attempt)
++            Write-Host "Retrying in $delay seconds (exit $exit)..."
++            Start-Sleep -Seconds $delay
++        }
++    }
++    if ($exit -ne 0) {
++        throw "Managed tool download failed after $attempts pass(es). See $log"
++    }
++}
++finally {
++    Pop-Location
++}
++
++if (-not $ListOnly) {
++    Write-Host ""
++    Write-Host "Managed tools are ready."
++    if (-not $StageToPayload) {
++        Write-Host "For an offline `npm run payload`, re-run with -StageToPayload."
++    }
++    Write-Host "Python wheels still come from PyPI during the payload venv step unless the uv cache is warm."
++}
+
+base-commit: 2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19
+prerequisite-patch-id: 0404c52fd67e819cc55c05241091da5488d5c864
+prerequisite-patch-id: 3a16c804ba9beb21225b01a30d04cfcb1ad26473
+prerequisite-patch-id: a9191c7bd723dabeb09461d367ea6ed04a10d71e
+prerequisite-patch-id: 3cf5bed1193ef34735a1d40c149aa6c26228ad20
+prerequisite-patch-id: a0873c0ecd784e38334170e271f3963c92fcb4de
+prerequisite-patch-id: 6a8b3b0f7b6c38c2248459506e25aebc56d7549d
+prerequisite-patch-id: 500cebcea3f89202fbe438ee36cfc5ef9996b257
+prerequisite-patch-id: a1384d96d4a927db0ae2b8347e6eef3f87c600fb
+prerequisite-patch-id: e2d0cb77016e6bc5d3d79620507863acc6ef863b
+prerequisite-patch-id: c8bac3fd6e45e45fa5f608f56c7b8a47b38be812
+prerequisite-patch-id: cd87ecad912d38e71e0ba9546740a1f7c3fb5f69
+prerequisite-patch-id: de26b66380ecdf47badc0a8abcb210a589259420
+prerequisite-patch-id: 7b3299448ff43f2f92ab92351aa6758a07e617da
+prerequisite-patch-id: 90730b33090f07521222c53662aaf53354d8313b
+prerequisite-patch-id: b6a4926656e650017452ed2cf194c27e159998e5
+prerequisite-patch-id: 1d3a66370c38346a1d776b5128fead66faa2e6ac
+prerequisite-patch-id: b11ad65386c9367ad6db06b16e93168525077449
+prerequisite-patch-id: d8a4f4012c65a56f137c3365de08503bc856f981
+prerequisite-patch-id: 394d3df59a3c23d0984b6107ef94152ac20ed46f
+prerequisite-patch-id: 9bccc1ea7188ab08acd833529426a2640cba3622
+prerequisite-patch-id: ad0028e4f2cd870cb60baa1b8dee0cd1acf6a228
+prerequisite-patch-id: 112c5b9da1948d8ec2788dc0c593a3e538675e6c
+prerequisite-patch-id: 6c3bce5812d63258548a380b69a9b6791c105cc4
+prerequisite-patch-id: bd12a9a28d2fe4cc886a863839771be094154842
+prerequisite-patch-id: 4216ec68ab1e104dfe4a95f55b85e19e7bb31fc8
+prerequisite-patch-id: 7a00de895723eeb294b9c67717aa0f653c8b16bd
+prerequisite-patch-id: 63c1d3a40cd1156bcc82acad61f771b99e26b140
+prerequisite-patch-id: 12e4f7a9e022d1be61e53227b7759599d7f83aac
+prerequisite-patch-id: 2f1ef426b50e5c8a993862022bbddbdfe8868392
+prerequisite-patch-id: 6da59c1c7a24dfd00f65134a9f5ccd693b1f4ce9
+prerequisite-patch-id: 89e933f39cc7ed1634dd74eaeaeef6f846b77a93
+prerequisite-patch-id: 826ea2e4dbbf986c6235dc946ecd41a46a49d270
+prerequisite-patch-id: 386f3e3621b05cc10aa1730462bd1dc643323fde
+prerequisite-patch-id: bebfe106d27da4abc0b338c9ab4d19132f5915da
+prerequisite-patch-id: 697986c175a4e2afbc791a3fe28b7331c74d79d2
+prerequisite-patch-id: dbd64d20c09751314411b48c9543a391cb519370
+prerequisite-patch-id: 76a3f955e8627bd7d11e71a70d389b9ca359fda9
+prerequisite-patch-id: 6da8ea6ac800fe740a7a2c0b47510b94140863ed
+prerequisite-patch-id: ac50be7d9166d0df9523f7bafed7976da15244b4
+prerequisite-patch-id: 1ca80a4a9cabeae9484be6e7514654732bcb007e
+prerequisite-patch-id: bfce74f7046c9b370880379ad33297dcd436e309
+prerequisite-patch-id: b963590a22c0fca9dbf1b49ef33cbec92a5c07d4
+prerequisite-patch-id: 825e3287bd0ef8cba7d811fe7b39f9c4aebb7bd4
+prerequisite-patch-id: 48a08e6a63cff45e031f1869c02a9578dbcee2da
+prerequisite-patch-id: b37f35d62e599a7c455659edafd629fcee06f32d
+prerequisite-patch-id: 0e3a1ea25943d798fd5814c5c48e95d54bcafec2
+prerequisite-patch-id: 79224df2bf3e297a971928411166dc04a9d77048
+prerequisite-patch-id: 613995c956e16a4e89d9d7aeb22f7e92c3180ac2
+prerequisite-patch-id: 62927440d4ce39b53918823c67d9a3b0b908618a
+prerequisite-patch-id: 026f95cc7e05187dc94ea1d956262146a078dd02
+prerequisite-patch-id: 901c946a4688b55770cedb45502811bf3db72cdb
+prerequisite-patch-id: 53da7f6d5a8515ca1ee2a07769c94322273b03d1
+prerequisite-patch-id: 6eb66c6b3c37c4d9444c4a57f5f133d8362819db
+prerequisite-patch-id: 5c52bea45319e547a734cdfab257babdd08ff644
+prerequisite-patch-id: 5fc01834ca755594d0266f5b29a002342f25c6e6
+prerequisite-patch-id: f9391764cee93dc0e1f1675002171864f48431b1
+prerequisite-patch-id: f884bae142b180c4af2ddc637d1cfd208fcaee41
+prerequisite-patch-id: ee43f5d41e4d5b85d21b78dd74b1be7b3449384a
