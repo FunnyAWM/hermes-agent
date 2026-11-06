@@ -1,0 +1,15 @@
+{
+  "mode": "python-probe",
+  "duration": 8.0,
+  "loopback": [
+    "127.0.0.1"
+  ],
+  "allowed": [],
+  "violations": [],
+  "remote_endpoints": [
+    "127.0.0.1:59637",
+    "127.0.0.1:59638"
+  ],
+  "unattributed_non_loopback": [],
+  "ok": true
+}

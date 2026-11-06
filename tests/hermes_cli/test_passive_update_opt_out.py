@@ -24,6 +24,13 @@ def _checkout_with_ahead_origin(tmp_path):
     return local
 
 
+def test_default_config_ships_passive_checks_off():
+    """T-11: the shipped default must not opt a fresh profile into update traffic."""
+    from hermes_cli.config_defaults import DEFAULT_CONFIG
+
+    assert DEFAULT_CONFIG["updates"]["check"] is False
+
+
 def test_passive_check_is_disabled_unless_the_user_opts_in(tmp_path):
     """PRD §8.1 隐 02: a fresh PC profile's only outbound link is the model endpoint."""
     from hermes_cli.source_check import check_for_updates
