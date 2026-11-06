@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 import hermes_yaml as yaml
 import pytest
@@ -37,7 +38,13 @@ def test_home_layout_joins_sibling_union(tmp_path, monkeypatch, layout):
     import hermes_constants
 
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    root = tmp_path / (".hermes" if layout == "default" else "data-root")
+    if layout == "default" and sys.platform == "win32":
+        # The Windows default lives under %LOCALAPPDATA%\hermes, not ~/.hermes.
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        default_root = tmp_path / "hermes"
+    else:
+        default_root = tmp_path / ".hermes"
+    root = default_root if layout == "default" else tmp_path / "data-root"
     active = root / "profiles/active" if layout == "profile" else root
     if layout == "default":
         monkeypatch.delenv("HERMES_HOME", raising=False)

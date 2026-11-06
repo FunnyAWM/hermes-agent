@@ -1,12 +1,15 @@
 """install.sh child output: one status line on a terminal, the full stream in CI."""
 import os
 from pathlib import Path
-import pty
 import re
 import shlex
 import subprocess
 
 import pytest
+
+# Module-level import, so Windows must skip before pytest sees the platform
+# mark: `pty` needs termios, which does not exist there.
+pty = pytest.importorskip("pty", reason="install.sh terminal capture needs a pty")
 
 pytestmark = pytest.mark.platforms("posix")
 INSTALL_SH = Path(__file__).resolve().parents[3] / "scripts" / "install.sh"

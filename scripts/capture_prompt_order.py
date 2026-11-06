@@ -67,7 +67,7 @@ def _stub_agent(memory_store):
 
 def main() -> int:
     sys.path.insert(0, str(REPO_ROOT))
-    with tempfile.TemporaryDirectory(prefix="hermes-t03-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="hermes-t03-", ignore_cleanup_errors=True) as tmp:
         home = Path(tmp) / "home"
         project = Path(tmp) / "project"
         (home / "memories").mkdir(parents=True)

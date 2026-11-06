@@ -99,7 +99,8 @@ def _child(definitions, code, *, setup=""):
     )
     return subprocess.run(
         [sys.executable, "-I", "-B", "-c", script],
-        input=json.dumps(definitions), capture_output=True, text=True, timeout=30,
+        input=json.dumps(definitions), capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=30,
         check=False,
     )
 

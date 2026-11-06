@@ -30,8 +30,10 @@ DESKTOP_PACKAGE = "apps/desktop/package.json"
 
 
 def _git(repo: Path, *args: str) -> str | None:
-    result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True,
-                            encoding="utf-8", timeout=60, check=False)
+    result = subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", timeout=60, check=False,
+    )
     return result.stdout.strip() if result.returncode == 0 else None
 
 

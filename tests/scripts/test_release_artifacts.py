@@ -33,7 +33,7 @@ def test_windows_metadata_is_read_from_package_and_stale_stamp_is_rejected(tmp_p
     root = tmp_path / 'release'
     root.mkdir()
     package = root / 'Product-1.2.3-win-x64.msix'
-    manifest = '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"><Identity Name="Product" Publisher="CN=Test" Version="1.2.3.0" ProcessorArchitecture="x64"/><Applications><Application Id="App"/></Applications></Package>'
+    manifest = '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"><Identity Name="Product" Publisher="CN=Test" Version="1.2.3.0" ProcessorArchitecture="x64"/><Applications><Application Id="App" Executable="Product.exe"/></Applications></Package>'
 
     def write_package(sha, receiver=None):
         with zipfile.ZipFile(package, 'w') as archive:
@@ -44,6 +44,12 @@ def test_windows_metadata_is_read_from_package_and_stale_stamp_is_rejected(tmp_p
             }))
 
     write_package(commit)
+    if os.name == "nt":
+        # Windows has no code path that reads the version from the MSIX alone;
+        # record() falls back to the unpacked executable beside it.
+        unpacked = root / "Product-unpacked"
+        unpacked.mkdir()
+        shutil.copy2(sys.executable, unpacked / "Product.exe")
     out = root / 'metadata-windows-x64.json'
     original = package.read_bytes()
     record('windows', 'x64', root, tag, commit, out)

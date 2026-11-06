@@ -277,7 +277,7 @@ def run_python_probe(duration: float, allowed_hosts: set[str], home: Path) -> di
             proc.kill()
         proc.wait(timeout=30)
     lines = (
-        audit_path.read_text(encoding="utf-8").splitlines()
+        audit_path.read_text(encoding="utf-8-sig").splitlines()
         if audit_path.exists()
         else []
     )

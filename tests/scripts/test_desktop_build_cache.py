@@ -16,6 +16,10 @@ from tests.ci.desktop_release_roles import gate
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/ci/desktop_build_cache.py"
 
+# The transport under test is the bash composite used by POSIX release lanes;
+# Windows packaging rebuilds through PowerShell.
+pytestmark = pytest.mark.platforms("posix")
+
 
 def source_tree(root):
     root.mkdir()

@@ -11,12 +11,19 @@ from hermes_platform.host.facts import native_arch
 from pm.environments import install_state_dir, site_packages
 from pm.lock import Lockfile
 from tests.hermes_cli.test_source_launcher_publication import fixture_tree
+from tests.preconditions import requires_tool
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.platforms("windows")
-@pytest.mark.parametrize("shell", ["powershell", "pwsh"])
+@pytest.mark.parametrize(
+    "shell",
+    [
+        "powershell",
+        pytest.param("pwsh", marks=requires_tool("pwsh")),
+    ],
+)
 def test_powershell_stage_publishes_without_a_checkout_venv(tmp_path, monkeypatch, shell):
     repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
     # Exercise the real pin reader, including the nested artifact objects.
