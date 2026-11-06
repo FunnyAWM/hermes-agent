@@ -107,6 +107,38 @@ Linux 包 maintainer 同步为 `FunnyAWM <funnyawm@qq.com>`；About 面板版权
 （`local-gateway.ts`：desktop 只拥有有界 CLI 客户端，不杀 detached owner），
 需要停用 `hermes gateway stop`。
 
+## 产物（`release-headless/`，基座 v0.23.0 重建，2026-11-06 20:52）
+
+构建（干净工作树 `ac3d203a74`，`git status` 只有两个未跟踪交付物）：同上一节的命令，
+只是环境变量指向新基线；`npm run build` 与 `electron-builder` 分别以退出码 0 结束。
+
+| 文件 | 字节 | SHA-256 |
+|---|---|---|
+| `HermesHeadless-0.23.0-fork.1-win-x64-setup.exe` | 146,509,205 | `FD5E0EBB8D48D7C840F041633BC9C8963E7AE2BBBA756BEF7CFA504B8E1D2ADA` |
+| `HermesHeadless-0.23.0-fork.1-win-x64-portable.exe` | 146,313,050 | `E5AC654D58FC2549E3B87DD897CCBE82187D10C63F6272D1B796B9CDEEE378C3` |
+
+包内 stamp（`release-headless/win-unpacked/resources/install-stamp.json`）：
+
+```json
+{"commit":"ac3d203a740850c292507ce512081d57c40ec144","branch":"patches","dirty":false,
+ "payload":"headless","distribution":"desktop-app","updateMechanism":"external",
+ "localRuntimeRoot":"D:\\VSCodeProjects\\hermes-agent"}
+```
+
+双击等价启动实测（`win-unpacked\KouriChat Next Headless.exe`，不设任何环境变量，
+2026-11-06 20:56）：
+
+```
+20:56:22,534 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
+20:57:02,047 [backend] Hermes gateway is ready
+20:57:02,116 [gateway-route win=main] published connection=local
+20:57:10,259 [bot-roster win=main] snapshot active=local answered=70b8548e expected=70b8548e rows=[local/default=""]
+```
+
+即：烘焙根命中、后端就绪、连接发布为 local、机器人板块只有 `local/default` 一行，
+全程无 bootstrap 日志。`CloseMainWindow` 后进程仍为 4 个（T-23 的托盘驻留：关闭窗口只隐藏，
+应用与 gateway 继续运行，`hermes gateway status` = running PID 46268），真正退出需托盘 Quit。
+
 ## 边界
 
 - 构建戳 `dirty: false`，与 `0d1be39e66` 源码对应；更早的 `8b7d5a18af` 与 `58d1f503f6f7`
@@ -118,11 +150,27 @@ Linux 包 maintainer 同步为 `FunnyAWM <funnyawm@qq.com>`；About 面板版权
 - 未跑完整 electron vitest 套件（只跑改动相关文件 + typecheck + eslint）；`release-headless/`
   已加入 `.gitignore`，二进制不入库。
 
-## 完整版（bundled）当前阻塞（T-20）
+## 完整版（bundled）：2026-11-06 裁决不做
 
 `prepare_tools` 需要 15 个受管包，账号 store 只有 ffmpeg/node/ripgrep/uv；缺 11 个：
 `bws chromium cua-driver gh git llamacpp-cpu/cuda/hip/vulkan npm python`。其中 python 为
 `cpython-3.14.9+20261021`（GitHub release 资产）。本机 egress 半通（PyPI 200、codeload 301、
 `github.com` 000），且密封 payload 按设计不复用宿主工具（`pm/local_tools.py:154`）。
-解除条件：放通 GitHub release 资产后跑 `scripts/bundles/native_build.py --prepare-only`，
-或从另一台机器搬运 `tools/` + `uv-cache` 后离线 `stage_tools`。
+
+2026-11-06 把 15 个包全部离线取回（`.cache\desktop-inputs\tools`，3.6 GB，脚本
+`scripts/download-managed-tools.ps1` 断点续传跑通）后仍判不做，原因换成体量：密封 payload 的
+`stage_tools` + `desktop.py --commit` 要把 CPython、node、uv、ffmpeg 等一并打进包，产物从
+headless 的约 140 MB 涨到 3.7 GB 以上，使用者确认「bundle 太重了」，改为**只发 headless 包，
+环境由用户按需补齐**，口径写进 `INSTALL.md`（§3 依赖、§4 运行时阶梯、§5 工具、§6 镜像）。
+
+上游原生通路仍未走通，两处障碍与解法都记在案：
+
+- `scripts/bundles/desktop.py --commit` 拒绝 fork 版本号（要求 `X.Y.Z`，本 fork 是
+  `0.23.0+fork1`）→ 走 fork 打包路径 `npm run payload` + `npm run build` + `electron-builder
+  --config electron-builder.fork.cjs`。
+- PM 的 3 天供应链年龄门禁（uv `exclude-newer`）要求索引报上传时间：华为云镜像不报，
+  解析在 `setuptools>=40.8.0` 上无解；清华 `https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple`
+  报时间且 wheel 可取，实测可用（`set UV_INDEX_URL=…`，不改仓库配置、不绕过门禁）。
+
+如果将来要出完整版：放通 GitHub release 资产后 `scripts/bundles/native_build.py --prepare-only`
+→ `--prepared` → `HERMES_DESKTOP_VARIANT=bundled`，或搬运 `tools/` + `uv-cache` 离线 `stage_tools`。

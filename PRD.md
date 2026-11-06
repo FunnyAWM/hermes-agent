@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.19（草稿，待评审） |
+| 文档版本 | v0.20（草稿，待评审） |
 | 日期 | 2026-11-06 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -208,6 +208,7 @@
 - **安装目录与数据目录分离。** 应用数据在 `HERMES_HOME`，覆盖安装只换程序，不动 `memories/`、`notes/`——这是 §9.3 回归的判据。
 - **优先复用本机环境（T-16，2026-11-03 使用者确认）。** 安装与开发初始化先检查本机已有的 Python、uv、Git、Node/npm 等所需软件；符合版本与运行要求就直接使用，后续 PM 不重复安装同类基础环境。Python 须符合 PM 所需的主次版本与本机架构；Node/npm 须满足项目要求；其余工具按锁定版本作兼容下限。缺失、不兼容或无法运行时才获取锁定版本。Hermes 的项目依赖仍安装到独立环境，不向用户全局 Python 写依赖；重复执行复用已有依赖环境。本机工具只读使用，不写入受管制品校验记录；密封发行包和跨平台产物继续按锁文件制作。版本比较只在锁文件写的是纯数字版本时进行，写成通道名或测试值时按不兼容处理，直接获取锁定版本。用户声明的 MCP stdio 命令 `uv`/`uvx` 不受本机复用影响，始终使用受管副本，保证与用户全局环境隔离。验收覆盖「兼容时无工具下载」「不兼容时回退」「后续 PM 沿用」「重复执行不重复安装」。
 - **发行变体分两种（2026-11-06 新增）。** `HERMES_DESKTOP_VARIANT=bundled` 出**完整版**：运行时随包，安装即离线可用；受管制品必须按 `pm/lock.json` 制作，宿主已装工具不被复用。`HERMES_DESKTOP_VARIANT=headless` 出**headless 版**：包里不带运行时，按本机阶梯解析（`HERMES_DESKTOP_HERMES_ROOT` → 构建期记录的 `localRuntimeRoot` → `HERMES_DESKTOP_HERMES` → `%LOCALAPPDATA%\hermes\hermes-agent` → 已发布 launcher），找不到时报错并给出下一步，**永不进入 bootstrap 安装**。两种身份独立（显示名、appId、userData、产物名互不重叠），可并存安装；构建期记录的本机根是数据，不是探测。上游 `light` 变体保持原语义（无运行时、仅远程），不在此列。
+- **本期只发 headless 包（2026-11-06 使用者裁决）。** 完整版的能力保留在构建里，但不进发行计划：15 个受管包已全部离线取回（3.6 GB）后仍判不做，密封 payload 会把产物从约 140 MB 推到 3.7 GB 以上，使用者口径是「bundle 太重了」。改为**用户按实际需要补环境**，所需环境、安装步骤、运行时阶梯、按需工具与镜像限制统一写进仓库根的 `INSTALL.md`（面向使用者，随补丁列交付）；`PRD §9` 的验收判据不因该裁决变化，headless 包的实机启动证据见 `evidence/t15-headless.md`。
 - **机器人板块只有一个助手（2026-11-06 使用者确认）。** 对齐手机端「聊 03 单一会话 + 设 07 自定义名称」：桌面机器人板块只展示 default profile 一行，其他 profile 继续运行但不再列出；工具栏不提供新建机器人/群聊/分组/筛选，行菜单只保留「打开对话」与「编辑资料」（名称在编辑资料里由用户设定）。机器人只有唯一的主会话，不再从机器人板块创建侧聊或跳转最近会话。板块之外的全局会话侧栏不属于本条约束。
 - **任务分派按语义路由（2026-11-06 使用者确认）。** 「记录 / 跟踪 / 指派一件事」写入 Hermes 内置任务列表（`todo_list`，会话级任务面板）；「指定时间 / 周期 / 提醒」创建定时任务（`cronjob_manage`）。两者都启用时才注入路由提示；`delegate_task` 子代理仍在核心工具集内，不需要新 UI。任务列表是会话级的，定时任务跨会话持久——语义路由不改变这一点。
 - **品牌改为 KouriChat Next（2026-11-06 使用者确认）。** 可见名称按变体为 `KouriChat Next` / `KouriChat Next Light` / `KouriChat Next Agent` / `KouriChat Next Headless`，图标统一来自 `apps/desktop/assets/logo.svg`。内部的 `appId`（`com.nousresearch.hermes*`）、`appNamePascal`、userData 键与 CLI 名 `hermes` 保持不变，避免覆盖安装、更新通道与用户数据换目录；因此安装包文件名仍以 `Hermes*` 开头。对外分发前仍需单独定 `appId` 与安装包标识。
@@ -711,3 +712,4 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.17 | 2026-11-06 | §5.4 登记 `hermes_cli/lan_addresses.py` 与 `web_server.py` 的局域网横幅：非回环绑定打印可达 IPv4 地址与配对提示，默认回环绑定与鉴权门禁不变（T-09b 远 01） |
 | v0.18 | 2026-11-06 | 收尾三件事：① T-11 用真实 Electron NetLog 结案，发现并修掉内置主题远程字体外联（§5.4 新登记 `apps/desktop/src/themes/presets.ts`），采集器改为解析数字事件类型并优雅退出；② T-12 在本机用 NSIS 覆盖安装两次结案（隔离 `HERMES_HOME` 逐字节保留、真实 `~/.hermes` 不动、从不卸载），T-15 产物在干净提交 `56b7516be4` 重建并刷新哈希；③ T-16 的 65 项失败逐条分类到 `evidence/t16-failures.md`（58 项已修或改为带理由的门禁，7 项为既有 Windows/环境残余），新增统一验收入口 `scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py` 与 `evidence/handoff/` 交接物 |
 | v0.19 | 2026-11-06 | 上游基座由 v0.22.5（`f5e0dd8e9b`）改钉到 **v0.23.0（`2bd378ed1b`）**：`origin/main` 先硬回退到上游，`main` 复位到 v0.23.0 并打本地 tag `v0.23.0`；fork 的 55 个提交正向重放（`git rebase --onto v0.23.0`）落在 `patches-v0.23.0` 分支，版本号随之改为 `0.23.0-fork.1` / `0.23.0+fork1`（换基座 N 归 1），补丁列重导出为 57 个补丁（56 个提交 + 1 个未跟踪交付物补丁）。桌面端两处行为差异按 fork 规则处理：单机器人面板不显示网关群聊（`groups.list` 的房间不再进列表），`pm/install.py` 的宿主工具复用与上游 `env_for` 单次依赖优先遍历合并保留两者 |
+| v0.20 | 2026-11-06 | §5.5 新增「本期只发 headless 包」裁决：完整版不进发行计划（受管包 3.6 GB 已离线备齐，密封后产物 3.7 GB 起），改由用户按需补环境，环境要求与安装步骤落到仓库根 `INSTALL.md`；headless 包在 v0.23.0 基座（干净提交 `ac3d203a74`）重建并实机启动验证，产物哈希与日志见 `evidence/t15-headless.md`（T-20 相应改为裁决不做，交付口径记入 T-26） |
