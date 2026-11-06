@@ -1296,10 +1296,12 @@ def _on_server_started(
         # Auth-gated JSON-RPC/WS only — announce the bind, not a URL. flush:
         # a piped stdout otherwise surfaces this minutes after the sentinel.
         print(f"  Hermes backend listening on {host}:{actual_port}", flush=True)
+        _print_lan_banner(host, actual_port)
     else:
         from hermes_cli.url_utils import format_url_host
 
         print(f"  Hermes Web UI → http://{format_url_host(host)}:{actual_port}")
+        _print_lan_banner(host, actual_port)
     _maybe_open_browser(host, actual_port, open_browser, initial_profile)
 
     if start_mcp_discovery_after_bind:
@@ -1401,6 +1403,14 @@ def _run_serve(serve, config, host: str, port: int) -> None:
             _report_port_in_use(host, port)
             raise SystemExit(PORT_IN_USE_EXIT_CODE) from None
         raise
+
+
+def _print_lan_banner(host: str, port: int) -> None:
+    """Announce reachable LAN URLs for a non-loopback bind (T-09b / 远 01)."""
+    from hermes_cli.lan_addresses import lan_banner_lines
+
+    for line in lan_banner_lines(host, port):
+        print(line, flush=True)
 
 
 def start_server(

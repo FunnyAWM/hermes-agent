@@ -169,6 +169,7 @@
 | `scripts/install.ps1`、`scripts/install.sh`、`setup-hermes.ps1`、`setup-hermes.sh`、`pm/local_tools.py`、`pm/install.py`、`pm/_uv.py`、`pm/packages.py`、`pm/cli.py` | 安装、开发环境初始化和后续 PM 操作优先复用兼容的本机工具与基础解释器；缺失或不兼容才安装锁定版本。两处例外：MCP stdio 的 `uv`/`uvx` 仍只取受管副本（`pm/install.py::uv_launcher` 不参与本机复用），锁文件里的版本号非纯数字（fixture 或通道名）时一律不复用本机 uv，直接安装锁定制品 | §5.5、T-16 | 中：涉及工具解析、版本检查和环境传递；跨目标打包仍按锁文件制作自包含产物 |
 | `tools/memory_tool_store.py`、`tools/memory_tool.py`、`hermes_cli/config_defaults.py`、`agent/agent_init.py` | `MEMORY.md` 模型写入默认 3000、可配置、`0` 表示不限；`USER.md` 默认不限；计数改为码点 + 簇尾归并；超限整次拒绝并返回实际字符数与上限 | 记 03、§7.2、D6/D7 | 中：与上游默认 2200/1375 不同，升级时按本表逐条 rebase；只约束模型写入，手动编辑/导入不受影响 |
 | `agent/system_prompt.py` | 在 stable 层首位新增记忆根约定，语义对齐 Android `SystemPrompt.ROOT_PROMPT`，工具名按 PC 适配；位于 SOUL 之前 | §7.5、D9 | 中：改变稳定前缀内容；上游每次动身份段都会冲突 |
+| `hermes_cli/lan_addresses.py`（新增模块）、`hermes_cli/web_server.py` | 非回环绑定的启动横幅追加可达的局域网 IPv4 地址与 `hermes device-pair generate` 配对提示；默认 `127.0.0.1` 绑定不变，只新增提示行 | §6.6 远 01、T-09b | 低：仅在启动横幅追加输出；上游改动绑定/横幅文本时按行 rebase |
 | `hermes_notes/store.py`、`tools/file_tools_write_guards.py` | 新增 `notes/docs/` 固定例外类别：只读、一层放平、计入清单、不参与摘要/合并；对 `notes/docs/**` 的写入/替换拒绝，读取放行 | 记 04 / 05、§7.1、D8 | 低：独立类别与路径守卫；需与其他写路径分开测试 |
 | `hermes_cli/web_server.py` | 非回环绑定时启动横幅枚举各网卡 LAN URL 并打印配对命令提示；默认回环行为不变 | 远 01、T-09b | 低：只改启动输出；不改变监听地址与鉴权门禁 |
 
@@ -691,3 +692,4 @@ updated: 2026-10-20
 | v0.14 | 2026-11-03 | 根据使用者确认，PC 与手机均使用持续会话，超长整理保留会话 ID 与历史；§5.5 新增安装优先复用本机兼容环境，登记 T-16 补丁。修复笔记清单扫描读取正文的问题，路线升 v1.6；完整自动抽取仍须验收 |
 | v0.15 | 2026-11-05 | §5.5 补两条 T-16 口径：版本比较只在锁文件写纯数字时进行，否则按不兼容处理；MCP stdio 的 `uv`/`uvx` 不参与本机复用，始终用受管副本。T-16 在 Windows 按四项验收结案，真实下载完成、posix 通道与密封发行包仍未验证 |
 | v0.16 | 2026-11-06 | 与 Android 现行契约对齐（`PRD_ANDROID.md` / `AGENTS_PROJECT.md` / T-81 / T-88 / T-112 / T-113）：§7.2 `MEMORY.md` 模型写入默认 3000、可配置、`0` 不限，`USER.md` 不限，取消合并上限；计数改为码点 + 簇尾归并；§7.1/§7.3 新增 `notes/docs/` 固定例外；§7.5 增补根提示词；§8.1 增补显式检索出站例外；§5.4 登记对应补丁。T-05 口径改为事实由常规记忆工具轮写入 notes，不要求压缩同轮抽取 |
+| v0.17 | 2026-11-06 | §5.4 登记 `hermes_cli/lan_addresses.py` 与 `web_server.py` 的局域网横幅：非回环绑定打印可达 IPv4 地址与配对提示，默认回环绑定与鉴权门禁不变（T-09b 远 01） |
