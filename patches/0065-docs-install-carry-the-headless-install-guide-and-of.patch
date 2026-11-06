@@ -1,6 +1,6 @@
-From 430719a0de572ed1741626b2cbfe807a2b37bc01 Mon Sep 17 00:00:00 2001
+From 7185fd45df013721b759c412648d3f3df524b4c1 Mon Sep 17 00:00:00 2001
 From: FunnyAWM <1142978300@qq.com>
-Date: Fri, 6 Nov 2026 21:27:18 +0800
+Date: Fri, 6 Nov 2026 21:35:20 +0800
 Subject: [PATCH] docs(install): carry the headless install guide and offline
  tool downloader
 
@@ -473,3 +473,6 @@ prerequisite-patch-id: be40bddb8da908bbe6149784be8b24a1c6e2f638
 prerequisite-patch-id: b8461436d0697f3df6ab5e0055880a29125c4e3e
 prerequisite-patch-id: f62cf2ab8971912748c7d1cb8d75c941097ba1b2
 prerequisite-patch-id: be551fa248eac7f2c049b3626191196cfa93ce59
+prerequisite-patch-id: e59a42ad3df490d98d803b46ea8f22ecf3d79d20
+prerequisite-patch-id: d0d3dbe81caf84f6beeadc5cf8021e9031f6b8e2
+prerequisite-patch-id: b133224daccb11c3abe207a39cda2968ee8588c4

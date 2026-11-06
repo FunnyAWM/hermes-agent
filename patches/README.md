@@ -3,9 +3,11 @@
 本 fork 相对上游 **v0.23.0** 基线的全部改动，按提交拆成可重放的补丁列。
 
 - 基线：`2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19`（本地 annotated tag `v0.23.0`）
-- `0001`–`0063`：v0.23.0 之上的全部 fork 改动。**只有改了本目录的提交不进列**；这类提交
-  如果同时改了 PRD / TODO / evidence，那部分内容会单独导出成一个只含这些路径的补丁，
-  所以重放结果和分支的文件内容一致（列数每次重导出都会变，以 `ls patches/00*.patch | wc -l` 为准）
+- 按提交顺序编号的补丁覆盖 v0.23.0 之上的**全部** fork 改动。**只有改了本目录的提交不进列**；
+  这类提交如果同时改了 PRD / TODO / evidence，那部分内容会单独导出成一个只含这些路径的补丁，
+  所以重放结果和分支的文件内容一致。列数每次重导出都会变，以 `ls patches/00*.patch | wc -l` 为准
+- 最后一个补丁是交付物 `INSTALL.md`、`scripts/download-managed-tools.ps1`（不属任何提交，
+  由临时提交导出后退回，见「重新生成」）
 - 二进制素材不在补丁里，见下节
 - `fork-side-of-merge-conflicts.patch`：不是提交补丁，是再往上合并时的冲突素材，
   不参与 `git am`
@@ -58,11 +60,12 @@ git apply -3 patches/fork-side-of-merge-conflicts.patch
 
 ## 验证
 
-在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 63 个全部成功
-（2026-11-06，分支 `2d7e15afa7`）。重放后的工作树与本分支只差两类内容：这些补丁文件本身
-（导出提交不入列）、上面 82 个二进制素材。`TODO.md`、`PRD.md`、`evidence/`、`INSTALL.md`
-逐字节一致；交付物脚本 `scripts/download-managed-tools.ps1` 内容一致，只有行尾按
-`core.autocrlf` 在检出时转成 CRLF。
+在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 全部成功
+（2026-11-06 最后一次整列重放；数量以 `ls patches/00*.patch | wc -l` 为准）。重放后的工作树
+与分支只差两类内容：这些补丁文件本身（导出提交不入列）、上面 82 个二进制素材——
+`git diff --name-only <分支 tip>..HEAD -- . ':!patches'` 只剩 82 个二进制加两个未跟踪交付物。
+`TODO.md`、`PRD.md`、`evidence/`、`INSTALL.md` 逐字节一致；交付物脚本
+`scripts/download-managed-tools.ps1` 内容一致，只有行尾按 `core.autocrlf` 在检出时转成 CRLF。
 
 ## 重新生成
 
