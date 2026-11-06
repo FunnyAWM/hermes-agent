@@ -39,8 +39,14 @@ PASSIVE_UPDATE_DOMAINS = (
 )
 _LOOPBACK = (ipaddress.ip_network("127.0.0.0/8"), ipaddress.ip_network("::1/128"))
 _NETWORK_EVENT_PREFIXES = (
-    "HOST_RESOLVER", "QUIC_SESSION", "TRANSPORT_CONNECT_JOB", "SOCKET_CONNECT", "URL_REQUEST",
-    "TCP_CONNECT", "UDP_CONNECT", "DNS_",
+    "HOST_RESOLVER",
+    "QUIC_SESSION",
+    "TRANSPORT_CONNECT_JOB",
+    "SOCKET_CONNECT",
+    "URL_REQUEST",
+    "TCP_CONNECT",
+    "UDP_CONNECT",
+    "DNS_",
 )
 
 
@@ -74,8 +80,28 @@ def _host_from_address(value: str) -> str | None:
 
 
 def hosts_from_netlog(payload: dict) -> set[str]:
-    """All hostnames a Chromium NetLog mentions on network events."""
+    """All hostnames a Chromium NetLog mentions on network events.
+
+    Real NetLog files encode event types as numeric ids and ship a
+    ``constants.logEventTypes`` name→id table; synthetic fixtures and some
+    tools use the names directly. Resolve both, or a real capture silently
+    parses to zero hosts and the run looks clean.
+    """
     hosts: set[str] = set()
+    raw_types = (payload.get("constants") or {}).get("logEventTypes") or {}
+    type_names = (
+        {value: name for name, value in raw_types.items()}
+        if isinstance(raw_types, dict)
+        else {}
+    )
+
+    def event_name(event: dict) -> str:
+        value = event.get("type")
+        if isinstance(value, str):
+            return value
+        if isinstance(value, int):
+            return str(type_names.get(value, ""))
+        return ""
 
     def add(value) -> None:
         if not isinstance(value, str) or not value.strip():
@@ -90,7 +116,14 @@ def hosts_from_netlog(payload: dict) -> set[str]:
 
     def walk(node) -> None:
         if isinstance(node, dict):
-            for key in ("host", "hostname", "url", "address", "server_address", "ip_endpoint"):
+            for key in (
+                "host",
+                "hostname",
+                "url",
+                "address",
+                "server_address",
+                "ip_endpoint",
+            ):
                 if key in node:
                     add(node[key])
             for value in node.values():
@@ -101,7 +134,9 @@ def hosts_from_netlog(payload: dict) -> set[str]:
                 walk(item)
 
     for event in payload.get("events", []) or []:
-        if str(event.get("type", "")).startswith(_NETWORK_EVENT_PREFIXES):
+        if not isinstance(event, dict):
+            continue
+        if event_name(event).startswith(_NETWORK_EVENT_PREFIXES):
             walk(event.get("params") or {})
             if event.get("source"):
                 walk(event["source"])
@@ -127,13 +162,29 @@ def classify(hosts: set[str], allowed_hosts: set[str] | None = None) -> dict:
     for host in sorted(hosts):
         if is_loopback_host(host):
             loopback.append(host)
-        elif any(host == domain or host.endswith("." + domain) for domain in PASSIVE_UPDATE_DOMAINS):
+        elif any(
+            host == domain or host.endswith("." + domain)
+            for domain in PASSIVE_UPDATE_DOMAINS
+        ):
             violations.append({"host": host, "reason": "passive-update domain"})
         elif host in allowed_hosts:
             allowed.append(host)
         else:
-            violations.append({"host": host, "reason": "unexpected non-loopback target"})
+            violations.append(
+                {"host": host, "reason": "unexpected non-loopback target"}
+            )
     return {"loopback": loopback, "allowed": allowed, "violations": violations}
+
+
+def _dedupe_violations(items: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict] = []
+    for item in items:
+        key = (str(item.get("host")), str(item.get("reason")))
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
 
 
 def _child(audit_path: Path, duration: float) -> int:
@@ -197,60 +248,181 @@ def run_python_probe(duration: float, allowed_hosts: set[str], home: Path) -> di
     audit_path = _mktemp_path("hermes-t11-audit-", ".jsonl")
     env = dict(os.environ)
     env.update(HERMES_HOME=str(home), HERMES_SERVE_HEADLESS="1", PYTHONUNBUFFERED="1")
-    for key in ("HERMES_DESKTOP", "HERMES_PARENT_PID", "HERMES_PARENT_START_MARKER",
-                "HERMES_PARENT_NONCE"):
+    for key in (
+        "HERMES_DESKTOP",
+        "HERMES_PARENT_PID",
+        "HERMES_PARENT_START_MARKER",
+        "HERMES_PARENT_NONCE",
+    ):
         env.pop(key, None)
     proc = subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "--child",
-         "--audit-json", str(audit_path), "--duration", str(duration + 1)],
-        cwd=str(REPO_ROOT), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--child",
+            "--audit-json",
+            str(audit_path),
+            "--duration",
+            str(duration + 1),
+        ],
+        cwd=str(REPO_ROOT),
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     try:
         endpoints = _sample_connections(proc.pid, duration)
     finally:
         if proc.poll() is None:
             proc.kill()
         proc.wait(timeout=30)
-    lines = audit_path.read_text(encoding="utf-8").splitlines() if audit_path.exists() else []
+    lines = (
+        audit_path.read_text(encoding="utf-8").splitlines()
+        if audit_path.exists()
+        else []
+    )
     audit_path.unlink(missing_ok=True)
     hosts = hosts_from_audit(lines)
     report = classify(hosts, allowed_hosts)
     report["remote_endpoints"] = endpoints
     report["unattributed_non_loopback"] = [
-        endpoint for endpoint in endpoints if not is_loopback_host(_host_from_address(endpoint) or "")]
+        endpoint
+        for endpoint in endpoints
+        if not is_loopback_host(_host_from_address(endpoint) or "")
+    ]
     report["ok"] = not report["violations"]
     return report
 
 
-def capture_desktop(exe: Path, duration: float, home: Path, netlog: Path) -> dict:
+def netlog_report(path: Path, allowed_hosts: set[str]) -> dict:
+    """Classify the hosts in a Chromium NetLog file.
+
+    A missing or empty file is a capture failure, not a clean result: the
+    caller must be able to tell "the app made no outbound requests" from
+    "Electron never wrote the log".
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        return {
+            "ok": False,
+            "blocked_reason": f"netlog not written: {path}",
+            "hosts": [],
+            "loopback": [],
+            "allowed": [],
+            "violations": [],
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig", errors="replace"))
+    except (OSError, ValueError) as exc:
+        return {
+            "ok": False,
+            "blocked_reason": f"netlog unreadable: {exc}",
+            "hosts": [],
+            "loopback": [],
+            "allowed": [],
+            "violations": [],
+        }
+    hosts = hosts_from_netlog(payload)
+    report = classify(hosts, allowed_hosts)
+    return {"ok": not report["violations"], "hosts": sorted(hosts), **report}
+
+
+def _stop_process(proc: subprocess.Popen, timeout: float = 15.0) -> None:
+    """Close Electron gracefully so Chromium finalizes the NetLog JSON.
+
+    ``proc.kill`` maps to TerminateProcess on Windows and truncates the log
+    mid-JSON. A bare ``taskkill /PID`` posts WM_CLOSE, which lets Electron run
+    its normal shutdown and flush the closing events.
+    """
+    if proc.poll() is None:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid)],
+                capture_output=True,
+                timeout=30,
+                check=False,
+            )
+        else:
+            proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=30)
+
+
+def capture_desktop(
+    exe: Path,
+    duration: float,
+    home: Path,
+    netlog: Path,
+    allowed_hosts: set[str] | None = None,
+) -> dict:
     if not exe.exists():
-        return {"ok": False, "blocked_reason": f"packaged Electron app not found: {exe}",
-                "violations": [], "netlog": None}
-    env = {key: value for key, value in os.environ.items()
-           if key not in {"HERMES_DESKTOP", "HERMES_PARENT_PID"}}
-    env.update(HERMES_HOME=str(home), HOME=str(home), USERPROFILE=str(home),
-               LOCALAPPDATA=str(home / "LocalAppData"), APPDATA=str(home / "AppData"))
+        return {
+            "ok": False,
+            "blocked_reason": f"packaged Electron app not found: {exe}",
+            "violations": [],
+            "netlog": None,
+        }
+    # Chromium needs these roots to exist before the app writes its profile;
+    # seed them inside the isolated home so the run cannot touch the real one.
+    for sub in ("LocalAppData", "AppData"):
+        (home / sub).mkdir(parents=True, exist_ok=True)
+    # --log-net-log truncates an existing file; remove mkstemp's empty file so
+    # a stale empty log can never be mistaken for a successful capture.
+    netlog.unlink(missing_ok=True)
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"HERMES_DESKTOP", "HERMES_PARENT_PID"}
+    }
+    # Do NOT redirect USERPROFILE/HOME: the desktop bootstrap exits before
+    # Electron initializes when they point somewhere new. Chromium's profile
+    # lives under APPDATA/LOCALAPPDATA and app data under HERMES_HOME, so those
+    # two are enough to keep the run isolated from the real user state.
+    env.update(
+        HERMES_HOME=str(home),
+        LOCALAPPDATA=str(home / "LocalAppData"),
+        APPDATA=str(home / "AppData"),
+    )
     proc = subprocess.Popen(
-        [str(exe), f"--log-net-log={netlog}", "--net-log-capture-mode=IncludeSensitive"],
-        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        [
+            str(exe),
+            f"--log-net-log={netlog}",
+            "--net-log-capture-mode=IncludeSensitive",
+        ],
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     try:
         endpoints = _sample_connections(proc.pid, duration)
     finally:
-        if proc.poll() is None:
-            proc.kill()
-        proc.wait(timeout=30)
-    return {"netlog": str(netlog), "remote_endpoints": endpoints}
+        _stop_process(proc)
+    report = netlog_report(netlog, allowed_hosts or set())
+    return {"netlog": str(netlog), "remote_endpoints": endpoints, **report}
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--child", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--audit-json", type=Path, default=Path("audit.jsonl"), help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--audit-json", type=Path, default=Path("audit.jsonl"), help=argparse.SUPPRESS
+    )
     parser.add_argument("--duration", type=float, default=10.0)
-    parser.add_argument("--allow", action="append", default=[], help="expected model endpoint host")
-    parser.add_argument("--netlog", type=Path, help="parse an existing Electron NetLog file")
-    parser.add_argument("--desktop-exe", type=Path,
-                        default=REPO_ROOT / "release" / "win-unpacked" / "Hermes.exe")
+    parser.add_argument(
+        "--allow", action="append", default=[], help="expected model endpoint host"
+    )
+    parser.add_argument(
+        "--netlog", type=Path, help="parse an existing Electron NetLog file"
+    )
+    parser.add_argument(
+        "--desktop-exe",
+        type=Path,
+        default=REPO_ROOT / "release" / "win-unpacked" / "Hermes.exe",
+    )
     parser.add_argument("--skip-electron", action="store_true")
     parser.add_argument("--json", type=Path, help="write the report here")
     args = parser.parse_args(argv)
@@ -270,15 +442,24 @@ def main(argv: list[str] | None = None) -> int:
             report["violations"].extend(net_report["violations"])
             report["ok"] = report["ok"] and not net_report["violations"]
         elif not args.skip_electron:
-            desktop = capture_desktop(args.desktop_exe, args.duration, home,
-                                      _mktemp_path("hermes-t11-netlog-", ".json"))
+            desktop = capture_desktop(
+                args.desktop_exe,
+                args.duration,
+                home,
+                _mktemp_path("hermes-t11-netlog-", ".json"),
+                allowed,
+            )
             report["electron"] = desktop
+            report["violations"].extend(desktop.get("violations", []))
             if desktop.get("blocked_reason"):
                 report["blocked_reason"] = desktop["blocked_reason"]
-                report["ok"] = False
+            report["ok"] = report["ok"] and bool(desktop.get("ok"))
 
+    report["violations"] = _dedupe_violations(report["violations"])
     if args.json:
-        args.json.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.json.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0 if report["ok"] else 1
 
