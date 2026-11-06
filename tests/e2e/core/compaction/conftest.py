@@ -30,7 +30,8 @@ def make_scenario(provider, tmp_path, monkeypatch):
     made: list[Scenario] = []
 
     def make(mode: str = "good", *, extra: str = "", platform: str = "cli", window: int | None = None,
-             threshold_tokens: int = THRESHOLD_TOKENS, name: str = "hermes_home") -> Scenario:
+             threshold_tokens: int = THRESHOLD_TOKENS, name: str = "hermes_home",
+             toolsets: tuple[str, ...] = ("file",), skip_memory: bool = True) -> Scenario:
         # The hermetic root conftest already isolates HERMES_HOME per test; HOME stays put because the
         # state.db live-system guard treats $HOME/.hermes as production.
         hermes_home = tmp_path / name
@@ -48,7 +49,8 @@ def make_scenario(provider, tmp_path, monkeypatch):
             extra += f"  context_timeout_seconds: {SLOW_SUMMARY_TIMEOUT_SECONDS}\n"
         write_home(hermes_home, server.base_url,
                    compaction_config(extra=extra, slow=slow, threshold_tokens=threshold_tokens))
-        sc = Scenario(server=server, dispatch=dispatch, home=hermes_home, mode=mode, platform=platform, window=window)
+        sc = Scenario(server=server, dispatch=dispatch, home=hermes_home, mode=mode, platform=platform,
+                      window=window, toolsets=toolsets, skip_memory=skip_memory)
         made.append(sc)
         return sc
 
