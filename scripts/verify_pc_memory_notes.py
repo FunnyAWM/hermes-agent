@@ -43,10 +43,10 @@ def _memory_limits(store) -> None:
     from hermes_cli.config_defaults import DEFAULT_CONFIG
 
     memory_cfg = DEFAULT_CONFIG["memory"]
-    check("registry default memory_char_limit == 2200",
-          memory_cfg["memory_char_limit"] == 2200, str(memory_cfg["memory_char_limit"]))
-    check("registry default user_char_limit == 1375",
-          memory_cfg["user_char_limit"] == 1375, str(memory_cfg["user_char_limit"]))
+    check("registry default memory_char_limit == 3000",
+          memory_cfg["memory_char_limit"] == 3000, str(memory_cfg["memory_char_limit"]))
+    check("registry default user_char_limit == 0 (unlimited)",
+          memory_cfg["user_char_limit"] == 0, str(memory_cfg["user_char_limit"]))
     check("runtime store memory limit == registry default",
           store.memory_char_limit == memory_cfg["memory_char_limit"], f"{store.memory_char_limit}")
     check("runtime store user limit == registry default",
@@ -55,11 +55,10 @@ def _memory_limits(store) -> None:
 
 def _memory_overflow(store, memory_file: Path) -> None:
     section("T-01 over-cap write is refused and the file is untouched")
-    first = store.add("memory", "a" * 2100)
-    check("add 2,100 chars succeeds", bool(first.get("success")), str(first.get("message"))[:90])
+    first = store.add("memory", "a" * 2900)
+    check("add 2,900 chars succeeds", bool(first.get("success")), str(first.get("message"))[:90])
     before = memory_file.read_bytes()
-    used = store._char_count("memory")
-    print(f"usage after accepted write: {used}/2200 chars")
+    print(f"usage after accepted write: {store._usage('memory')}")
 
     overflow = store.add("memory", "b" * 200)
     message = str(overflow.get("message") or overflow.get("error") or "")
@@ -78,8 +77,8 @@ def _memory_overflow(store, memory_file: Path) -> None:
           str(user_ok.get("message"))[:60])
     user_over = store.add("user", "c" * 1400)
     user_msg = str(user_over.get("message") or user_over.get("error") or "")
-    check("USER.md refuses past 1,375 chars", not user_over.get("success"), user_msg[:120])
-    check("USER refusal quotes 1,375", "1,375" in user_msg, user_msg[:120])
+    check("USER.md accepts past the old 1,375 limit", bool(user_over.get("success")), user_msg[:120])
+    check("USER usage renders unlimited", "unlimited" in store._usage("user"), store._usage("user"))
 
 
 def _data_root(home: Path, memory_file: Path, user_file: Path) -> None:

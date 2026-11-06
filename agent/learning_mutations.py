@@ -97,6 +97,7 @@ def _mutate_memory(node_id: str, replacement: str | None) -> dict[str, Any]:
     message = f"deleted memory from {name}" if replacement is None else f"updated memory in {name}"
 
     def _apply(entries, limit):
+        from hermes_charcount import char_count
         from tools.memory_tool import ENTRY_DELIMITER
         from tools.memory_tool_store import _error
 
@@ -107,8 +108,8 @@ def _mutate_memory(node_id: str, replacement: str | None) -> dict[str, Any]:
         idx = entries.index(text)
         new_entries = entries[:idx] + ([] if replacement is None else [replacement]) + entries[idx + 1:]
         # Same cap the memory tool enforces on replace (never on remove: deleting is how a file
-        # already over its total gets back under it).
-        if replacement is not None and (total := len(ENTRY_DELIMITER.join(new_entries))) > limit:
+        # already over its total gets back under it). A zero cap means unlimited.
+        if replacement is not None and limit > 0 and (total := char_count(ENTRY_DELIMITER.join(new_entries))) > limit:
             return _error(f"Replacement would put memory at {total:,}/{limit:,} chars. Shorten the new content.",
                           "over_budget")
         return new_entries, message

@@ -56,13 +56,13 @@ def test_edit_memory_replaces_chunk(home):
 def test_edit_memory_refuses_an_entry_over_the_memory_tools_limit(home):
     """Same char cap as the memory tool's replace: an over-limit entry reads as external drift to
     every later mutation, so the tool's own remove/replace would refuse (with a .bak) until the
-    file is fixed by hand."""
-    from tools.memory_tool import MemoryStore
-
-    result = lm.edit_node("memory:profile:2", "x" * 5000)
+    file is fixed by hand. USER.md is uncapped; MEMORY.md keeps the 3000 default."""
+    result = lm.edit_node("memory:memory:0", "x" * 5000)
 
     assert not result["ok"] and "Shorten" in result["message"]
-    assert (home / "memories" / "USER.md").read_text(encoding="utf-8") == "user profile note"
+    assert (home / "memories" / "MEMORY.md").read_text(encoding="utf-8") == "alpha note\nline two\n§\nbeta note"
+    from tools.memory_tool import MemoryStore
+
     assert MemoryStore().remove("user", "user profile note")["success"]
 
     # The cap gates what an edit adds, never a delete: pruning is the way out of a file that is
@@ -190,7 +190,7 @@ def test_memory_drift_is_refused_with_backup_like_memory_tool(home):
     from tools.memory_tool_store import _drift_error
 
     path = home / "memories" / "MEMORY.md"
-    raw = "alpha note\n§\nbeta note\n\n## Vendor Master\n" + "x" * 2300 + "\n"
+    raw = "alpha note\n§\nbeta note\n\n## Vendor Master\n" + "x" * 3100 + "\n"
     path.write_text(raw, encoding="utf-8")
 
     res = lm.edit_node("memory:memory:0", "alpha rewritten")

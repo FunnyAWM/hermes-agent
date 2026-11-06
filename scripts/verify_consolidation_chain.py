@@ -3,8 +3,8 @@
 The live half of T-05 is a model conversation that runs to the context edge, summarises, extracts
 facts into ``notes/`` and compacts the same persistent session. That needs model credentials and a real session, so
 it stays blocked and is tracked separately. What this script *can* pin down is the part that would
-silently corrupt the hand-off: after a near-cap consolidation, do the two memory files stay within
-2200/1375, does the ``\\n§\\n`` counting rule survive, does the extracted note use PRD §7.3 front
+silently corrupt the hand-off: after a near-cap consolidation, does the memory file stay within
+its 3000-char model-write limit, does the ``\\n§\\n`` counting rule survive, does the extracted note use PRD §7.3 front
 matter, and does a reloaded store render MEMORY → USER → notes index without the
 dropped entries?
 
@@ -128,16 +128,15 @@ def main() -> int:
         user_block = fresh.format_for_system_prompt("user") or ""
         index = notes.render_index()
 
-        check("fresh store still within MEMORY limit", fresh._char_count("memory") <= 2200,
-              f"{fresh._char_count('memory')}/2200")
-        check("fresh store still within USER limit", fresh._char_count("user") <= 1375,
-              f"{fresh._char_count('user')}/1375")
-        check("combined memory budget <= 3575", fresh._char_count("memory") + fresh._char_count("user") <= 3575)
+        check("fresh store still within MEMORY limit", fresh._char_count("memory") <= 3000,
+              f"{fresh._char_count('memory')}/3000")
+        check("USER.md is uncapped", fresh.user_char_limit == 0, f"{fresh.user_char_limit}")
+        check("no combined memory budget", not hasattr(fresh, "combined_char_limit"))
         check("count is delimited entries, not the banner",
               fresh._char_count("memory") == len(ENTRY_DELIMITER.join(fresh.memory_entries)),
               f"delimiter={ENTRY_DELIMITER!r}")
         check("banner percentage matches the counted chars",
-              f"{fresh._char_count('memory'):,}/2,200 chars" in memory_block, memory_block.splitlines()[1] if memory_block else "")
+              f"{fresh._char_count('memory'):,}/3,000 chars" in memory_block, memory_block.splitlines()[1] if memory_block else "")
         check("consolidated conclusion survives store reload", "nsis + portable" in memory_block)
         check("dropped MSIX conclusion is gone", "MSIX" not in memory_block)
         check("notes index shows display name/name/summary",

@@ -628,7 +628,7 @@ class TestPreflightCompression:
         agent._user_profile_enabled = False
         agent._memory_manager = None
         agent._cached_system_prompt = (
-            "system prompt\n\nMEMORY (your personal notes) [1% — 10/2,200 chars]\nold fact"
+            "system prompt\n\nMEMORY (your personal notes) [1% — 10/3,000 chars]\nold fact"
         )
         memory_store = MagicMock()
         memory_store.format_for_system_prompt.return_value = None  # emptied
