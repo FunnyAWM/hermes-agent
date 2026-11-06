@@ -174,6 +174,7 @@
 | `apps/desktop/src/themes/presets.ts` | 五个内置主题去掉 `typography.fontUrl`：主题加载器会把它作为远程样式表注入，默认配置的桌面因此访问 `fonts.googleapis.com`（隐 02）。内置 mono 栈本就不引用这些远程字族，删除后仅去掉外联、不改渲染；导入的第三方主题仍可携带（显式用户行为） | 隐 02、§8.1、T-11 | 低：只删内置预设字段；上游新增同名字段时按行 rebase，`presets.test.ts` 拦住回归 |
 | `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
 | `agent/prompt_builder.py`、`agent/system_prompt.py` | 任务分派路由提示：记录/跟踪任务 → `todo_list`，指定时间/周期/提醒 → `cronjob_manage`；仅在两个工具都启用时注入，不改动既有 guidance 顺序 | §5.5、桌面单机器人与任务分派、T-21 | 低：新增一个常量与一个工具门控分支；上游改动 guidance 清单时按行 rebase |
+| `apps/desktop/electron/minimize-to-tray.ts`、`gateway-quit.ts`、`quit-guard.ts`、`main.ts` | 托盘默认驻留；真正退出时停本机 gateway，退出提示把本机工作视为会丢失；远程/Cloud 保持继续运行 | §5.5、托盘驻留与网关生命周期、T-23 | 中：与上游“gateway 脱离桌面端存活”相反；同步上游时保留本 fork 版本并重跑生命周期用例 |
 
 每条补丁的底线要求：
 
@@ -211,6 +212,7 @@
 - **任务分派按语义路由（2026-11-06 使用者确认）。** 「记录 / 跟踪 / 指派一件事」写入 Hermes 内置任务列表（`todo_list`，会话级任务面板）；「指定时间 / 周期 / 提醒」创建定时任务（`cronjob_manage`）。两者都启用时才注入路由提示；`delegate_task` 子代理仍在核心工具集内，不需要新 UI。任务列表是会话级的，定时任务跨会话持久——语义路由不改变这一点。
 - **品牌改为 KouriChat Next（2026-11-06 使用者确认）。** 可见名称按变体为 `KouriChat Next` / `KouriChat Next Light` / `KouriChat Next Agent` / `KouriChat Next Headless`，图标统一来自 `apps/desktop/assets/logo.svg`。内部的 `appId`（`com.nousresearch.hermes*`）、`appNamePascal`、userData 键与 CLI 名 `hermes` 保持不变，避免覆盖安装、更新通道与用户数据换目录；因此安装包文件名仍以 `Hermes*` 开头。对外分发前仍需单独定 `appId` 与安装包标识。
 - **构建产物元数据（2026-11-06）。** 公司名与版权改为 `FunnyAWM`（`Copyright © 2026 FunnyAWM`），安装包“文件说明”为 `Native desktop shell for Rosmontis.`，联系邮箱 `funnyawm@qq.com` 记录在 npm author 与 Linux maintainer；PE 版本资源没有邮箱字段。内部 appId/userData/CLI 仍保持不变。
+- **托盘驻留与网关生命周期（2026-11-06 使用者确认）。** 桌面端默认驻留托盘（偏好文件缺失即开启，设置里可关闭）；关闭窗口只隐藏，应用与本机 gateway 继续运行。真正退出（托盘 Quit、`app.quit()`、系统会话结束）时先停本机 gateway owner，再退出桌面端；只停当前 `HERMES_HOME`，不带 `--all`，不误停其它 home。远程 / Cloud / SSH 后端不受影响。上游“gateway 脱离桌面端存活”的默认行为在本 fork 改为受控补丁，退出确认文案把本机工作视为会丢失。强制结束进程不走该路径，gateway 会存活到下次启动重新 attach。
 
 **Windows 验证进展（v0.11）**：已产出不同文件名的 NSIS 与 portable 包，产品版本均保留 `0.22.5-fork.1`，
 日志、大小和散列见 `evidence/t15.md`。构建戳为脏工作区，当前仅作打包验证；
