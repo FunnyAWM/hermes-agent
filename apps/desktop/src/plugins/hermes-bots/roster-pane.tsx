@@ -15,9 +15,6 @@ import {
   parseRosterKey,
   saveSelectedRosterBot
 } from './bot-state'
-import { $canonicalRoomLive } from './canonical-group-details'
-import { bindGatewayGroupRoom, useGatewayGroupRooms } from './canonical-group-registry'
-import { CanonicalGroupRow } from './canonical-group-row'
 /**
  * The Bots pane itself: the roster's selection reconciliation, the
  * workspace-ownership reads its lifecycle keys off, and the pane that lists
@@ -44,7 +41,7 @@ import { $showHiddenBots, isBotHidden } from './hidden-bots'
 import { useBots } from './i18n'
 import { $activityToasts } from './roster-actions'
 import { renderRosterContent } from './roster-pane-content'
-import { deriveRosterPresentation, deriveRosterRows, type RosterGroupRow, sortRosterBots } from './roster-pane-derivation'
+import { deriveRosterPresentation, deriveRosterRows, sortRosterBots } from './roster-pane-derivation'
 import { renderRosterDialogs } from './roster-pane-dialogs'
 import { RosterGroupRowView } from './roster-pane-groups'
 import { $lastSources, usePublishRosterSnapshot } from './roster-pane-lifecycle'
@@ -53,6 +50,7 @@ import { renderRosterToolbar } from './roster-pane-toolbar'
 import { botNeedsHandleLabel, rosterGatewayOptions } from './roster-sections'
 import { botWorkspaceOwnerKey, setBotsWorkspaceOwner } from './routing'
 import { activeBots, useTurnBusy } from './row-helpers'
+import { singleBotRoster } from './single-bot'
 import type { BotMeta, GatewaySource, GroupMember, RosterActivityFilter, RosterKindFilter, RosterRow } from './types'
 import {
   $botSections,
@@ -273,8 +271,6 @@ export function BotsPane() {
   const groupNeedsYou = useValue($groupNeedsYou)
   const groupClarify = useValue($groupClarify)
   const groupRooms = useValue($groupChats)
-  const gatewayRooms = useGatewayGroupRooms()
-  const gatewayRoomLive = useValue($canonicalRoomLive)
   const rememberedSources = useValue($lastSources)
   const rosterHydrated = useValue($rosterHydrated)
   const selectionHydrated = useValue($selectedRosterHydrated)
@@ -300,7 +296,10 @@ export function BotsPane() {
   const sourceWithSelectedOwner =
     selectionHydrated && rosterHydrated ? rosterWithSelectedOwner(source, sourceSnapshot, selectedRosterKey) : source
 
-  const { roster, activityOf, isPinned } = sortRosterBots(sourceWithSelectedOwner, allMeta)
+  const sorted = sortRosterBots(sourceWithSelectedOwner, allMeta)
+  // One assistant, one row: other profiles keep working but are not offered here.
+  const roster = singleBotRoster(sorted.roster)
+  const { activityOf, isPinned } = sorted
 
   // Sections made on ANOTHER desktop arrive as id + name on each member's
   // ui_meta; rebuild the records this machine has never seen so the roster
@@ -352,12 +351,11 @@ export function BotsPane() {
     activityFilter,
     rowKindFilter,
     groupRooms,
-    gatewayRooms,
-    gatewayRoomLive,
     activeRosterKeys,
     gatewayOptions,
     activityOf,
-    isPinned
+    isPinned,
+    singleBot: true
   })
 
   const {
@@ -419,14 +417,14 @@ export function BotsPane() {
   useReconcileRosterOwner(data, error, selectionHydrated, roster, sourceSnapshot, allMeta)
 
   const staleNotice =
-    error && !live && (roster.length || gatewayRooms.length)
+    error && !live && roster.length
       ? 'Roster refresh failed — showing the last good list.' +
         (gatewayUp ? '' : ' Waiting for the gateway to reconnect…')
       : null
 
   const groupChatMembers = groupChatName ? groupChatMemberBots(groupChatName, roster, allMeta) : []
 
-  if (shouldRenderGroupChatInPane(groupChatName) && groupChatMembers.length) {
+  if (groupChatMembers.length > 1 && shouldRenderGroupChatInPane(groupChatName)) {
     return <GroupChatWorkspace group={groupChatName} members={groupChatMembers} origin={groupOpenOrigin(groupChatName)} />
   }
 
@@ -439,20 +437,11 @@ export function BotsPane() {
       onGroup={setGrouping}
       onNewSection={target => setSectionDialog({ bot: target, mode: 'create' })}
       showHandle={botNeedsHandleLabel(bot, roster, allMeta)}
+      singleBot
     />
   )
 
-  // Move up / down reorders Desktop rooms; gateway rooms keep recency order.
-  const desktopGroupRows = sortedGroupRows.filter(row => !row.gateway)
-
-  const renderGroupRow = ({ gateway, ...row }: RosterGroupRow) => gateway ? (
-    <CanonicalGroupRow
-      active={groupChatName === gateway.key}
-      key={gateway.key}
-      onOpen={() => openGroupChat(bindGatewayGroupRoom(gateway), 'key')}
-      room={gateway}
-    />
-  ) : (
+  const renderGroupRow = (row: { members: GroupMember[]; name: string }) => (
     <RosterGroupRowView
       active={groupChatName === row.name}
       b={b}
@@ -465,7 +454,7 @@ export function BotsPane() {
       onDisband={setDeletingGroup}
       onNewSection={target => setSectionDialog({ group: target, mode: 'create' })}
       onOpen={group => openGroupChat(group, 'name')}
-      sortedGroupRows={desktopGroupRows}
+      sortedGroupRows={sortedGroupRows}
     />
   )
 
@@ -489,6 +478,7 @@ export function BotsPane() {
     <div className="flex h-full flex-col">
       {renderRosterToolbar({
         b,
+        singleBot: true,
         activityToasts,
         activeSourceRoster,
         roster,
@@ -514,7 +504,7 @@ export function BotsPane() {
         staleNotice,
         isLoading,
         initialRosterLoading,
-        listedCount: roster.length + gatewayRooms.length,
+        listedCount: roster.length,
         error,
         gatewayUp,
         refetch,

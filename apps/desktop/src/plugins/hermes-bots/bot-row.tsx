@@ -100,9 +100,11 @@ interface BotRowProps {
   /** Opens the New section dialog; the bot is filed into it on create. */
   onNewSection: (bot: RosterRow) => void
   showHandle?: boolean
+  /** Fork rule: one assistant offers only open-chat and rename. */
+  singleBot?: boolean
 }
 
-export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle }: BotRowProps) {
+export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle, singleBot = false }: BotRowProps) {
   const { t } = useI18n()
   const b = useBots()
   const focusedOwner = focusedRosterOwner(useValue($focusedBotOwner))
@@ -317,6 +319,27 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
       </div>
     </RowButton>
   )
+
+  if (singleBot) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => void openRosterBot(bot)}>{b.bot.openBotChat}</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onSelect={() =>
+              void ensureBotMetadata(bot)
+                .then(() => onEdit(bot))
+                .catch(error => host.notifyError?.(error, b.bot.loadFailed))
+            }
+          >
+            {b.bot.editMenu}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }
 
   return (
     <ContextMenu>
