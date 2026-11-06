@@ -210,6 +210,7 @@
 - **机器人板块只有一个助手（2026-11-06 使用者确认）。** 对齐手机端「聊 03 单一会话 + 设 07 自定义名称」：桌面机器人板块只展示 default profile 一行，其他 profile 继续运行但不再列出；工具栏不提供新建机器人/群聊/分组/筛选，行菜单只保留「打开对话」与「编辑资料」（名称在编辑资料里由用户设定）。机器人只有唯一的主会话，不再从机器人板块创建侧聊或跳转最近会话。板块之外的全局会话侧栏不属于本条约束。
 - **任务分派按语义路由（2026-11-06 使用者确认）。** 「记录 / 跟踪 / 指派一件事」写入 Hermes 内置任务列表（`todo_list`，会话级任务面板）；「指定时间 / 周期 / 提醒」创建定时任务（`cronjob_manage`）。两者都启用时才注入路由提示；`delegate_task` 子代理仍在核心工具集内，不需要新 UI。任务列表是会话级的，定时任务跨会话持久——语义路由不改变这一点。
 - **品牌改为 KouriChat Next（2026-11-06 使用者确认）。** 可见名称按变体为 `KouriChat Next` / `KouriChat Next Light` / `KouriChat Next Agent` / `KouriChat Next Headless`，图标统一来自 `apps/desktop/assets/logo.svg`。内部的 `appId`（`com.nousresearch.hermes*`）、`appNamePascal`、userData 键与 CLI 名 `hermes` 保持不变，避免覆盖安装、更新通道与用户数据换目录；因此安装包文件名仍以 `Hermes*` 开头。对外分发前仍需单独定 `appId` 与安装包标识。
+- **构建产物元数据（2026-11-06）。** 公司名与版权改为 `FunnyAWM`（`Copyright © 2026 FunnyAWM`），安装包“文件说明”为 `Native desktop shell for Rosmontis.`，联系邮箱 `funnyawm@qq.com` 记录在 npm author 与 Linux maintainer；PE 版本资源没有邮箱字段。内部 appId/userData/CLI 仍保持不变。
 
 **Windows 验证进展（v0.11）**：已产出不同文件名的 NSIS 与 portable 包，产品版本均保留 `0.22.5-fork.1`，
 日志、大小和散列见 `evidence/t15.md`。构建戳为脏工作区，当前仅作打包验证；
