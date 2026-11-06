@@ -118,6 +118,9 @@ def fake_store(tmp_path: Path) -> tuple[Path, Path]:
     sha = python_pkg["artifacts"][target]["sha256"]
 
     store = tmp_path / "store"
+    # These activation tests consume recorded tool environments. Seal the fixture
+    # so a compatible Python on the test host cannot replace its canary export.
+    (store.parent / "manifest.json").write_text("{}", encoding="utf-8")
     entry = store / f"python-{python_pkg['version']}-{target}"
     entry.mkdir(parents=True)
 

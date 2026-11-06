@@ -23,6 +23,7 @@ def test_minimal_bootstrap_closure_reaches_pm_paths_and_locks(tmp_path):
     script = """
 from pathlib import Path
 import pm.paths
+import pm.install
 from pm.store import Store
 from pm.lock import Facts
 root = pm.paths.store_root()

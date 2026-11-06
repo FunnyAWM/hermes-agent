@@ -18,7 +18,8 @@ INSTALLER = Path(__file__).resolve().parents[3] / "scripts" / "install.ps1"
     # the legacy name every PM accepts (the stable one rejects `chromium`).
     ("python-deps", 0, True),
 ])
-def test_python_stage_delegates_to_pin_without_touching_existing_env(tmp_path, stage, exit_code, skip_browser):
+@pytest.mark.parametrize("available", ["local", "managed", "download"])
+def test_python_stage_delegates_to_pin_without_touching_existing_env(tmp_path, stage, exit_code, skip_browser, available):
     powershell = shutil.which("powershell")
     assert powershell
     install = tmp_path / "install with spaces"
@@ -46,8 +47,18 @@ function uv {
     try {
         ConvertTo-Json -Compress -InputObject @($args) | Add-Content -Encoding UTF8 $Log
         switch ($args[1]) {
-            'install' { }
-            'find' { Write-Output $env:BOOTSTRAP_PYTHON }
+            'install' { $script:Downloaded = $true }
+            'find' {
+                if (($args -contains '--no-managed-python') -and $env:PROBE_AVAILABLE -ne 'local') {
+                    $global:LASTEXITCODE = 1
+                    return
+                }
+                if ($env:PROBE_AVAILABLE -eq 'download' -and -not $script:Downloaded) {
+                    $global:LASTEXITCODE = 1
+                    return
+                }
+                Write-Output $env:BOOTSTRAP_PYTHON
+            }
             default { throw 'PM must not be a child of the bootstrap uv' }
         }
         $global:LASTEXITCODE = 0
@@ -63,7 +74,7 @@ Invoke-StageByName $env:PROBE_STAGE
 exit $LASTEXITCODE
 ''', encoding="utf-8-sig")
     # uv python find returns the distribution interpreter, not a venv launcher.
-    env = dict(os.environ, PROBE_STAGE=stage, PROBE_EXIT=str(exit_code), BOOTSTRAP_PYTHON=sys._base_executable,
+    env = dict(os.environ, PROBE_STAGE=stage, PROBE_EXIT=str(exit_code), PROBE_AVAILABLE=available, BOOTSTRAP_PYTHON=sys._base_executable,
                PM_LOG=str(pm_log), UV_BUSY=str(tmp_path / "uv-busy"), PATHEXT=".COM;.EXE;.BAT;.CMD")
     env.pop("PYTHONPATH", None)
     env.pop("PROBE_SKIP_BROWSER", None)
@@ -79,9 +90,17 @@ exit $LASTEXITCODE
     # The request names the machine's architecture: a bare version lets uv
     # pick an emulated x86_64 build on Windows-on-ARM.
     uv_arch = "aarch64" if native_arch() == "arm64" else "x86_64"
-    assert [json.loads(line) for line in log.read_text(encoding="utf-8-sig").splitlines()] == [
-        ["python", "find", "--managed-python", "--no-project", f"cpython-3.12-windows-{uv_arch}-none"],
+    expected_calls = [
+        ["python", "find", "--system", "--no-managed-python", "--no-python-downloads", "--no-project", f"cpython-3.12-windows-{uv_arch}-none"],
     ]
+    if available != "local":
+        expected_calls.append(["python", "find", "--managed-python", "--no-python-downloads", "--no-project", f"cpython-3.12-windows-{uv_arch}-none"])
+    if available == "download":
+        expected_calls.extend([
+            ["python", "install", "--no-bin", "--no-registry", f"cpython-3.12-windows-{uv_arch}-none"],
+            ["python", "find", "--managed-python", "--no-project", f"cpython-3.12-windows-{uv_arch}-none"],
+        ])
+    assert [json.loads(line) for line in log.read_text(encoding="utf-8-sig").splitlines()] == expected_calls
     if stage == "python-deps":
         assert json.loads(pm_log.read_text(encoding="utf-8-sig")) == (
             ["install", "--without", "agent-browser"] if skip_browser else ["install"])

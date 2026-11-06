@@ -18,8 +18,9 @@ def test_arm64_windows_ripgrep_stages_pythons_vc_runtime_beside_rg(tmp_path, mon
     runtime.parent.mkdir(parents=True)
     runtime.write_bytes(b"arm64 vc runtime")
     monkeypatch.setattr(pm.install, "_lockfile", lambda: None)
-    monkeypatch.setattr(pm.install, "_installed_location",
-                        lambda package, lockfile, target: ({"python": {"entry": "python-1"}}, store))
+    monkeypatch.setattr(pm.install, "_resolved_package",
+                        lambda *args, **kwargs: pm.install.InstalledPackage(
+                            runtime.parent, "3.14.2", runtime.parent / "python.exe"))
 
     staged = tmp_path / "scratch" / "tree"
     wrapped = staged / "ripgrep-15.2.0-aarch64-pc-windows-msvc"
