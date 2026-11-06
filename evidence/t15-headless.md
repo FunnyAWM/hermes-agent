@@ -107,37 +107,47 @@ Linux 包 maintainer 同步为 `FunnyAWM <funnyawm@qq.com>`；About 面板版权
 （`local-gateway.ts`：desktop 只拥有有界 CLI 客户端，不杀 detached owner），
 需要停用 `hermes gateway stop`。
 
-## 产物（`release-headless/`，基座 v0.23.0 重建，2026-11-06 20:52）
+## 产物（`release-headless/`，基座 v0.23.0 重建，2026-11-06 21:43）
 
-构建（干净工作树 `ac3d203a74`，`git status` 只有两个未跟踪交付物）：同上一节的命令，
-只是环境变量指向新基线；`npm run build` 与 `electron-builder` 分别以退出码 0 结束。
+构建（干净工作树 `a0f8f725cd`；跑前把两个未跟踪交付物移到仓库外，因为 `dirty` 按
+`git status --porcelain --untracked-files=all` 计算，未跟踪文件也算脏；跑完移回）。旧基线的
+`HermesHeadless-0.22.5-fork.1-*` 与同一次 bundled 半途产物 `apps/desktop/build/agent-payload`
+（3.7 GB）已删除；受管包 store `.cache/desktop-inputs/tools`（3.6 GB）保留。
 
 | 文件 | 字节 | SHA-256 |
 |---|---|---|
-| `HermesHeadless-0.23.0-fork.1-win-x64-setup.exe` | 146,509,205 | `FD5E0EBB8D48D7C840F041633BC9C8963E7AE2BBBA756BEF7CFA504B8E1D2ADA` |
-| `HermesHeadless-0.23.0-fork.1-win-x64-portable.exe` | 146,313,050 | `E5AC654D58FC2549E3B87DD897CCBE82187D10C63F6272D1B796B9CDEEE378C3` |
+| `HermesHeadless-0.23.0-fork.1-win-x64-setup.exe` | 146,509,284 | `090A93072233F9922A34C0CE723A8876B911D3D840BBA059CD7D1B6A759E0F33` |
+| `HermesHeadless-0.23.0-fork.1-win-x64-portable.exe` | 146,313,133 | `C9594E83E0D55C3FB36143D632E6E3F6D8B3E013CE93BAD742BF229DF6DDF842` |
 
 包内 stamp（`release-headless/win-unpacked/resources/install-stamp.json`）：
 
 ```json
-{"commit":"ac3d203a740850c292507ce512081d57c40ec144","branch":"patches","dirty":false,
+{"commit":"a0f8f725cdbd66961dbdba4df6ffd6775dfc9d0e","branch":"patches","dirty":false,
  "payload":"headless","distribution":"desktop-app","updateMechanism":"external",
  "localRuntimeRoot":"D:\\VSCodeProjects\\hermes-agent"}
 ```
 
 双击等价启动实测（`win-unpacked\KouriChat Next Headless.exe`，不设任何环境变量，
-2026-11-06 20:56）：
+2026-11-06 21:44）：
 
 ```
-20:56:22,534 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
-20:57:02,047 [backend] Hermes gateway is ready
-20:57:02,116 [gateway-route win=main] published connection=local
-20:57:10,259 [bot-roster win=main] snapshot active=local answered=70b8548e expected=70b8548e rows=[local/default=""]
+21:44:33,995 [backend] Hermes gateway is ready
+21:44:34,003 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
+21:44:34,045 [gateway-route win=main] published connection=local
+21:44:38,093 [gateway-route win=main] active key=default via=primary conn=local profile=default
+21:44:39,299 [hermes:api GET /api/model/info] Error: Timed out connecting to Hermes backend after 5000ms
+21:44:42,617 [bot-roster win=main] snapshot active=local answered=70b8548e expected=70b8548e rows=[local/default=""]
 ```
 
-即：烘焙根命中、后端就绪、连接发布为 local、机器人板块只有 `local/default` 一行，
-全程无 bootstrap 日志。`CloseMainWindow` 后进程仍为 4 个（T-23 的托盘驻留：关闭窗口只隐藏，
-应用与 gateway 继续运行，`hermes gateway status` = running PID 46268），真正退出需托盘 Quit。
+即：烘焙根命中、后端就绪、连接发布为 local、机器人板块只有 `local/default` 一行，全程无
+bootstrap 日志。`/api/model/info` 的 5 秒超时是**冷启动竞态、非本次引入**：同一行日志今天已出现
+6 次（17:11 一次、17:42 四次、本次一次），都在后端刚就绪的几秒内，之后路由与 roster 正常；
+未继续定位（不属本任务口径）。`CloseMainWindow` 后进程仍为 4 个（T-23 的托盘驻留：关闭窗口只隐藏，
+应用与本机 gateway 继续运行），真正退出需托盘 Quit。
+
+21:43 之前还有一次 v0.23.0 重建（干净树 `ac3d203a74`，20:52，setup
+`FD5E0EBB8D48D7C840F041633BC9C8963E7AE2BBBA756BEF7CFA504B8E1D2ADA`），已被本次取代，只换提交、
+口径与结论一致（同一条实机日志路径、同样命中烘焙根）。
 
 ## 边界
 
