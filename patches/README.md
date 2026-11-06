@@ -3,10 +3,10 @@
 本 fork 相对上游 **v0.23.0** 基线的全部改动，按提交拆成可重放的补丁列。
 
 - 基线：`2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19`（本地 annotated tag `v0.23.0`）
-- `0001`–`0056`：v0.23.0 之上的 56 个 fork 提交。**导出本目录的提交、只写进度记录的
-  提交不入列**（它们改的就是本目录，或改的行由导出提交引入）；列数以后每次重导出都会变，
-  以 `ls patches/00*.patch | wc -l` 为准
-- `0057`：补上两个未跟踪的交付物文件 `INSTALL.md`、`scripts/download-managed-tools.ps1`
+- `0001`–`0063`：v0.23.0 之上的全部 fork 改动。**只有改了本目录的提交不进列**；这类提交
+  如果同时改了 PRD / TODO / evidence，那部分内容会单独导出成一个只含这些路径的补丁，
+  所以重放结果和分支的文件内容一致（列数每次重导出都会变，以 `ls patches/00*.patch | wc -l` 为准）
+- 二进制素材不在补丁里，见下节
 - `fork-side-of-merge-conflicts.patch`：不是提交补丁，是再往上合并时的冲突素材，
   不参与 `git am`
 
@@ -58,24 +58,40 @@ git apply -3 patches/fork-side-of-merge-conflicts.patch
 
 ## 验证
 
-在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 57 个全部成功；
-重放后的工作树与本分支只差三类内容：这些补丁文件本身（导出提交不入列）、上面 82 个
-二进制素材、以及 `0056` 新引入的两个未跟踪文件。
+在 `v0.23.0` 处新建干净 worktree，`git am --3way patches/00*.patch` 63 个全部成功
+（2026-11-06，分支 `2d7e15afa7`）。重放后的工作树与本分支只差两类内容：这些补丁文件本身
+（导出提交不入列）、上面 82 个二进制素材。`TODO.md`、`PRD.md`、`evidence/`、`INSTALL.md`
+逐字节一致；交付物脚本 `scripts/download-managed-tools.ps1` 内容一致，只有行尾按
+`core.autocrlf` 在检出时转成 CRLF。
 
 ## 重新生成
 
-导出提交与 TODO 进度记录不进补丁列，所以逐提交生成并跳过它们：
+逐提交生成；只改本目录的提交跳过，既改本目录又改跟踪文件的提交按路径过滤只导出跟踪文件：
 
 ```bash
-EXCL="$(git rev-parse <export-or-bookkeeping-sha> ...)"
-n=1
+OUT=<scratch-dir>; rm -rf "$OUT"; mkdir -p "$OUT"; n=1
 for c in $(git rev-list --reverse v0.23.0..HEAD); do
-  case " $EXCL " in *" $c "*) continue ;; esac
-  git format-patch -1 --no-binary --no-signature --base=v0.23.0 --start-number $n -o patches "$c" >/dev/null
+  files=$(git show --name-only --format= "$c" | sed '/^$/d')
+  tracked=$(printf '%s\n' "$files" | grep -v '^patches/' || true)
+  [ -z "$tracked" ] && continue
+  if printf '%s\n' "$files" | grep -q '^patches/'; then
+    # shellcheck disable=SC2086
+    git format-patch -1 --no-binary --no-signature --base=v0.23.0 --start-number $n -o "$OUT" "$c" -- $tracked >/dev/null
+  else
+    git format-patch -1 --no-binary --no-signature --base=v0.23.0 --start-number $n -o "$OUT" "$c" >/dev/null
+  fi
   n=$((n + 1))
 done
 ```
 
-`--no-binary` 必须显式给出：默认会内嵌二进制，单个补丁可到 4 MB，过不了体积门禁。
-生成后仍需剔除 `Binary files ... differ` 所在的整段 `diff --git` 块。未跟踪的交付物按
-同样办法单独生成一个补丁号（当前是 `0057`）。
+`--no-binary` 必须显式给出：默认会内嵌二进制，单个补丁可到 4 MB，过不了体积门禁。生成后
+仍需剔除 `Binary files ... differ` 所在的整段 `diff --git` 块：
+
+```bash
+for f in "$OUT"/*.patch; do
+  perl -0777 -i -pe 's/^diff --git[^\n]*\n(?:(?!^diff --git).)*?Binary files [^\n]*differ[^\n]*\n//msg' "$f"
+done
+```
+
+未跟踪的交付物（`INSTALL.md`、`scripts/download-managed-tools.ps1`）不属任何提交，临时
+提交它们、按下一个号导出、再 `git reset --soft HEAD~1` 退回，提交不留在分支上。
