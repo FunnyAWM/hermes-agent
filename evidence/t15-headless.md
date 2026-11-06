@@ -40,9 +40,9 @@ python scripts/check                                → 14 checks ok（health 0 
 env 覆盖优先于烘焙根；覆盖目标不是 checkout 时回落到烘焙根；烘焙根失效/无可用 Python 时
 记录日志并继续下一级；`refuseBootstrap` 只对 headless 硬停；`headlessRuntimeRoot` 的回落条件。
 
-## 产物（`apps/desktop/release-headless/`）
+## 产物（`apps/desktop/release-headless/`，2026-11-06 16:41 重建）
 
-构建（脏工作区，仅打包验证）：
+构建（干净工作树 `8b7d5a18af`）：
 
 ```powershell
 $env:HERMES_DESKTOP_VARIANT = "headless"
@@ -53,46 +53,54 @@ npx electron-builder --config electron-builder.fork.cjs --win nsis portable --x6
   -c.electronDist="C:\Users\11429\AppData\Local\electron\Cache\0a74c7b0...\electron-v44.9.3-win32-x64.zip"
 ```
 
+`HERMES_DESKTOP_VARIANT` 必须同时出现在 **打包** 进程：只给 `npm run build` 时主进程戳是
+headless，但 `product-identity.cjs` 会按稳定版命名产出 `Hermes-…-setup.exe`（appId/userData
+与既有安装重叠）。该次误产物已删除，下表为带变体重打包的结果。
+
 | 文件 | 字节 | SHA-256 |
 |---|---|---|
-| `HermesHeadless-0.22.5-fork.1-win-x64-setup.exe` | 146,818,202 | `E371FCBBB397250C752D56FA5FB27B25F47B4EDB87446A0A5804BC6AE02B97A1` |
-| `HermesHeadless-0.22.5-fork.1-win-x64-portable.exe` | 146,629,492 | `4A68A3118DC9D03AF2031B4CEBE3A88DA3AE19CD5D7DCCD52872B44170EDAF8B` |
+| `HermesHeadless-0.22.5-fork.1-win-x64-setup.exe` | 146,461,618 | `51738510CB2FA911067E9DEAACCE0D9CE673A7DB52C9F95FD8D358967EF414A5` |
+| `HermesHeadless-0.22.5-fork.1-win-x64-portable.exe` | 146,265,465 | `D4BD10BB861E1FC5B6879DC807EC89FFA236B5E9232C94EA293B0A8BC5CDDBFD` |
 
 包内 stamp（`release-headless/win-unpacked/resources/install-stamp.json`）：
 
 ```json
-{"commit":"58d1f503f6f7adff111154b5f9e016c7566f399a","dirty":true,"payload":"headless",
+{"commit":"8b7d5a18afea69860328136190f54618a5fbe3ce","dirty":false,"payload":"headless",
  "distribution":"desktop-app","updateMechanism":"external",
  "localRuntimeRoot":"D:\\VSCodeProjects\\hermes-agent"}
 ```
 
-可执行文件为 `Hermes Headless.exe`；与 bootstrap 包（`Hermes.exe`、`Hermes-…-setup.exe`）
-文件名、appId、userData 均不同，可并存。
+可执行文件为 `KouriChat Next Headless.exe`（窗口标题 `KouriChat Next`，品牌图标已替换）；
+与 bootstrap/稳定包（`Hermes.exe`、`Hermes-…-setup.exe`）文件名、appId、userData 均不同，
+可并存。安装包文件名仍为 `HermesHeadless-*`：`artifactNamePascal` 有意保持内部身份不变，
+否则既有安装无法原地升级。
 
-## 双击等价启动实测
+## 双击等价启动实测（2026-11-06 16:44）
 
-直接启动 `release-headless/win-unpacked/Hermes Headless.exe`（不设任何环境变量），
+直接启动 `release-headless/win-unpacked/KouriChat Next Headless.exe`（不设任何环境变量），
 `%LOCALAPPDATA%\hermes\logs\desktop.log` 新增：
 
 ```
-14:54:48,285 [boot] Resolving Hermes backend
-14:54:48,289 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
-14:55:31,216 [backend] Hermes gateway is ready
-14:55:31,222 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
-14:55:31,249 [gateway-route win=main] published connection=local
+16:44:15,255 [backend] using Hermes source at D:\VSCodeProjects\hermes-agent
+16:44:26,098 [gateway] owner runs 1d1e08e0… but this Hermes is 8b7d5a18af…; restarting it
+16:44:56,615 [gateway-route win=main] published connection=local
+16:45:13,371 [bot-roster win=main] snapshot active=local answered=70b8548e expected=70b8548e rows=[local/default=""]
+16:45:28,150 [backend] Hermes gateway is ready
 ```
 
-即：烘焙根生效、命中阶梯 1b、43 秒内后端就绪、连接发布为 local；全程无 bootstrap 日志。
-`CloseMainWindow` 关闭，应用干净退出（`release-headless` 进程数归零）；gateway 进程按
-Desktop 设计**继续存活**（`local-gateway.ts`：desktop 只拥有有界 CLI 客户端，不杀 detached owner），
+即：烘焙根生效、命中阶梯 1b、连接发布为 local、后端就绪；全程无 bootstrap 日志。
+`bot-roster` 快照只有 `local/default` 一行，与“机器人板块仅保留 default”一致。
+网关 owner 仍是旧提交 `1d1e08e`，启动时自动重启到当前 `8b7d5a18af`；重启窗口内
+`GET /api/profiles` 报过一次 `Gateway ticket bootstrap failed`，网关就绪后未再出现
+（属重启竞态，不是启动失败）。
+`CloseMainWindow` 关闭，应用干净退出（进程数归零）；gateway 进程按 Desktop 设计**继续存活**
+（`local-gateway.ts`：desktop 只拥有有界 CLI 客户端，不杀 detached owner），
 需要停用 `hermes gateway stop`。
 
 ## 边界
 
-- 构建戳 `dirty: true`：本次变体改动当时未提交，产物只作功能验证，不作发行。
-- 上面的两个安装包构建于**收口重构之前**的工作树；重构只把阶梯 1–1b、末级硬停与
-  Runtime 行抽成函数（行为不变），由 11 项 `headless-runtime` 用例、8 文件 54 项回归与
-  `scripts/check` 覆盖。若需与最终源码逐字节对应的安装包，按上面命令重建即可。
+- 构建戳 `dirty: false`，与 `8b7d5a18af` 源码对应；早先 14:53 那一组产物（`58d1f503f6f7`、
+  `dirty: true`）已被本次重建取代。
 - `localRuntimeRoot` 是构建机器的事实（`D:\VSCodeProjects\hermes-agent`）。换机器后该级失效，
   走后续阶梯；源码里这是数据，不是探测。
 - T-12 的覆盖安装与哈希证据针对 bootstrap 包，对 headless 包不成立；headless 需要单独做
