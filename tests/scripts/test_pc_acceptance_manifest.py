@@ -140,3 +140,35 @@ def test_json_summary_is_pure_json(tmp_path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"] == {"total": 1, "completed": 1, "blocked": 0}
     assert payload["results"][0]["id"] == "T-01"
+
+
+def test_out_writes_the_same_report_the_gate_returned(tmp_path):
+    path = _write(tmp_path, [_task()])
+    report = tmp_path / "nested" / "acceptance.json"
+    assert verify.main(["--manifest", str(path), "--run", "--out", str(report)]) == 0
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["exit"] == 0
+    assert payload["results"] == [{"id": "T-01", "ok": True, "detail": ""}]
+
+
+def test_out_records_blocked_exit_3(tmp_path):
+    path = _write(
+        tmp_path,
+        [
+            _task(
+                "T-02",
+                status="blocked",
+                command=None,
+                blocked_reason="needs Android hardware",
+                handoff="evidence/handoff/T-09b.md",
+            )
+        ],
+    )
+    report = tmp_path / "acceptance.json"
+    assert (
+        verify.main(["--manifest", str(path), "--allow-blocked", "--out", str(report)])
+        == 3
+    )
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["exit"] == 3
+    assert payload["blocked"] == ["T-02"]

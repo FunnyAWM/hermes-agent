@@ -137,6 +137,16 @@ def run_tasks(manifest: dict, *, timeout: float) -> list[dict]:
     return results
 
 
+def _emit(report: dict, args, text: str) -> None:
+    """Print per flag, and always honour --out so a gate run leaves one artifact."""
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else text)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -152,12 +162,18 @@ def main(argv: list[str] | None = None) -> int:
         help="treat blocked tasks as a handoff state (exit 3) instead of a failure",
     )
     parser.add_argument("--json", action="store_true", help="print a JSON summary")
+    parser.add_argument("--out", type=Path, help="write the JSON summary to this file")
     args = parser.parse_args(argv)
 
     try:
         manifest = load_manifest(args.manifest)
     except (OSError, ValueError) as exc:
         print(f"invalid manifest: {exc}", file=sys.stderr)
+        _emit(
+            {"manifest": str(args.manifest), "errors": [str(exc)], "exit": 2},
+            args,
+            f"invalid manifest: {exc}",
+        )
         return 2
 
     errors = validate(manifest)
@@ -170,11 +186,10 @@ def main(argv: list[str] | None = None) -> int:
         "blocked": [],
     }
     if errors:
-        if args.json:
-            print(json.dumps(report, ensure_ascii=False, indent=2))
-        else:
-            for error in errors:
-                print(f"[FAIL] {error}", file=sys.stderr)
+        report["exit"] = 2
+        for error in errors:
+            print(f"[FAIL] {error}", file=sys.stderr)
+        _emit(report, args, f"{len(errors)} manifest error(s)")
         return 2
 
     report["blocked"] = [
@@ -187,27 +202,28 @@ def main(argv: list[str] | None = None) -> int:
             report["results"].append(result)
             if not result["ok"]:
                 failures += 1
-            if not args.json:
+            if not args.json and not args.out:
                 state = "ok" if result["ok"] else "FAIL"
                 print(
                     f"[{state}] {result['id']}"
                     + (f": {result['detail']}" if not result["ok"] else "")
                 )
 
-    if args.json:
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-    else:
-        print(
-            f"{summary['completed']} completed / {summary['blocked']} blocked / "
-            f"{summary['total']} tasks"
-            + (f"; {failures} verification command(s) failed" if args.run else "")
-        )
-
     if failures:
-        return 1
-    if summary["blocked"]:
-        return 3 if args.allow_blocked else 1
-    return 0
+        code = 1
+    elif summary["blocked"]:
+        code = 3 if args.allow_blocked else 1
+    else:
+        code = 0
+    report["exit"] = code
+    _emit(
+        report,
+        args,
+        f"{summary['completed']} completed / {summary['blocked']} blocked / "
+        f"{summary['total']} tasks"
+        + (f"; {failures} verification command(s) failed" if args.run else ""),
+    )
+    return code
 
 
 if __name__ == "__main__":
