@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.18（草稿，待评审） |
+| 文档版本 | v0.19（草稿，待评审） |
 | 日期 | 2026-11-06 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -153,10 +153,10 @@
 
 | 位置 | 写法 | 为什么 |
 |---|---|---|
-| 桌面端 `apps/desktop/package.json` | `0.22.5-fork.1`（SemVer） | electron-builder / npm 认 pre-release；`-` 在文件名里也安全 |
-| Python `pyproject.toml` | `0.22.5+fork1`（PEP 440 本地版本） | PEP 440 不认 `-fork.1`（`-` 后只接受数字表示 post），只能写成 `+fork1` |
+| 桌面端 `apps/desktop/package.json` | `0.23.0-fork.1`（SemVer） | electron-builder / npm 认 pre-release；`-` 在文件名里也安全 |
+| Python `pyproject.toml` | `0.23.0+fork1`（PEP 440 本地版本） | PEP 440 不认 `-fork.1`（`-` 后只接受数字表示 post），只能写成 `+fork1` |
 
-两者不是同一个字符串，**不要试图让它们相等**；它们的含义相同：上游 0.22.5 之上的第 1 版 fork。
+两者不是同一个字符串，**不要试图让它们相等**；它们的含义相同：上游 0.23.0 之上的第 1 版 fork。
 
 **受控补丁登记表**。往内核里加一处改动，就必须在这里加一行；表里没有的改动视为违规改造。
 
@@ -710,3 +710,4 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.16 | 2026-11-06 | 与 Android 现行契约对齐（`PRD_ANDROID.md` / `AGENTS_PROJECT.md` / T-81 / T-88 / T-112 / T-113）：§7.2 `MEMORY.md` 模型写入默认 3000、可配置、`0` 不限，`USER.md` 不限，取消合并上限；计数改为码点 + 簇尾归并；§7.1/§7.3 新增 `notes/docs/` 固定例外；§7.5 增补根提示词；§8.1 增补显式检索出站例外；§5.4 登记对应补丁。T-05 口径改为事实由常规记忆工具轮写入 notes，不要求压缩同轮抽取 |
 | v0.17 | 2026-11-06 | §5.4 登记 `hermes_cli/lan_addresses.py` 与 `web_server.py` 的局域网横幅：非回环绑定打印可达 IPv4 地址与配对提示，默认回环绑定与鉴权门禁不变（T-09b 远 01） |
 | v0.18 | 2026-11-06 | 收尾三件事：① T-11 用真实 Electron NetLog 结案，发现并修掉内置主题远程字体外联（§5.4 新登记 `apps/desktop/src/themes/presets.ts`），采集器改为解析数字事件类型并优雅退出；② T-12 在本机用 NSIS 覆盖安装两次结案（隔离 `HERMES_HOME` 逐字节保留、真实 `~/.hermes` 不动、从不卸载），T-15 产物在干净提交 `56b7516be4` 重建并刷新哈希；③ T-16 的 65 项失败逐条分类到 `evidence/t16-failures.md`（58 项已修或改为带理由的门禁，7 项为既有 Windows/环境残余），新增统一验收入口 `scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py` 与 `evidence/handoff/` 交接物 |
+| v0.19 | 2026-11-06 | 上游基座由 v0.22.5（`f5e0dd8e9b`）改钉到 **v0.23.0（`2bd378ed1b`）**：`origin/main` 先硬回退到上游，`main` 复位到 v0.23.0 并打本地 tag `v0.23.0`；fork 的 55 个提交正向重放（`git rebase --onto v0.23.0`）落在 `patches-v0.23.0` 分支，版本号随之改为 `0.23.0-fork.1` / `0.23.0+fork1`（换基座 N 归 1），补丁列重导出为 56 个补丁。桌面端两处行为差异按 fork 规则处理：单机器人面板不显示网关群聊（`groups.list` 的房间不再进列表），`pm/install.py` 的宿主工具复用与上游 `env_for` 单次依赖优先遍历合并保留两者 |
