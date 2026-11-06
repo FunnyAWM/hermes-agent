@@ -284,6 +284,7 @@ import {
   saveGatewayDownload
 } from './gateway-file-download'
 import { downloadViaOauthSessionToFile, downloadViaTokenToFile } from './gateway-file-download-transport'
+import { stopGatewayForQuit } from './gateway-quit'
 import { stopGatewayBeforeUpdate } from './gateway-stop-before-update'
 import { resolveGatewayVersion } from './gateway-version'
 import { probeGatewayWebSocket } from './gateway-ws-probe'
@@ -11565,9 +11566,7 @@ function reapInstallRootedStragglers(excludePids: number[]): void {
   }
 }
 
-// Closing Desktop never stops the detached gateway: only processes this app
-// still owns are torn down, and the straggler reap protects every live Hermes
-// runtime tree (package-process-reap.ts).
+// Desktop owns the local gateway's lifetime: tray-resident while open, stopped on quit.
 const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void> => {
   const ownedChildren = IS_WINDOWS ? collectOwnedBackendChildren() : []
   const localShutdown = localBackendLifecycle.shutdown()
@@ -11577,6 +11576,7 @@ const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void>
 
   // Bounded: a backend that ignores SIGTERM must not wedge app quit (main's 7 s teardown budget).
   await waitForTeardown([localShutdown, primaryStop, pooledStops], 7_000)
+  stopGatewayForQuit([headlessRuntimeRoot(INSTALL_STAMP, resolveUpdateRoot), resolveUpdateRoot()], HERMES_HOME, rememberLog)
 
   reapInstallRootedStragglers(Number.isInteger(primary?.pid) ? [primary.pid] : [])
 

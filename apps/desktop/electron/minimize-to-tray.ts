@@ -183,13 +183,14 @@ export function createMinimizeToTray(options: Options) {
             height: process.platform === 'darwin' ? 18 : 24
           })
         )
-        tray.setToolTip('Hermes')
+        const productName = app.getName()
+        tray.setToolTip(productName)
         tray.setContextMenu(
           Menu.buildFromTemplate([
-            { label: 'Show Hermes', click: restore },
+            { label: `Show ${productName}`, click: restore },
             { type: 'separator' },
             // Do not bypass the ordinary active-work confirmation or teardown.
-            { label: 'Quit Hermes', click: () => app.quit() }
+            { label: `Quit ${productName}`, click: () => app.quit() }
           ])
         )
 
@@ -303,8 +304,10 @@ export function createMinimizeToTray(options: Options) {
 
     try {
       on = JSON.parse(fs.readFileSync(options.preferencesPath, 'utf8')).enabled === true
-    } catch {
-      // Missing or malformed preference preserves ordinary minimize/close.
+    } catch (error) {
+      // Fork default: stay resident in the tray until the user opts out.
+      // A corrupt file keeps the old safe behavior (ordinary close).
+      on = (error as NodeJS.ErrnoException).code === 'ENOENT'
     }
 
     const operation = apply(on)

@@ -4,11 +4,10 @@
 // that go. The decision + copy live here (pure, testable) so main.ts only owns
 // the IPC and the dialog call.
 //
-// That's only true for a backend the app owns: an SSH-managed server the app
-// starts and stops. The local profile gateway is attached, not owned (`hermes
-// gateway ensure`): it keeps cron, messaging adapters and the in-flight turn
-// running after the app quits, exactly like a remote URL or Hermes Cloud
-// backend, so those prompts say so instead of warning about lost work (#79579).
+// That's true for every backend whose lifetime the app owns: the local profile
+// gateway (stopped on quit in this fork, tray-resident while the app lives) and
+// an SSH-managed server. A remote URL or Hermes Cloud backend is supervised
+// elsewhere and keeps the turn running, so those prompts say so (#79579).
 
 const MAX_LISTED = 4
 
@@ -72,18 +71,18 @@ export interface BackendOwnershipInput {
    * SSH-managed servers, across the primary and every pooled profile.
    */
   ownedBackendCount: number
-  /** What the primary profile resolves to; null means the local profile gateway (attached, not owned). */
+  /** What the primary profile resolves to; null means the local profile gateway (owned). */
   primaryRouteKind: 'cloud' | 'remote' | 'ssh' | null
 }
 
 /**
- * Whether quitting takes the agent down with the app. Only SSH backends are
- * started and stopped by the app. The local gateway, a remote URL and a cloud
- * backend all outlive it; but any server the app itself manages (another
- * window's SSH connection) might be where the turn is running, so it counts.
+ * Whether quitting takes the agent down with the app. The local gateway and
+ * SSH servers are started and stopped by the app; a remote URL and a cloud
+ * backend outlive it. Any server the app itself manages might be where the
+ * turn is running, so it counts too.
  */
 export function backendOwnedByApp({ ownedBackendCount, primaryRouteKind }: BackendOwnershipInput): boolean {
-  return primaryRouteKind === 'ssh' || ownedBackendCount > 0
+  return (primaryRouteKind !== 'remote' && primaryRouteKind !== 'cloud') || ownedBackendCount > 0
 }
 
 /**
@@ -93,8 +92,8 @@ export function backendOwnedByApp({ ownedBackendCount, primaryRouteKind }: Backe
  * are the app replacing itself, not the user walking away, and a modal there
  * would strand the detached script waiting on a PID that never exits.
  *
- * `backendOwned` (see backendOwnedByApp) picks the copy: an owned backend dies
- * with the app, a remote/cloud one keeps working after it closes.
+ * `backendOwned` (see backendOwnedByApp) picks the copy: the local gateway and
+ * SSH backends die with the app, a remote/cloud one keeps working after it closes.
  */
 export function quitPromptFor(
   work: ActiveWork,
