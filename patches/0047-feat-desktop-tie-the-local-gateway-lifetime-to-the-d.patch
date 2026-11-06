@@ -1,0 +1,344 @@
+From 0dad8e3edb693dd9e8b87ab7d8d46a3ea79559e6 Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Fri, 6 Nov 2026 17:49:11 +0800
+Subject: [PATCH 47/48] feat(desktop): tie the local gateway lifetime to the
+ desktop app
+
+The app now stays resident in the tray by default, so closing the
+window keeps the gateway and live work running. A real quit stops the
+local gateway owner before exit, and the quit prompt now warns that
+local work is lost. Remote and cloud backends keep running.
+---
+ apps/desktop/electron/gateway-quit.test.ts    | 52 ++++++++++++++++++
+ apps/desktop/electron/gateway-quit.ts         | 53 +++++++++++++++++++
+ apps/desktop/electron/main.ts                 |  6 +--
+ .../desktop/electron/minimize-to-tray.test.ts | 11 ++--
+ apps/desktop/electron/minimize-to-tray.ts     | 13 +++--
+ apps/desktop/electron/quit-guard.test.ts      | 31 +++++------
+ apps/desktop/electron/quit-guard.ts           | 25 +++++----
+ 7 files changed, 150 insertions(+), 41 deletions(-)
+ create mode 100644 apps/desktop/electron/gateway-quit.test.ts
+ create mode 100644 apps/desktop/electron/gateway-quit.ts
+
+diff --git a/apps/desktop/electron/gateway-quit.test.ts b/apps/desktop/electron/gateway-quit.test.ts
+new file mode 100644
+index 0000000000..fc85fbf895
+--- /dev/null
++++ b/apps/desktop/electron/gateway-quit.test.ts
+@@ -0,0 +1,52 @@
++import assert from 'node:assert/strict'
++import path from 'node:path'
++
++import { test, vi } from 'vitest'
++
++import { stopGatewayForQuit } from './gateway-quit'
++
++const HERMES = process.platform === 'win32' ? path.join('Scripts', 'hermes.exe') : path.join('bin', 'hermes')
++
++test('quit requests a detached gateway stop without waiting', () => {
++  const unref = vi.fn()
++  const spawn = vi.fn(() => ({ unref }))
++  const log = vi.fn()
++  const cli = path.join('C:\\source', '.venv', HERMES)
++
++  stopGatewayForQuit(['C:\\missing', 'C:\\source'], 'C:\\home', log, {
++    existsSync: candidate => candidate === cli,
++    spawn: spawn as never
++  })
++
++  assert.equal(spawn.mock.calls[0][0], cli)
++  assert.deepEqual(spawn.mock.calls[0][1], ['gateway', 'stop', '-y'])
++  assert.equal((spawn.mock.calls[0][2] as { detached: boolean }).detached, true)
++  assert.equal((spawn.mock.calls[0][2] as { env: NodeJS.ProcessEnv }).env.HERMES_HOME, 'C:\\home')
++  assert.equal(unref.mock.calls.length, 1)
++  assert.match(log.mock.calls[0][0], /stop requested/)
++})
++
++test('a missing CLI skips the stop and says why', () => {
++  const spawn = vi.fn()
++  const log = vi.fn()
++
++  stopGatewayForQuit(['C:\\missing'], 'C:\\home', log, { existsSync: () => false, spawn: spawn as never })
++
++  assert.equal(spawn.mock.calls.length, 0)
++  assert.match(log.mock.calls[0][0], /no managed hermes CLI/)
++})
++
++test('a spawn failure is logged, never thrown', () => {
++  const log = vi.fn()
++  const cli = path.join('C:\\source', 'venv', HERMES)
++
++  assert.doesNotThrow(() =>
++    stopGatewayForQuit(['C:\\source'], 'C:\\home', log, {
++      existsSync: candidate => candidate === cli,
++      spawn: () => {
++        throw new Error('spawn denied')
++      }
++    })
++  )
++  assert.match(log.mock.calls[0][0], /spawn denied/)
++})
+diff --git a/apps/desktop/electron/gateway-quit.ts b/apps/desktop/electron/gateway-quit.ts
+new file mode 100644
+index 0000000000..b7b19b2128
+--- /dev/null
++++ b/apps/desktop/electron/gateway-quit.ts
+@@ -0,0 +1,53 @@
++import { spawn } from 'node:child_process'
++import { existsSync } from 'node:fs'
++import path from 'node:path'
++
++interface ChildLike {
++  unref: () => void
++}
++
++export interface GatewayQuitStopDeps {
++  existsSync?: (path: string) => boolean
++  spawn?: (command: string, args: string[], options: object) => ChildLike
++}
++
++/**
++ * Stop the local gateway owner when Desktop really quits. Detached so quit never
++ * waits on the gateway's drain; hiding to the tray never reaches this path.
++ * Roots are tried in order (headless baked checkout first, then the update root).
++ */
++export function stopGatewayForQuit(
++  roots: readonly (string | null | undefined)[],
++  home: string,
++  log: (message: string) => void,
++  deps: GatewayQuitStopDeps = {}
++): void {
++  const exists = deps.existsSync ?? existsSync
++  const run = deps.spawn ?? spawn
++  const bin = process.platform === 'win32' ? path.join('Scripts', 'hermes.exe') : path.join('bin', 'hermes')
++
++  const cliPath = roots
++    .filter((root): root is string => Boolean(root))
++    .flatMap(root => [path.join(root, 'venv', bin), path.join(root, '.venv', bin)])
++    .find(exists)
++
++  if (!cliPath) {
++    log('[gateway] stop on quit skipped: no managed hermes CLI under the runtime roots')
++
++    return
++  }
++
++  try {
++    const child = run(cliPath, ['gateway', 'stop', '-y'], {
++      env: { ...process.env, HERMES_HOME: home },
++      detached: true,
++      stdio: 'ignore',
++      windowsHide: true
++    })
++
++    child.unref()
++    log(`[gateway] stop requested for desktop quit via ${cliPath}`)
++  } catch (error) {
++    log(`[gateway] stop on quit failed: ${error instanceof Error ? error.message : String(error)}`)
++  }
++}
+diff --git a/apps/desktop/electron/main.ts b/apps/desktop/electron/main.ts
+index bc70c9d121..51e7798e15 100644
+--- a/apps/desktop/electron/main.ts
++++ b/apps/desktop/electron/main.ts
+@@ -283,6 +283,7 @@ import {
+   saveGatewayDownload
+ } from './gateway-file-download'
+ import { downloadViaOauthSessionToFile, downloadViaTokenToFile } from './gateway-file-download-transport'
++import { stopGatewayForQuit } from './gateway-quit'
+ import { stopGatewayBeforeUpdate } from './gateway-stop-before-update'
+ import { resolveGatewayVersion } from './gateway-version'
+ import { probeGatewayWebSocket } from './gateway-ws-probe'
+@@ -11585,9 +11586,7 @@ function reapInstallRootedStragglers(excludePids: number[]): void {
+   }
+ }
+ 
+-// Closing Desktop never stops the detached gateway: only processes this app
+-// still owns are torn down, and the straggler reap protects every live Hermes
+-// runtime tree (package-process-reap.ts).
++// Desktop owns the local gateway's lifetime: tray-resident while open, stopped on quit.
+ const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void> => {
+   const ownedChildren = IS_WINDOWS ? collectOwnedBackendChildren() : []
+   const localShutdown = localBackendLifecycle.shutdown()
+@@ -11597,6 +11596,7 @@ const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void>
+ 
+   // Bounded: a backend that ignores SIGTERM must not wedge app quit (main's 7 s teardown budget).
+   await waitForTeardown([localShutdown, primaryStop, pooledStops], 7_000)
++  stopGatewayForQuit([headlessRuntimeRoot(INSTALL_STAMP, resolveUpdateRoot), resolveUpdateRoot()], HERMES_HOME, rememberLog)
+ 
+   reapInstallRootedStragglers(Number.isInteger(primary?.pid) ? [primary.pid] : [])
+ 
+diff --git a/apps/desktop/electron/minimize-to-tray.test.ts b/apps/desktop/electron/minimize-to-tray.test.ts
+index 23c99ec8c5..f72420a2fd 100644
+--- a/apps/desktop/electron/minimize-to-tray.test.ts
++++ b/apps/desktop/electron/minimize-to-tray.test.ts
+@@ -7,7 +7,7 @@ import type { BrowserWindow } from 'electron'
+ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+ 
+ const native = vi.hoisted(() => ({
+-  app: { on: vi.fn(), quit: vi.fn(), dock: { show: vi.fn(), hide: vi.fn() } },
++  app: { getName: () => 'KouriChat Next', on: vi.fn(), quit: vi.fn(), dock: { show: vi.fn(), hide: vi.fn() } },
+   ipc: new Map<string, (...args: any[]) => any>(),
+   windows: [] as any[],
+   trays: [] as any[],
+@@ -279,13 +279,14 @@ test('a restore before the deferred hide fires cancels the stale hide', async ()
+   expect(main.minimized).toBe(false)
+ })
+ 
+-test('opt-in minimize and primary Close preserve windows while explicit Quit still exits', async () => {
++test('tray residency is the default; primary Close preserves windows while explicit Quit still exits', async () => {
+   const { controller, main, peer } = setup()
+-  expect(await controller.start()).toEqual({ enabled: false, available: false })
++  // No preference file: the fork keeps the app resident in the tray.
++  expect(await controller.start()).toEqual({ enabled: true, available: true })
+   main.minimize()
+-  expect(main.visible).toBe(true)
++  await flushDeferredHide()
++  expect(main.visible).toBe(false)
+   main.restore()
+-  await native.ipc.get('hermes:minimize-to-tray:set')!(null, true)
+   expect(native.ipc.get('hermes:minimize-to-tray:get')!()).toEqual({ enabled: true, available: true })
+   main.minimize()
+   await flushDeferredHide()
+diff --git a/apps/desktop/electron/minimize-to-tray.ts b/apps/desktop/electron/minimize-to-tray.ts
+index 6551e2545c..dabbf811cc 100644
+--- a/apps/desktop/electron/minimize-to-tray.ts
++++ b/apps/desktop/electron/minimize-to-tray.ts
+@@ -183,13 +183,14 @@ export function createMinimizeToTray(options: Options) {
+             height: process.platform === 'darwin' ? 18 : 24
+           })
+         )
+-        tray.setToolTip('Hermes')
++        const productName = app.getName()
++        tray.setToolTip(productName)
+         tray.setContextMenu(
+           Menu.buildFromTemplate([
+-            { label: 'Show Hermes', click: restore },
++            { label: `Show ${productName}`, click: restore },
+             { type: 'separator' },
+             // Do not bypass the ordinary active-work confirmation or teardown.
+-            { label: 'Quit Hermes', click: () => app.quit() }
++            { label: `Quit ${productName}`, click: () => app.quit() }
+           ])
+         )
+ 
+@@ -303,8 +304,10 @@ export function createMinimizeToTray(options: Options) {
+ 
+     try {
+       on = JSON.parse(fs.readFileSync(options.preferencesPath, 'utf8')).enabled === true
+-    } catch {
+-      // Missing or malformed preference preserves ordinary minimize/close.
++    } catch (error) {
++      // Fork default: stay resident in the tray until the user opts out.
++      // A corrupt file keeps the old safe behavior (ordinary close).
++      on = (error as NodeJS.ErrnoException).code === 'ENOENT'
+     }
+ 
+     const operation = apply(on)
+diff --git a/apps/desktop/electron/quit-guard.test.ts b/apps/desktop/electron/quit-guard.test.ts
+index ef4045aafe..1253660a8d 100644
+--- a/apps/desktop/electron/quit-guard.test.ts
++++ b/apps/desktop/electron/quit-guard.test.ts
+@@ -61,12 +61,11 @@ test('quitPromptFor summarizes past the list cap and counts untitled work', () =
+   assert.ok(prompt.detail.includes('• 5 more'))
+ })
+ 
+-// #79579: only a backend the app owns (started over SSH) dies with it. The
+-// local profile gateway is attached (`hermes gateway ensure`), and a remote URL
+-// or Hermes Cloud backend is supervised elsewhere: all keep the turn running
+-// after the app quits, so the prompt must not claim the work is lost.
+-test('backendOwnedByApp: the local gateway is attached, not owned', () => {
+-  assert.equal(backendOwnedByApp({ ownedBackendCount: 0, primaryRouteKind: null }), false)
++// The local profile gateway runs while the app lives (tray included) and is
++// stopped on quit; a remote URL or Hermes Cloud backend is supervised elsewhere
++// and keeps the turn running, so only those prompts may claim the work survives.
++test('backendOwnedByApp: the local gateway is owned and stopped on quit', () => {
++  assert.equal(backendOwnedByApp({ ownedBackendCount: 0, primaryRouteKind: null }), true)
+ })
+ 
+ test('backendOwnedByApp: an SSH primary is owned (the app starts and stops that server)', () => {
+@@ -83,17 +82,19 @@ test('backendOwnedByApp: a remote primary alongside a spawned backend stays owne
+   assert.equal(backendOwnedByApp({ ownedBackendCount: 1, primaryRouteKind: 'remote' }), true)
+ })
+ 
+-test('quitPromptFor warns about lost work when the app owns the backend (SSH)', () => {
+-  const owned = backendOwnedByApp({ ownedBackendCount: 1, primaryRouteKind: 'ssh' })
+-  const prompt = quitPromptFor({ count: 1, titles: ['Fix login'] }, false, owned)
++for (const primaryRouteKind of [null, 'ssh'] as const) {
++  test(`quitPromptFor warns about lost work when the app owns the ${primaryRouteKind ?? 'local gateway'} backend`, () => {
++    const owned = backendOwnedByApp({ ownedBackendCount: 0, primaryRouteKind })
++    const prompt = quitPromptFor({ count: 1, titles: ['Fix login'] }, false, owned)
+ 
+-  assert.ok(prompt)
+-  assert.ok(prompt.detail.includes('is lost'))
+-  assert.deepEqual(prompt.buttons, ['Keep Running', 'Quit Anyway'])
+-})
++    assert.ok(prompt)
++    assert.ok(prompt.detail.includes('is lost'))
++    assert.deepEqual(prompt.buttons, ['Keep Running', 'Quit Anyway'])
++  })
++}
+ 
+-for (const primaryRouteKind of [null, 'remote', 'cloud'] as const) {
+-  test(`quitPromptFor says the agent keeps running on a ${primaryRouteKind ?? 'local gateway'} backend`, () => {
++for (const primaryRouteKind of ['remote', 'cloud'] as const) {
++  test(`quitPromptFor says the agent keeps running on a ${primaryRouteKind} backend`, () => {
+     const owned = backendOwnedByApp({ ownedBackendCount: 0, primaryRouteKind })
+     const prompt = quitPromptFor({ count: 1, titles: ['Fix login'] }, false, owned)
+ 
+diff --git a/apps/desktop/electron/quit-guard.ts b/apps/desktop/electron/quit-guard.ts
+index d88d2c65dc..c8c230273e 100644
+--- a/apps/desktop/electron/quit-guard.ts
++++ b/apps/desktop/electron/quit-guard.ts
+@@ -4,11 +4,10 @@
+ // that go. The decision + copy live here (pure, testable) so main.ts only owns
+ // the IPC and the dialog call.
+ //
+-// That's only true for a backend the app owns: an SSH-managed server the app
+-// starts and stops. The local profile gateway is attached, not owned (`hermes
+-// gateway ensure`): it keeps cron, messaging adapters and the in-flight turn
+-// running after the app quits, exactly like a remote URL or Hermes Cloud
+-// backend, so those prompts say so instead of warning about lost work (#79579).
++// That's true for every backend whose lifetime the app owns: the local profile
++// gateway (stopped on quit in this fork, tray-resident while the app lives) and
++// an SSH-managed server. A remote URL or Hermes Cloud backend is supervised
++// elsewhere and keeps the turn running, so those prompts say so (#79579).
+ 
+ const MAX_LISTED = 4
+ 
+@@ -72,18 +71,18 @@ export interface BackendOwnershipInput {
+    * SSH-managed servers, across the primary and every pooled profile.
+    */
+   ownedBackendCount: number
+-  /** What the primary profile resolves to; null means the local profile gateway (attached, not owned). */
++  /** What the primary profile resolves to; null means the local profile gateway (owned). */
+   primaryRouteKind: 'cloud' | 'remote' | 'ssh' | null
+ }
+ 
+ /**
+- * Whether quitting takes the agent down with the app. Only SSH backends are
+- * started and stopped by the app. The local gateway, a remote URL and a cloud
+- * backend all outlive it; but any server the app itself manages (another
+- * window's SSH connection) might be where the turn is running, so it counts.
++ * Whether quitting takes the agent down with the app. The local gateway and
++ * SSH servers are started and stopped by the app; a remote URL and a cloud
++ * backend outlive it. Any server the app itself manages might be where the
++ * turn is running, so it counts too.
+  */
+ export function backendOwnedByApp({ ownedBackendCount, primaryRouteKind }: BackendOwnershipInput): boolean {
+-  return primaryRouteKind === 'ssh' || ownedBackendCount > 0
++  return (primaryRouteKind !== 'remote' && primaryRouteKind !== 'cloud') || ownedBackendCount > 0
+ }
+ 
+ /**
+@@ -93,8 +92,8 @@ export function backendOwnedByApp({ ownedBackendCount, primaryRouteKind }: Backe
+  * are the app replacing itself, not the user walking away, and a modal there
+  * would strand the detached script waiting on a PID that never exits.
+  *
+- * `backendOwned` (see backendOwnedByApp) picks the copy: an owned backend dies
+- * with the app, a remote/cloud one keeps working after it closes.
++ * `backendOwned` (see backendOwnedByApp) picks the copy: the local gateway and
++ * SSH backends die with the app, a remote/cloud one keeps working after it closes.
+  */
+ export function quitPromptFor(
+   work: ActiveWork,

@@ -1,0 +1,336 @@
+From 3c5bf5c8a6d458fa340d53e126ad88e54df71946 Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Fri, 6 Nov 2026 16:20:09 +0800
+Subject: [PATCH 39/48] feat(desktop): drive Bot Mode with a single default bot
+
+The mobile client has one assistant, one conversation and a user-set
+name. Mirror that here: the roster keeps only the default profile, the
+toolbar loses create/group/filter controls, and a row offers open-chat
+and rename only. Other profiles keep running; they are just not offered
+in the Bots pane.
+---
+ .../src/plugins/hermes-bots/bot-row.test.tsx  | 14 +++++++
+ .../src/plugins/hermes-bots/bot-row.tsx       | 25 +++++++++++-
+ .../roster-pane-derivation.test.ts            | 39 +++++++++++++++++++
+ .../hermes-bots/roster-pane-derivation.ts     | 11 ++++--
+ .../hermes-bots/roster-pane-toolbar.tsx       | 13 +++++++
+ .../src/plugins/hermes-bots/roster-pane.tsx   | 15 ++++---
+ .../plugins/hermes-bots/single-bot.test.ts    | 20 ++++++++++
+ .../src/plugins/hermes-bots/single-bot.ts     | 17 ++++++++
+ 8 files changed, 144 insertions(+), 10 deletions(-)
+ create mode 100644 apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.test.ts
+ create mode 100644 apps/desktop/src/plugins/hermes-bots/single-bot.test.ts
+ create mode 100644 apps/desktop/src/plugins/hermes-bots/single-bot.ts
+
+diff --git a/apps/desktop/src/plugins/hermes-bots/bot-row.test.tsx b/apps/desktop/src/plugins/hermes-bots/bot-row.test.tsx
+index f7c7d1e1b7..4ec16cd24d 100644
+--- a/apps/desktop/src/plugins/hermes-bots/bot-row.test.tsx
++++ b/apps/desktop/src/plugins/hermes-bots/bot-row.test.tsx
+@@ -185,6 +185,20 @@ describe('the menu opens the same forever-chat a row click does', () => {
+ 
+     expect(openRosterBot.mock.calls).toEqual([[bot, { intent: 'tab' }]])
+   })
++
++  it('single-bot mode keeps open-chat and rename only', async () => {
++    render(
++      <BotRow bot={{ name: 'default' } as RosterRow} onDelete={noop} onEdit={noop} onGroup={noop} onNewSection={noop} singleBot />
++    )
++
++    fireEvent.contextMenu(screen.getByRole('button'))
++
++    expect(await screen.findByText('Open Bot Chat')).toBeTruthy()
++    expect(screen.getByText('Edit…')).toBeTruthy()
++    expect(screen.queryByText('Open Bot Chat in new tab')).toBeNull()
++    expect(screen.queryByText('New chat with this bot')).toBeNull()
++    expect(screen.queryByText('Pin to top')).toBeNull()
++  })
+ })
+ 
+ describe('context-menu mutations hydrate the alias first', () => {
+diff --git a/apps/desktop/src/plugins/hermes-bots/bot-row.tsx b/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
+index 7c220f713e..b357cbad98 100644
+--- a/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
++++ b/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
+@@ -111,9 +111,11 @@ interface BotRowProps {
+   /** Opens the New section dialog; the bot is filed into it on create. */
+   onNewSection: (bot: RosterRow) => void
+   showHandle?: boolean
++  /** Fork rule: one assistant offers only open-chat and rename. */
++  singleBot?: boolean
+ }
+ 
+-export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle }: BotRowProps) {
++export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle, singleBot = false }: BotRowProps) {
+   const { t } = useI18n()
+   const b = useBots()
+   const focusedOwner = focusedRosterOwner(useValue($focusedBotOwner))
+@@ -329,6 +331,27 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
+     </RowButton>
+   )
+ 
++  if (singleBot) {
++    return (
++      <ContextMenu>
++        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
++        <ContextMenuContent>
++          <ContextMenuItem onSelect={() => void openRosterBot(bot)}>{b.bot.openBotChat}</ContextMenuItem>
++          <ContextMenuSeparator />
++          <ContextMenuItem
++            onSelect={() =>
++              void ensureBotMetadata(bot)
++                .then(() => onEdit(bot))
++                .catch(error => host.notifyError?.(error, b.bot.loadFailed))
++            }
++          >
++            {b.bot.editMenu}
++          </ContextMenuItem>
++        </ContextMenuContent>
++      </ContextMenu>
++    )
++  }
++
+   return (
+     <ContextMenu>
+       <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+diff --git a/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.test.ts b/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.test.ts
+new file mode 100644
+index 0000000000..12798e804e
+--- /dev/null
++++ b/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.test.ts
+@@ -0,0 +1,39 @@
++import { describe, expect, it } from 'vitest'
++
++import { deriveRosterRows } from './roster-pane-derivation'
++import type { BotMeta, GroupChat, RosterRow } from './types'
++
++function derive(roster: RosterRow[], singleBot: boolean) {
++  return deriveRosterRows({
++    roster,
++    allMeta: {} as Record<string, BotMeta>,
++    gatewayFilter: 'all',
++    query: '',
++    activityFilter: 'all',
++    rowKindFilter: 'all',
++    groupRooms: { Room: { log: [], members: [{ name: 'default' }], watermarks: {} } as GroupChat },
++    activeRosterKeys: new Set<string>(),
++    gatewayOptions: [],
++    activityOf: () => 0,
++    isPinned: () => false,
++    singleBot
++  })
++}
++
++describe('deriveRosterRows singleBot', () => {
++  it('keeps the one visible row and drops group rooms', () => {
++    const single = derive([{ name: 'default' }], true)
++
++    expect(single.visibleRoster.map(bot => bot.name)).toEqual(['default'])
++    expect(single.rosterRows.map(row => row.kind)).toEqual(['bot'])
++    expect(single.groupNames).toEqual([])
++    expect(single.hiddenBots).toEqual([])
++  })
++
++  it('leaves the multi-bot presentation untouched when the rule is off', () => {
++    const multi = derive([{ name: 'default' }, { name: 'writer' }], false)
++
++    expect(multi.visibleRoster.map(bot => bot.name)).toEqual(['default', 'writer'])
++    expect(multi.groupNames).toEqual(['Room'])
++  })
++})
+diff --git a/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.ts b/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.ts
+index 94681c52da..dc2687e91a 100644
+--- a/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.ts
++++ b/apps/desktop/src/plugins/hermes-bots/roster-pane-derivation.ts
+@@ -40,6 +40,8 @@ interface RosterRowsInput {
+   gatewayOptions: ReturnType<typeof rosterGatewayOptions>
+   activityOf: (bot: RosterRow) => number
+   isPinned: (bot: RosterRow) => boolean
++  /** Fork rule: the pane drives one assistant, so no groups and no hiding. */
++  singleBot?: boolean
+ }
+ 
+ export function deriveRosterRows({
+@@ -53,13 +55,14 @@ export function deriveRosterRows({
+   activeRosterKeys,
+   gatewayOptions,
+   activityOf,
+-  isPinned
++  isPinned,
++  singleBot = false
+ }: RosterRowsInput) {
+   const activeSourceRoster = roster.filter(bot => !bot.remoteSource)
+   // Hidden rows remain fully alive and recoverable at the bottom. Every
+   // non-display consumer continues to receive the complete roster.
+-  const hiddenBots = roster.filter(bot => isBotHidden(bot, allMeta))
+-  const visibleRoster = roster.filter(bot => !isBotHidden(bot, allMeta))
++  const hiddenBots = singleBot ? [] : roster.filter(bot => isBotHidden(bot, allMeta))
++  const visibleRoster = singleBot ? roster : roster.filter(bot => !isBotHidden(bot, allMeta))
+   const gatewayRoster = filterBotsByGateway(visibleRoster, gatewayFilter)
+ 
+   const filteredRoster = filterBots(gatewayRoster, allMeta, query).filter((bot: RosterRow) =>
+@@ -83,7 +86,7 @@ export function deriveRosterRows({
+       )
+   )
+ 
+-  const groupNames = groupChatNames(allMeta, groupRooms)
++  const groupNames = singleBot ? [] : groupChatNames(allMeta, groupRooms)
+ 
+   const groupRows = groupNames
+     .map(name => ({
+diff --git a/apps/desktop/src/plugins/hermes-bots/roster-pane-toolbar.tsx b/apps/desktop/src/plugins/hermes-bots/roster-pane-toolbar.tsx
+index fe8db7e584..b3541509f5 100644
+--- a/apps/desktop/src/plugins/hermes-bots/roster-pane-toolbar.tsx
++++ b/apps/desktop/src/plugins/hermes-bots/roster-pane-toolbar.tsx
+@@ -41,6 +41,8 @@ function NewGroupChatItem({ label, onSelect, roster }: NewGroupChatItemProps) {
+ 
+ interface renderRosterToolbarProps {
+   b: ReturnType<typeof useBots>
++  /** Fork rule: one assistant leaves nothing to create, search or filter. */
++  singleBot?: boolean
+   activityToasts: boolean
+   activeSourceRoster: RosterRow[]
+   /** Full roster; New Group Chat seats only `seatableGroupBots` of it. */
+@@ -67,6 +69,7 @@ interface renderRosterToolbarProps {
+ 
+ export function renderRosterToolbar({
+   b,
++  singleBot = false,
+   activityToasts,
+   activeSourceRoster,
+   roster,
+@@ -87,6 +90,16 @@ export function renderRosterToolbar({
+   gatewayFilter,
+   setGatewayFilter
+ }: renderRosterToolbarProps) {
++  if (singleBot) {
++    return (
++      <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">
++        <span className="text-[0.6875rem] font-semibold uppercase tracking-wider text-(--ui-text-quaternary)">
++          Bots
++        </span>
++      </div>
++    )
++  }
++
+   return (
+     <>
+       <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">
+diff --git a/apps/desktop/src/plugins/hermes-bots/roster-pane.tsx b/apps/desktop/src/plugins/hermes-bots/roster-pane.tsx
+index 84dda2bf3b..12057f5307 100644
+--- a/apps/desktop/src/plugins/hermes-bots/roster-pane.tsx
++++ b/apps/desktop/src/plugins/hermes-bots/roster-pane.tsx
+@@ -15,7 +15,6 @@ import {
+   parseRosterKey,
+   saveSelectedRosterBot
+ } from './bot-state'
+-import { CanonicalGroupList } from './canonical-group-registry'
+ /**
+  * The Bots pane itself: the roster's selection reconciliation, the
+  * workspace-ownership reads its lifecycle keys off, and the pane that lists
+@@ -51,6 +50,7 @@ import { renderRosterToolbar } from './roster-pane-toolbar'
+ import { botNeedsHandleLabel, rosterGatewayOptions } from './roster-sections'
+ import { botWorkspaceOwnerKey, setBotsWorkspaceOwner } from './routing'
+ import { activeBots, useTurnBusy } from './row-helpers'
++import { singleBotRoster } from './single-bot'
+ import type { BotMeta, GatewaySource, GroupMember, RosterActivityFilter, RosterKindFilter, RosterRow } from './types'
+ import {
+   $botSections,
+@@ -296,7 +296,10 @@ export function BotsPane() {
+   const sourceWithSelectedOwner =
+     selectionHydrated && rosterHydrated ? rosterWithSelectedOwner(source, sourceSnapshot, selectedRosterKey) : source
+ 
+-  const { roster, activityOf, isPinned } = sortRosterBots(sourceWithSelectedOwner, allMeta)
++  const sorted = sortRosterBots(sourceWithSelectedOwner, allMeta)
++  // One assistant, one row: other profiles keep working but are not offered here.
++  const roster = singleBotRoster(sorted.roster)
++  const { activityOf, isPinned } = sorted
+ 
+   // Sections made on ANOTHER desktop arrive as id + name on each member's
+   // ui_meta; rebuild the records this machine has never seen so the roster
+@@ -351,7 +354,8 @@ export function BotsPane() {
+     activeRosterKeys,
+     gatewayOptions,
+     activityOf,
+-    isPinned
++    isPinned,
++    singleBot: true
+   })
+ 
+   const {
+@@ -420,7 +424,7 @@ export function BotsPane() {
+ 
+   const groupChatMembers = groupChatName ? groupChatMemberBots(groupChatName, roster, allMeta) : []
+ 
+-  if (shouldRenderGroupChatInPane(groupChatName) && groupChatMembers.length) {
++  if (groupChatMembers.length > 1 && shouldRenderGroupChatInPane(groupChatName)) {
+     return <GroupChatWorkspace group={groupChatName} members={groupChatMembers} origin={groupOpenOrigin(groupChatName)} />
+   }
+ 
+@@ -433,6 +437,7 @@ export function BotsPane() {
+       onGroup={setGrouping}
+       onNewSection={target => setSectionDialog({ bot: target, mode: 'create' })}
+       showHandle={botNeedsHandleLabel(bot, roster, allMeta)}
++      singleBot
+     />
+   )
+ 
+@@ -471,9 +476,9 @@ export function BotsPane() {
+ 
+   return (
+     <div className="flex h-full flex-col">
+-      <CanonicalGroupList onOpen={openGroupChat} />
+       {renderRosterToolbar({
+         b,
++        singleBot: true,
+         activityToasts,
+         activeSourceRoster,
+         roster,
+diff --git a/apps/desktop/src/plugins/hermes-bots/single-bot.test.ts b/apps/desktop/src/plugins/hermes-bots/single-bot.test.ts
+new file mode 100644
+index 0000000000..af47d9fc45
+--- /dev/null
++++ b/apps/desktop/src/plugins/hermes-bots/single-bot.test.ts
+@@ -0,0 +1,20 @@
++import { describe, expect, it } from 'vitest'
++
++import { singleBotRoster } from './single-bot'
++import type { RosterRow } from './types'
++
++const bot = (name: string, extra: Partial<RosterRow> = {}): RosterRow => ({ name, ...extra })
++
++describe('singleBotRoster', () => {
++  it('keeps only the default profile, in roster order', () => {
++    expect(singleBotRoster([bot('researcher'), bot('default'), bot('writer')])).toEqual([bot('default')])
++  })
++
++  it('keeps a uniquely named default profile without inventing a row', () => {
++    expect(singleBotRoster([bot('researcher')])).toEqual([])
++  })
++
++  it('returns an empty roster when the default row is absent', () => {
++    expect(singleBotRoster([])).toEqual([])
++  })
++})
+diff --git a/apps/desktop/src/plugins/hermes-bots/single-bot.ts b/apps/desktop/src/plugins/hermes-bots/single-bot.ts
+new file mode 100644
+index 0000000000..468634e1f0
+--- /dev/null
++++ b/apps/desktop/src/plugins/hermes-bots/single-bot.ts
+@@ -0,0 +1,17 @@
++/**
++ * Fork product rule: the Bots pane drives exactly ONE assistant.
++ *
++ * The mobile client has a single assistant with one conversation and a
++ * user-set name (PRD_ANDROID 聊 03 / 设 07). The roster is reduced to the
++ * default profile; every other profile still exists and keeps working, it is
++ * just not offered here.
++ */
++
++import { isDefaultBot } from './data'
++import type { RosterRow } from './types'
++
++export function singleBotRoster(roster: RosterRow[]): RosterRow[] {
++  const bot = roster.find(isDefaultBot)
++
++  return bot ? [bot] : []
++}

@@ -1,0 +1,41 @@
+From 621b3f253533f4f8457fc9f6d78d8588b00191ef Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Fri, 6 Nov 2026 16:30:59 +0800
+Subject: [PATCH 41/48] refactor(desktop): keep BotRow inside its complexity
+ cap
+
+---
+ apps/desktop/src/plugins/hermes-bots/bot-row.tsx | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/apps/desktop/src/plugins/hermes-bots/bot-row.tsx b/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
+index b357cbad98..e82f70fd28 100644
+--- a/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
++++ b/apps/desktop/src/plugins/hermes-bots/bot-row.tsx
+@@ -97,6 +97,15 @@ import {
+  *  directly above use, so the two lists in one rail don't disagree about how
+  *  an age is spelled. Not `relativeTime` — that's the bidirectional Intl form
+  *  ("in 14 hr"), which belongs on a scheduled next-run. */
++/** The one-line preview under a row: a bot-to-bot delivery drops its prefix. */
++function rowPreview(preview: string | undefined | null, fromBot: boolean): string {
++  if (fromBot) {
++    return (preview || '').replace(A2A_PREFIX_RE, '').trim() || '…'
++  }
++
++  return preview || ''
++}
++
+ function rowAge(ms: number, r: SidebarRowLabels): string {
+   const { unit, value } = coarseElapsed(Date.now() - ms)
+ 
+@@ -192,9 +201,7 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
+   const { fromBot } = previewKind(previewSession?.preview, $lastRoster.get(), bot.connectionId)
+ 
+   // DM previews read like DMs: strip the delivery prefix, keep the message.
+-  const displayPreview = stripPreviewMarkdown(
+-    fromBot ? (previewSession?.preview || '').replace(A2A_PREFIX_RE, '').trim() || '…' : previewSession?.preview || ''
+-  )
++  const displayPreview = stripPreviewMarkdown(rowPreview(previewSession?.preview, fromBot))
+ 
+   const handle = botHandle(bot.name, bot)
+   const gatewayLabel = bot.connectionLabel || (bot.connectionId === 'local' ? b.bot.thisDevice : '')

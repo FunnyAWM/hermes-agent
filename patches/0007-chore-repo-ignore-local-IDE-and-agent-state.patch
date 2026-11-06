@@ -1,0 +1,20 @@
+From 5ef28f793d4e6918fdb5d4c8a3bb205ceee1fadb Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Tue, 3 Nov 2026 10:34:00 +0800
+Subject: [PATCH 07/48] chore(repo): ignore local IDE and agent state
+
+---
+ .gitignore | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index f9a8e1dbc4..e756b583d6 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -332,3 +332,6 @@ native/fts5_cjk/*.so
+ /pm/.lock.json.lock
+ 
+ apps/desktop/.dist-build*
++.idea
++.ruff_cache
++.workbuddy

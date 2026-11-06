@@ -1,0 +1,20 @@
+From b77bffa86ce98246d4a8bcc45f4f3fb780955af8 Mon Sep 17 00:00:00 2001
+From: FunnyAWM <1142978300@qq.com>
+Date: Fri, 6 Nov 2026 09:45:04 +0800
+Subject: [PATCH 15/48] chore(repo): ignore local agent state
+
+---
+ .gitignore | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index c25e9f8b33..3ceffce3f1 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -337,3 +337,6 @@ apps/desktop/.dist-build*
+ .workbuddy
+ 
+ /evidence/*.log
++
++# Local agent state (repo wiki cache and session metadata)
++/.qoder/
