@@ -117,11 +117,18 @@ def _data_root(home: Path, memory_file: Path, user_file: Path) -> None:
 
 def _notes(home: Path) -> None:
     section("T-04 notes shards: category enum, path safety, index cap")
-    from hermes_notes import CATEGORY_DISPLAY_NAMES, MAX_INDEX_ENTRIES, NotesStore
+    from hermes_notes import (
+        CATEGORY_DISPLAY_NAMES,
+        MAX_INDEX_ENTRIES,
+        WRITABLE_CATEGORIES,
+        NotesStore,
+    )
 
-    expected = {"work", "study", "life", "health", "finance", "people", "other"}
-    check("7 fixed English categories", set(CATEGORY_DISPLAY_NAMES) == expected,
+    expected = {"work", "study", "life", "health", "finance", "people", "other", "docs"}
+    check("8 fixed categories including docs", set(CATEGORY_DISPLAY_NAMES) == expected,
           ", ".join(sorted(CATEGORY_DISPLAY_NAMES)))
+    check("docs is read-only to the model", set(WRITABLE_CATEGORIES) == expected - {"docs"},
+          ", ".join(sorted(WRITABLE_CATEGORIES)))
     check("index cap is 64", MAX_INDEX_ENTRIES == 64, str(MAX_INDEX_ENTRIES))
 
     store = NotesStore(home)
@@ -137,7 +144,12 @@ def _notes(home: Path) -> None:
             store.note_path("work", bad_topic)
         except ValueError:
             rejected += 1
-    check("invalid category and traversal topics rejected (7/7)", rejected == 7, str(rejected))
+    try:
+        store.note_path("docs", "imported")
+    except ValueError:
+        rejected += 1
+    check("invalid category, docs write and traversal topics rejected (8/8)", rejected == 8,
+          str(rejected))
     ok_path = store.note_path("work", "roadmap")
     check("valid path is notes/work/roadmap.md", ok_path == home / "notes" / "work" / "roadmap.md",
           str(ok_path))
@@ -159,6 +171,11 @@ def _notes(home: Path) -> None:
     legacy.parent.mkdir(parents=True, exist_ok=True)
     legacy.write_text("---\nname: 旧笔记\ndescription: 未知类别\n---\nLEGACY_BODY\n", encoding="utf-8")
 
+    imported = home / "notes" / "docs" / "spec.md"
+    imported.parent.mkdir(parents=True, exist_ok=True)
+    imported.write_text("---\nname: spec\ndescription: 导入的原始文档\n---\nIMPORTED_BODY\n",
+                        encoding="utf-8")
+
     rendered = store.render_index()
     print("rendered index:")
     for line in rendered.splitlines():
@@ -166,8 +183,11 @@ def _notes(home: Path) -> None:
     check("index header present", rendered.startswith("NOTES INDEX"), rendered[:40])
     check("display name + name + summary shape", "- 工作/发布路线 — 今年两次发布" in rendered)
     check("unknown category bucket reads as 其他", "- 其他/旧笔记 — 未知类别" in rendered)
-    check("bodies are never injected", "BODY_SECRET" not in rendered and "LEGACY_BODY" not in rendered)
-    check("four shards listed", len(store.list_entries()) == 4, str(len(store.list_entries())))
+    check("docs import stays indexed under 文档", "- 文档/spec — 导入的原始文档" in rendered)
+    check("bodies are never injected",
+          "BODY_SECRET" not in rendered and "LEGACY_BODY" not in rendered
+          and "IMPORTED_BODY" not in rendered)
+    check("five shards listed", len(store.list_entries()) == 5, str(len(store.list_entries())))
 
     for index in range(MAX_INDEX_ENTRIES + 5):
         path = store.note_path("other", f"cap-{index}")

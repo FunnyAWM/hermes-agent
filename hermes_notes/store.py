@@ -15,7 +15,11 @@ CATEGORY_DISPLAY_NAMES: Final[dict[str, str]] = {
     "finance": "财务",
     "people": "人际",
     "other": "其他",
+    "docs": "文档",
 }
+# ``docs`` is an imported-source directory: scanning/indexing includes it, but the
+# model may never create notes there (Android 记 04 / D8).
+WRITABLE_CATEGORIES: Final[frozenset[str]] = frozenset(CATEGORY_DISPLAY_NAMES) - {"docs"}
 MAX_INDEX_ENTRIES: Final[int] = 64
 _MAX_SUMMARY_CHARS: Final[int] = 40
 _FRONT_MATTER_RE: Final[re.Pattern[str]] = re.compile(r"^---\s*\n(?P<body>.*?)(?:\n---\s*\n|\Z)", re.DOTALL)
@@ -45,14 +49,16 @@ class NotesStore:
             raise ValueError("max_entries must be positive")
         self.max_entries = max_entries
 
-    def validate_category(self, category: str) -> str:
+    def validate_category(self, category: str, *, for_write: bool = False) -> str:
         if category not in CATEGORY_DISPLAY_NAMES:
             allowed = ", ".join(CATEGORY_DISPLAY_NAMES)
             raise ValueError(f"invalid note category {category!r}; choose one of: {allowed}")
+        if for_write and category not in WRITABLE_CATEGORIES:
+            raise ValueError(f"note category {category!r} is read-only")
         return category
 
     def note_path(self, category: str, topic: str) -> Path:
-        self.validate_category(category)
+        self.validate_category(category, for_write=True)
         if not topic or Path(topic).name != topic or topic in {".", ".."}:
             raise ValueError("note topic must be a single file name")
         filename = topic if topic.endswith(".md") else f"{topic}.md"

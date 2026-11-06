@@ -530,6 +530,7 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         "unless the user explicitly directs you to."
     )
     expected = "\n\n".join((
+        system_prompt.MEMORY_ROOT_PROMPT,
         "IDENTITY",
         "HELP",
         "STEER",
@@ -560,7 +561,9 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         prompt = build_system_prompt(agent, system_message="SYSTEM_MESSAGE")
 
     assert prompt == expected
-    assert agent._cached_system_prompt_static == "\n\n".join(expected.split("\n\n")[:4])
+    assert agent._cached_system_prompt_static == "\n\n".join((
+        system_prompt.MEMORY_ROOT_PROMPT, "IDENTITY", "HELP", "STEER", "CODING_STABLE",
+    ))
 
 
 class TestTelegramRichMessagesHint:

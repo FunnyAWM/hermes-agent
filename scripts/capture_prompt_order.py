@@ -8,8 +8,9 @@ Usage::
 
     .venv\\Scripts\\python.exe scripts\\capture_prompt_order.py
 
-Exit code 0 means all three T-03 criteria hold:
+Exit code 0 means all four T-03 / T-18 criteria hold:
 
+0. the shared memory root prompt comes before SOUL and everything else;
 1. no skills-index line appears before the MEMORY block;
 2. MEMORY -> USER -> notes index are three consecutive volatile sections;
 3. the SOUL section is the real SOUL.md, not the built-in default identity.
@@ -24,6 +25,8 @@ from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+ROOT_MARKER = "running inside Hermes' local memory system"
+SOUL_MARKER = "SOUL_MARKER"
 MEMORY_MARKER = "MEMORY (your personal notes)"
 USER_MARKER = "USER PROFILE"
 NOTES_MARKER = "NOTES INDEX"
@@ -98,7 +101,8 @@ def main() -> int:
 
         print("tiers: " + ", ".join(f"{k}={len(v):,} chars" for k, v in parts.items()))
         markers = {
-            "SOUL": "SOUL_MARKER",
+            "ROOT": ROOT_MARKER,
+            "SOUL": SOUL_MARKER,
             "AGENTS": "AGENTS_MARKER",
             "MEMORY": MEMORY_MARKER,
             "USER": USER_MARKER,
@@ -114,7 +118,9 @@ def main() -> int:
             print(f"  | {line.splitlines()[0][:90]}")
 
         missing = [name for name, offset in offsets.items() if offset < 0]
-        check("every section is present", not missing, ", ".join(missing) or "all six")
+        check("every section is present", not missing, ", ".join(missing) or "all seven")
+        check("ROOT comes first", 0 <= offsets["ROOT"] < offsets["SOUL"],
+              f"root at {offsets['ROOT']}, soul at {offsets['SOUL']}")
         check("SOUL comes before AGENTS", 0 <= offsets["SOUL"] < offsets["AGENTS"])
         check("AGENTS comes before MEMORY", offsets["AGENTS"] < offsets["MEMORY"])
         check("no skills-index line before MEMORY", offsets["SKILLS"] > offsets["MEMORY"],
@@ -135,7 +141,7 @@ def main() -> int:
     if _failures:
         print(f"RESULT: {len(_failures)} criterion(s) failed -> {', '.join(_failures)}")
         return 1
-    print("RESULT: all T-03 criteria hold")
+    print("RESULT: all T-03 / T-18 criteria hold")
     return 0
 
 

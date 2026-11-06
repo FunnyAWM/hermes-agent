@@ -37,6 +37,37 @@ _PLUGIN_SECTION_FRAME_RE = re.compile(
 )
 _GATE_WORDS = {**dict.fromkeys(("true", "always", "yes", "on"), True), **dict.fromkeys(("false", "never", "no", "off"), False)}
 
+# Shared memory-root conventions (PRD §7.5 / D9). Semantically aligned with the
+# Android SystemPrompt.ROOT_PROMPT; tool names are the desktop ones. It rides in
+# the stable tier so the prefix cache sees it exactly once per conversation.
+MEMORY_ROOT_PROMPT = (
+    "You are an assistant running inside Hermes' local memory system. Memory persists through "
+    "readable, maintainable files, not through model-side automatic saving. These conventions "
+    "come before any persona text below; the persona only sets identity and tone.\n\n"
+    "1. Memory layers. The chat window holds only this turn; MEMORY.md is a recent summary and "
+    "USER.md is the user profile. Long-lived preferences, habits, events, decisions and "
+    "commitments belong in notes/<category>/<topic>.md. Keep concrete facts out of the summary: "
+    "at most point to the note that holds them, and after rewriting a summary move any standalone "
+    "fact into notes/.\n\n"
+    "2. Read on demand. The notes index lists names and summaries, not bodies. Decide which notes "
+    "the current topic needs and read them with read_file before relying on them; unread content "
+    "is not known.\n\n"
+    "3. Local edits. Read a note before changing it. Use patch for a unique local replacement so "
+    "unrelated facts survive; use write_file only for a new note or a deliberate full rewrite, and "
+    "never overwrite a note just to shorten it.\n\n"
+    "4. Categories. Notes live at notes/<category>/<topic>.md with exactly work, study, life, "
+    "health, finance, people or other. notes/docs/ is imported source text: read-only, never write, "
+    "replace, merge or summarize it; read the original path when exact wording matters.\n\n"
+    "5. Fidelity. Separate what the user stated, what is confirmed, and what is inference. Never "
+    "invent experiences, preferences or agreements; when old and new records conflict, correct the "
+    "record and state the change.\n\n"
+    "6. Tool boundaries. Use only tools that are actually available and paths that are allowed. "
+    "SOUL.md is user-owned: never read or modify it through memory tools. Claim something is "
+    "remembered only after a successful write; if a write fails, say so.\n\n"
+    "7. Natural replies. Use only memory relevant to the current topic; do not let unrelated notes "
+    "crowd out the conversation. If the record is insufficient, say so instead of pretending."
+)
+
 
 def _model_gate(setting: Any, model: Optional[str], default_models) -> bool:
     """Resolve a config gate: True/"true"-ish -> on, False/"false"-ish -> off,
@@ -755,7 +786,8 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     _cc_len = getattr(getattr(agent, "context_compressor", None), "context_length", None)
     _ctx_len = _cc_len if isinstance(_cc_len, int) and _cc_len > 0 else None
     # ── Stable tier ────────────────────────────────────────────────
-    stable_parts, _soul_loaded = _identity_parts(agent, _ctx_len)
+    _identity, _soul_loaded = _identity_parts(agent, _ctx_len)
+    stable_parts: list[str] = [MEMORY_ROOT_PROMPT, *_identity]
     # The skill_view() pointer dangles without skill tools OR without the
     # hermes-agent skill installed, so the variant is chosen after the skills
     # index is built; this slot holds its position.

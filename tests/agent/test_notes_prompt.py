@@ -8,7 +8,7 @@ from hermes_notes import CATEGORY_DISPLAY_NAMES, MAX_INDEX_ENTRIES, NotesStore
 
 def test_notes_store_validates_categories_and_renders_summary_only(tmp_path: Path):
     store = NotesStore(tmp_path)
-    assert set(CATEGORY_DISPLAY_NAMES) == {"work", "study", "life", "health", "finance", "people", "other"}
+    assert set(CATEGORY_DISPLAY_NAMES) == {"work", "study", "life", "health", "finance", "people", "other", "docs"}
     try:
         store.note_path("invalid", "topic")
     except ValueError as exc:

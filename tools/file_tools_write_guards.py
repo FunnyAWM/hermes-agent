@@ -144,6 +144,25 @@ def _resolved_or_raw(filepath: str, task_id: str) -> str:
         return filepath
 
 
+def _check_notes_docs_readonly(filepath: str, task_id: str = "default") -> str | None:
+    """Imported source text under ``<home>/notes/docs`` is read-only for the model."""
+    home = _get_real_hermes_home()
+    if not home:
+        return None
+    docs = os.path.normcase(os.path.realpath(os.path.join(home, "notes", "docs")))
+    for candidate in (_resolved_or_raw(filepath, task_id), os.path.normpath(_expand_tilde(filepath))):
+        try:
+            real = os.path.normcase(os.path.realpath(candidate))
+        except (OSError, ValueError):
+            continue
+        if real == docs or real.startswith(docs + os.sep):
+            return (
+                f"Refusing to write to {filepath}: notes/docs holds imported source text and is "
+                "read-only. Write new notes under notes/<category>/ instead."
+            )
+    return None
+
+
 def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None:
     """Return an error message if the path targets a sensitive system location."""
     # NT/device-namespace guard on the RAW string, BEFORE the task-base join:
