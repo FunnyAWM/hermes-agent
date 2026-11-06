@@ -1,11 +1,11 @@
 """Reproducible PC-side check for TODO.md T-05 (PRD 记 06, data half).
 
 The live half of T-05 is a model conversation that runs to the context edge, summarises, extracts
-facts into ``notes/`` and opens a new session. That needs model credentials and a real session, so
+facts into ``notes/`` and compacts the same persistent session. That needs model credentials and a real session, so
 it stays blocked and is tracked separately. What this script *can* pin down is the part that would
 silently corrupt the hand-off: after a near-cap consolidation, do the two memory files stay within
 2200/1375, does the ``\\n§\\n`` counting rule survive, does the extracted note use PRD §7.3 front
-matter, and does a *fresh* store (the new session) render MEMORY → USER → notes index without the
+matter, and does a reloaded store render MEMORY → USER → notes index without the
 dropped entries?
 
 Usage (repo root, evidence venv)::
@@ -121,7 +121,7 @@ def main() -> int:
               str(len(fields["description"])))
         check("topic lives under notes/work/", note_path == home / "notes" / "work" / "hermes-packaging.md")
 
-        # 4. New session = fresh store + fresh notes scan; nothing carries over in memory.
+        # 4. 数据重载校验；同会话 ID 与历史归档另由集成测试覆盖。
         fresh = MemoryStore()
         fresh.load_from_disk()
         memory_block = fresh.format_for_system_prompt("memory") or ""
@@ -138,7 +138,7 @@ def main() -> int:
               f"delimiter={ENTRY_DELIMITER!r}")
         check("banner percentage matches the counted chars",
               f"{fresh._char_count('memory'):,}/2,200 chars" in memory_block, memory_block.splitlines()[1] if memory_block else "")
-        check("consolidated conclusion survives the new session", "nsis + portable" in memory_block)
+        check("consolidated conclusion survives store reload", "nsis + portable" in memory_block)
         check("dropped MSIX conclusion is gone", "MSIX" not in memory_block)
         check("notes index shows display name/name/summary",
               "- 工作/Hermes 打包方案 — Windows 走 NSIS 与 portable" in index, index.splitlines()[-1])

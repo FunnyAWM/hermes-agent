@@ -78,10 +78,9 @@ class NotesStore:
                 category = relative.parts[0] if len(relative.parts) > 1 else "other"
                 if category not in CATEGORY_DISPLAY_NAMES:
                     category = "other"
-                text = path.read_text(encoding="utf-8")
+                fields = self._read_front_matter(path)
             except (OSError, UnicodeError, ValueError):
                 continue
-            fields = self._front_matter_fields(text)
             name = fields.get("name") or path.stem
             summary = fields.get("description") or ""
             summary = " ".join(summary.split())[:_MAX_SUMMARY_CHARS]
@@ -92,16 +91,31 @@ class NotesStore:
         return entries, entries[: self.max_entries]
 
     def render_index(self) -> str:
-        entries = self.list_entries()
+        total, entries = self._scan()
         if not entries:
             return ""
         lines = ["NOTES INDEX (names and summaries only)"]
         lines.extend(f"- {entry.display_line}" for entry in entries)
-        omitted = self.omitted_count()
+        omitted = len(total) - len(entries)
         if omitted > 0:
             lines.append(f"(-{omitted} older notes beyond this index's {self.max_entries}-entry cap; "
                          "list notes/<category>/ to read one)")
         return "\n".join(lines)
+
+    @staticmethod
+    def _read_front_matter(path: Path) -> dict[str, str]:
+        # 按二进制行读取，避免文本流预先解码头部之后的正文。
+        with path.open("rb") as stream:
+            first = stream.readline().decode("utf-8-sig")
+            if first.rstrip() != "---":
+                return {}
+            lines = [first]
+            for raw_line in stream:
+                line = raw_line.decode("utf-8")
+                lines.append(line)
+                if line.rstrip() == "---":
+                    break
+        return NotesStore._front_matter_fields("".join(lines))
 
     @staticmethod
     def _front_matter_fields(text: str) -> dict[str, str]:
