@@ -8,6 +8,7 @@ import { BUILTIN_THEMES } from './presets'
 it('no built-in theme declares a remote font stylesheet', () => {
   const offenders = Object.values(BUILTIN_THEMES).flatMap((theme) => {
     const url = theme.typography?.fontUrl
+
     return url && /^https?:\/\//i.test(url) ? [`${theme.name} -> ${url}`] : []
   })
 
