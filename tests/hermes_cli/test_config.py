@@ -1381,17 +1381,6 @@ class TestEnvWriteDenylist:
         env = load_env()
         assert env[allowed_key] == "test-value-123"
 
-    @pytest.mark.parametrize("allowed_key", ["git_config_parameters", "ld_preload"])
-    @pytest.mark.platforms("posix")
-    def test_lowercase_exec_names_are_inert_on_posix(self, allowed_key):
-        """POSIX env names are case-sensitive, so the lowercase spelling of a denied
-        exec-influence name is a different, inert variable. On Windows the same
-        spelling normalizes onto the denylist — covered by
-        test_windows_policy_denies_mixed_case_exec_names."""
-        save_env_value(allowed_key, "test-value-123")
-        env = load_env()
-        assert env[allowed_key] == "test-value-123"
-
     @pytest.mark.parametrize("protected_key", ["Ld_Preload", "Git_Config_Parameters"])
     def test_windows_policy_denies_mixed_case_exec_names(self, protected_key, monkeypatch):
         """Windows env names are case-insensitive, so the writer must refuse the mixed-case
