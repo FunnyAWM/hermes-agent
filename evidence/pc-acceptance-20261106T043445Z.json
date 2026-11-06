@@ -1,0 +1,18 @@
+{
+  "manifest": "D:\\VSCodeProjects\\hermes-agent\\scripts\\pc_acceptance_manifest.json",
+  "summary": {
+    "total": 20,
+    "completed": 15,
+    "blocked": 5
+  },
+  "errors": [],
+  "results": [],
+  "blocked": [
+    "T-07",
+    "T-09b",
+    "T-09c",
+    "T-10",
+    "T-13"
+  ],
+  "exit": 3
+}
