@@ -557,7 +557,10 @@ def test_update_sync_survives_unreadable_secondary_profile(admission_env):
     workspace = Path(Facts(runtime_facts_path(core), strict=True).get("venv")["resolved_lock"]).parent
     assert "primary-dep" in (workspace / "pyproject.toml").read_text()
     assert broken.read_text(encoding="utf-8") == "plugins: [broken]\n"
-    assert str(broken.parent) in json.dumps(_latest_receipt(home).get("warnings"))
+    # Compare against the decoded warning: `json.dumps` escapes Windows separators, so a raw
+    # path needle can only ever match on POSIX. The report must name the profile that sat out.
+    warnings = _latest_receipt(home).get("warnings") or []
+    assert any(str(broken.parent) in str(item.get("message", item)) for item in warnings)
     assert venv_is_current(project_root=core) is True
 
 
