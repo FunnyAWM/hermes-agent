@@ -118,10 +118,10 @@ test('nonstable runtime pins userData before the app name can change', async ():
 })
 
 test.each([
-  [undefined, 'Hermes', 'hermes', 'latest', 'canary'],
-  ['bundled', 'Hermes Agent', 'hermes', 'latest', 'canary'],
-  ['light', 'Hermes Light', 'hermes-light', 'light', 'light-canary'],
-  ['headless', 'Hermes Headless', 'hermes', 'latest', 'canary']
+  [undefined, 'KouriChat Next', 'hermes', 'latest', 'canary'],
+  ['bundled', 'KouriChat Next Agent', 'hermes', 'latest', 'canary'],
+  ['light', 'KouriChat Next Light', 'hermes-light', 'light', 'light-canary'],
+  ['headless', 'KouriChat Next Headless', 'hermes', 'latest', 'canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (

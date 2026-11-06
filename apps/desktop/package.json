@@ -1,6 +1,6 @@
 {
   "name": "hermes",
-  "productName": "Hermes",
+  "productName": "KouriChat Next",
   "private": true,
   "version": "0.22.5-fork.1",
   "description": "Native desktop shell for Hermes Agent.",
