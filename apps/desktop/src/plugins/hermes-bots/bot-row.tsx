@@ -93,7 +93,7 @@ import {
 // ── bot row ──────────────────────────────────────────────────────────────────
 
 /** The one-line preview under a row: a bot-to-bot delivery drops its prefix. */
-function rowPreview(preview: string | undefined | null, fromBot: boolean): string {
+function rowPreview(preview: string | undefined | null, fromBot: string | null): string {
   if (fromBot) {
     return (preview || '').replace(A2A_PREFIX_RE, '').trim() || '…'
   }
