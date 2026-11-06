@@ -1,0 +1,332 @@
+{
+  "schema": 1,
+  "generated": "2026-11-06",
+  "notes": "PC acceptance manifest; commands are argv arrays and run only with --run.",
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "记忆目录与 MEMORY/USER 契约样本",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/tools/test_memory_contract_alignment.py",
+        "tests/tools/test_memory_capacity.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t01.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-02",
+      "title": "默认配置与 get_memory_dir 自检",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/t02.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t02.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-03",
+      "title": "根提示词顺序（ROOT 先于 SKILLS）",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/capture_prompt_order.py"
+      ],
+      "evidence": [
+        "evidence/t03.md",
+        "evidence/t03-after.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-04",
+      "title": "notes/docs 只读扁平导入",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/hermes_notes/test_docs_category.py",
+        "tests/tools/test_notes_docs_readonly.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t04.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-05",
+      "title": "超长整理链端到端（假模型）",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/e2e/core/compaction/test_consolidation_chain.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t05.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-06",
+      "title": "版本锚点 0.22.5-fork.1",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/verify_version_anchor.py",
+        "--commit",
+        "v0.22.5-fork.1"
+      ],
+      "evidence": [
+        "evidence/t06.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-07",
+      "title": "上游升级预检",
+      "status": "blocked",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/check_upstream_upgrade.py",
+        "--json"
+      ],
+      "evidence": [
+        "evidence/t07.md",
+        "evidence/t07-dryrun.md"
+      ],
+      "blocked_reason": "本机无 upstream remote，GitHub 不可达，无法取得真实稳定 tag",
+      "handoff": "evidence/handoff/T-07.md"
+    },
+    {
+      "id": "T-08",
+      "title": "当前路径与插件能力审阅",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/t08.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t08.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-09a",
+      "title": "设备配对插件",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/hermes_cli/test_dashboard_device_pairing.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t09a.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-09b",
+      "title": "局域网可达（Android 真机）",
+      "status": "blocked",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/hermes_cli/test_lan_banner.py",
+        "tests/hermes_cli/test_serve_real_bind_windows.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t09b.md"
+      ],
+      "blocked_reason": "Android M5 未开始，无真机客户端可联调；PC 侧已实现并自动化",
+      "handoff": "evidence/handoff/T-09b.md"
+    },
+    {
+      "id": "T-09c",
+      "title": "模式标识与静默回退（Android UI）",
+      "status": "blocked",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/hermes_cli/test_remote_status_contract.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t09c.md"
+      ],
+      "blocked_reason": "判定、3 秒回退与草稿保留均在 Android 端，尚无实现可联调",
+      "handoff": "evidence/handoff/T-09c.md"
+    },
+    {
+      "id": "T-10",
+      "title": "两端记忆答案比对",
+      "status": "blocked",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/verify_memory_comparison.py",
+        "--answers",
+        "evidence/fixtures/memory-comparison/answers/android.json"
+      ],
+      "evidence": [
+        "evidence/t10.md"
+      ],
+      "blocked_reason": "缺 Android 侧答案与模型配置",
+      "handoff": "evidence/handoff/T-10.md"
+    },
+    {
+      "id": "T-11",
+      "title": "默认配置出站自查",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/capture_desktop_network.py",
+        "--desktop-exe",
+        "apps/desktop/release/win-unpacked/Hermes.exe",
+        "--duration",
+        "12",
+        "--json",
+        "evidence/t11-desktop.json"
+      ],
+      "evidence": [
+        "evidence/t11.md",
+        "evidence/t11-desktop.json"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-12",
+      "title": "NSIS 覆盖安装不丢记忆",
+      "status": "completed",
+      "command": [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/verify_nsis_overwrite.ps1",
+        "-Installer",
+        "apps/desktop/release/Hermes-0.22.5-fork.1-win-x64-setup.exe"
+      ],
+      "evidence": [
+        "evidence/t12.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-13",
+      "title": "上游记忆格式漂移监控",
+      "status": "blocked",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "scripts/check_upstream_memory.py",
+        "--json"
+      ],
+      "evidence": [
+        "evidence/t13.md"
+      ],
+      "blocked_reason": "跨版本比较依赖真实上游 tag；本地契约基线已锁定",
+      "handoff": "evidence/handoff/T-13.md"
+    },
+    {
+      "id": "T-14",
+      "title": "路线图对齐",
+      "status": "completed",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "evidence": [
+        "evidence/t14.md",
+        "IMPLEMENTATION_ROADMAP.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-15",
+      "title": "Windows NSIS + portable 打包",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import hashlib,pathlib,sys; p=pathlib.Path('apps/desktop/release/Hermes-0.22.5-fork.1-win-x64-setup.exe'); sys.exit(0 if p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest().upper()=='FD9622D538A4051C5E8EFA1740F614EC9F1ECA4B1DE1F58007BB1AC7D3FBE4AC' else 1)"
+      ],
+      "evidence": [
+        "evidence/t15.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-16",
+      "title": "本机工具优先复用与失败分类",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/scripts/test_install_snapshot.py",
+        "tests/scripts/test_netlog_egress.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t16.md",
+        "evidence/t16-failures.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-17",
+      "title": "记忆契约实现（3000 默认 / USER 不限）",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/tools/test_memory_contract_alignment.py",
+        "tests/tools/test_memory_capacity.py",
+        "tests/tools/test_memory_tool.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t01.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-18",
+      "title": "根提示词与 docs 类别",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/agent/test_system_prompt_root.py",
+        "tests/hermes_notes/test_docs_category.py",
+        "tests/tools/test_notes_docs_readonly.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t03.md",
+        "evidence/t04.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    }
+  ]
+}

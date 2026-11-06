@@ -2,7 +2,9 @@
 
 > **范围**：本文件只覆盖 PC 端——Windows / Linux 上的 Hermes 桌面客户端与它依赖的内核。
 > **Android 客户端、同步中转不在本文件**，另有工作区。
-> **事实源**：`PRD.md` v0.15（2026-11-06）。功能范围与验收判据以 PRD 为准，本文件只把它拆成可执行项。
+> **事实源**：`PRD.md` v0.18（2026-11-06）。功能范围与验收判据以 PRD 为准，本文件只把它拆成可执行项。
+> **统一验收入口**：`scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py`
+> （结构校验恒跑，`--run` 跑每条完成项命令；受阻项必须带 `blocked_reason` 与 `evidence/handoff/` 交接物）。
 > **跨端口径对齐（2026-11-06）**：以 `D:\AndroidProjects\kourichat-next\docs\PRD_ANDROID.md`、
 > `AGENTS_PROJECT.md`、`TODO.md`（T-81 / T-88 / T-112 / T-113）为事实源，统一记忆上限、计数口径、
 > `notes/docs/`、根提示词与超长整理口径。PC 侧原按 2200/1375 完成的验证需按新契约复验。
@@ -60,7 +62,7 @@ PC 端一部分活是「验证它确实生效」，而不是「实现它」—�
 | T-13 | §11 R3 / D6–D9 | 上游记忆格式漂移监控：升级时检查记忆上限、计数口径、分隔符、`notes/docs/` 与根提示词是否变化 | 完成受阻 | 本地共享契约基线已建（3000 默认、USER 不限、簇尾归并计数、`\n§\n`、七类 + `docs/` 只读、根提示词），脚本与测试均读同一 fixture；跨版本比较依赖 T-07 的真实上游 tag | `evidence/fixtures/memory-contract.json`、`scripts/memory_contract.py`、`scripts/check_upstream_memory.py --json` + `tests/scripts/test_upstream_memory_check.py` → `evidence/t13.md` |
 | T-14 | §11 R7 | 将历史路线对齐当前 Android 原生边界、目录与同步契约、PC fork 策略和已批准的远程实施顺序 | 已完成 | —；旧 HTML 原件保持不变，现行施工使用仓库对齐版 v1.6 | [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md)；原件与交付 SHA-256、相对链接及版本核对、`git diff --check` → [evidence/t14.md](./evidence/t14.md) |
 | T-15 | §5.5 / Q6 | 打包改造：Windows 由 MSIX-only 改为 `nsis` + `portable`，Linux/mac 维持 `AppImage` / `dmg`+`zip`。覆盖层 `apps/desktop/electron-builder.fork.cjs` 已建，上游 `electron-builder.config.cjs` 未改 | 已完成 | — | 2026-11-06 在干净提交 `56b7516be4` 重建 `release/*-setup.exe`、`*-portable.exe`（`dirty=false`，NSIS per-user + portable，未签名），离线构建经 `-c.electronDist=<缓存 zip>`；大小、SHA-256 与产品版本 → `evidence/t15.md`。覆盖安装见 T-12 |
-| T-16 | §5.5 | 安装脚本、开发初始化与 PM 优先复用兼容本机工具和 Python；缺失或不兼容才获取锁定版本 | 已完成 | — | `scripts/run_tests.sh tests/pm tests/scripts tests/scripts/install -j 2 -q`（316 文件，残余失败逐条判为环境项）+ `scripts/check`（14 checks, ok）+ 一次性 `HERMES_HOME` 实机探针四项 → `evidence/t16.md`。未验证：受管制品的真实下载完成（本机无 egress）、posix 通道实跑、PowerShell 7 lane、密封发行包 |
+| T-16 | §5.5 | 安装脚本、开发初始化与 PM 优先复用兼容本机工具和 Python；缺失或不兼容才获取锁定版本 | 已完成 | — | `scripts/run_tests.sh tests/pm tests/scripts tests/scripts/install -j 2 -q`（316 文件）+ `scripts/check`（14 checks, ok）+ 一次性 `HERMES_HOME` 实机探针四项 → `evidence/t16.md`。2026-11-06 清理：58/65 失败已修或改为带理由的门禁，残余 7 项 + 1 并发偶发逐条记 `evidence/t16-failures.md`；统一入口 `scripts/verify_pc_acceptance.py`（20 任务：15 完成 / 5 受阻，受阻均带交接物）→ `tests/scripts/test_pc_acceptance_manifest.py`。未验证：受管制品的真实下载完成（本机无 egress）、posix 通道实跑、PowerShell 7 lane、密封发行包 |
 | T-17 | D6 / D7 / 记 03 | 记忆契约对齐：`MEMORY.md` 模型写入默认 3000、可配置、`0` 不限；`USER.md` 不设上限；超限整次拒绝并返回实际字符数与上限；码点 + 簇尾归并计数（emoji 序列算 1） | 已完成 | — | `tests/tools/test_memory_contract_alignment.py`、`test_memory_capacity.py`、`test_memory_tool.py` → `evidence/t01.md`；2026-11-06 提交 |
 | T-18 | D8 / D9 / 记 04 / §7.5 | 根提示词与 `notes/docs/`：新增 PC 版根约定置于 stable 首位；`docs/` 类别只读、一层放平、计入清单、不参与摘要/合并 | 已完成 | — | `tests/agent/test_system_prompt_root.py`、`tests/hermes_notes/test_docs_category.py`、`tests/tools/test_notes_docs_readonly.py`、`scripts/capture_prompt_order.py` → `evidence/t03.md`、`evidence/t04.md`；2026-11-06 全绿 |
 

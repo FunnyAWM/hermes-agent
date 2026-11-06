@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.16（草稿，待评审） |
+| 文档版本 | v0.18（草稿，待评审） |
 | 日期 | 2026-11-06 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -171,7 +171,8 @@
 | `agent/system_prompt.py` | 在 stable 层首位新增记忆根约定，语义对齐 Android `SystemPrompt.ROOT_PROMPT`，工具名按 PC 适配；位于 SOUL 之前 | §7.5、D9 | 中：改变稳定前缀内容；上游每次动身份段都会冲突 |
 | `hermes_cli/lan_addresses.py`（新增模块）、`hermes_cli/web_server.py` | 非回环绑定的启动横幅追加可达的局域网 IPv4 地址与 `hermes device-pair generate` 配对提示；默认 `127.0.0.1` 绑定不变，只新增提示行 | §6.6 远 01、T-09b | 低：仅在启动横幅追加输出；上游改动绑定/横幅文本时按行 rebase |
 | `hermes_notes/store.py`、`tools/file_tools_write_guards.py` | 新增 `notes/docs/` 固定例外类别：只读、一层放平、计入清单、不参与摘要/合并；对 `notes/docs/**` 的写入/替换拒绝，读取放行 | 记 04 / 05、§7.1、D8 | 低：独立类别与路径守卫；需与其他写路径分开测试 |
-| `hermes_cli/web_server.py` | 非回环绑定时启动横幅枚举各网卡 LAN URL 并打印配对命令提示；默认回环行为不变 | 远 01、T-09b | 低：只改启动输出；不改变监听地址与鉴权门禁 |
+| `apps/desktop/src/themes/presets.ts` | 五个内置主题去掉 `typography.fontUrl`：主题加载器会把它作为远程样式表注入，默认配置的桌面因此访问 `fonts.googleapis.com`（隐 02）。内置 mono 栈本就不引用这些远程字族，删除后仅去掉外联、不改渲染；导入的第三方主题仍可携带（显式用户行为） | 隐 02、§8.1、T-11 | 低：只删内置预设字段；上游新增同名字段时按行 rebase，`presets.test.ts` 拦住回归 |
+| `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
 
 每条补丁的底线要求：
 
@@ -209,7 +210,8 @@
 
 **Windows 验证进展（v0.11）**：已产出不同文件名的 NSIS 与 portable 包，产品版本均保留 `0.22.5-fork.1`，
 日志、大小和散列见 `evidence/t15.md`。构建戳为脏工作区，当前仅作打包验证；
-正式版本锚点、覆盖安装保留记忆和全程出站检查仍由 T-06 / T-12 / T-11 验收。
+正式版本锚点与覆盖安装保留记忆已由 T-06 / T-12 结案（v0.18）；默认配置出站由 T-11 以真实 NetLog 结案，
+真实模型请求与换机恢复流程仍未验收。
 
 ---
 
@@ -482,9 +484,12 @@ updated: 2026-10-20
 | 隐 05 | 同步中转看不到内容与文件名 | 中转目录里全是密文对象，无路径痕迹、无中文片段 |
 | 隐 06 | 记忆可被外部工具直接读取 | 记事本、`cat`、任意 Markdown 编辑器均可打开，无私有格式、无加密 |
 
-**PC 验证进展（v0.12）**：桌面更新探针与 HTTP 被动轮询已修复默认关闭门禁。
-两组临时 profile 的独立 `serve` 实测各观察 10 秒，仅出现回环 TCP 连接，见 `evidence/t11.md`、`evidence/t11-network.json`。
-该结果未覆盖 Electron、canonical gateway、模型请求及 UDP，不代表隐 02 的完整桌面验收已通过。
+**PC 验证进展（v0.18）**：被动更新门禁、headless `serve` 审计探针与真实 Electron NetLog 已全部落地。
+干净产物 `apps/desktop/release/win-unpacked/Hermes.exe` 采集 12 秒：NetLog 无任何非回环目标，
+headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.json`。
+本轮首次采集还查出内置主题经 `typography.fontUrl` 拉取 `fonts.googleapis.com`（并触发一次 Google DNS
+查询），已从五个预设移除并加测试（§5.4）。**仍未覆盖**：真实模型请求的对话/工具流式出站，需要配置
+端点后用 `capture_desktop_network.py --allow <host>` 复跑；显式开启的联网检索/工具按 Android 隐 07 另计。
 
 隐 06 是这套设计的底线。任何一条需求如果会导致「记忆离不开本客户端」，就该被否决。
 
@@ -562,6 +567,11 @@ updated: 2026-10-20
 | 升级不丢记忆 | 覆盖安装新版本后，记忆、笔记、会话全部保留 |
 | 换机可恢复 | 导出压缩包 → 新机导入 → 记忆与笔记完整，会话可缺（会话不同步） |
 | 两端答案可比 | 同一份记忆、同一个问题，手机与桌面的回答在事实层面不矛盾 |
+
+**落地状态（v0.18）**：第一条已在本机验收——同一台 Windows 上对已有 per-user 安装连续静默覆盖两次，
+隔离 `HERMES_HOME` 里的 `memories/`、`notes/`、`sessions/` 安装前后逐字节一致，真实 `~/.hermes` 未被改动，
+工具从不执行卸载（`evidence/t12.md`，`scripts/verify_nsis_overwrite.ps1`）。应用首跑停在 bootstrap，
+「运行中的后端不改写记忆」仍属未验证边界。第二条需要换机流程实测；第三条待 Android 侧答案（`evidence/t10.md`）。
 
 最后一条使用固定记忆样本 + 十个固定问题，每次改动提示词拼装逻辑时人工比对一次。
 基线在 `evidence/fixtures/memory-comparison/`；v0.16 起样本须按新契约重建（`MEMORY.md` 3000 / `USER.md` 不限 /
@@ -693,3 +703,4 @@ updated: 2026-10-20
 | v0.15 | 2026-11-05 | §5.5 补两条 T-16 口径：版本比较只在锁文件写纯数字时进行，否则按不兼容处理；MCP stdio 的 `uv`/`uvx` 不参与本机复用，始终用受管副本。T-16 在 Windows 按四项验收结案，真实下载完成、posix 通道与密封发行包仍未验证 |
 | v0.16 | 2026-11-06 | 与 Android 现行契约对齐（`PRD_ANDROID.md` / `AGENTS_PROJECT.md` / T-81 / T-88 / T-112 / T-113）：§7.2 `MEMORY.md` 模型写入默认 3000、可配置、`0` 不限，`USER.md` 不限，取消合并上限；计数改为码点 + 簇尾归并；§7.1/§7.3 新增 `notes/docs/` 固定例外；§7.5 增补根提示词；§8.1 增补显式检索出站例外；§5.4 登记对应补丁。T-05 口径改为事实由常规记忆工具轮写入 notes，不要求压缩同轮抽取 |
 | v0.17 | 2026-11-06 | §5.4 登记 `hermes_cli/lan_addresses.py` 与 `web_server.py` 的局域网横幅：非回环绑定打印可达 IPv4 地址与配对提示，默认回环绑定与鉴权门禁不变（T-09b 远 01） |
+| v0.18 | 2026-11-06 | 收尾三件事：① T-11 用真实 Electron NetLog 结案，发现并修掉内置主题远程字体外联（§5.4 新登记 `apps/desktop/src/themes/presets.ts`），采集器改为解析数字事件类型并优雅退出；② T-12 在本机用 NSIS 覆盖安装两次结案（隔离 `HERMES_HOME` 逐字节保留、真实 `~/.hermes` 不动、从不卸载），T-15 产物在干净提交 `56b7516be4` 重建并刷新哈希；③ T-16 的 65 项失败逐条分类到 `evidence/t16-failures.md`（58 项已修或改为带理由的门禁，7 项为既有 Windows/环境残余），新增统一验收入口 `scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py` 与 `evidence/handoff/` 交接物 |
