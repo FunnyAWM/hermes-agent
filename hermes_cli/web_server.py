@@ -9,6 +9,7 @@ Usage: ``python -m hermes_cli.main web [--port 8080]``.
 from contextlib import asynccontextmanager
 
 import asyncio
+import atexit
 from collections import deque
 import hmac
 import logging
@@ -206,6 +207,20 @@ def _get_pty_active_session_files(app: FastAPI) -> dict[str, Path]:
 
 
 app = FastAPI(title="Hermes Agent", version=get_version_info().base_version, lifespan=app_lifespan)
+
+
+def _kourichat_link_exit_sync() -> None:
+    """When the desktop backend leaves, try to find the chain and sync once (the user's
+    exit-sync requirement). Best-effort: never raises, never blocks shutdown long."""
+    try:
+        from hermes_cli.sync_cmd import _exit_sync_once
+
+        _exit_sync_once()
+    except Exception:  # health: allow BLE001 -- shutdown hook: the exit sync is best-effort by contract and must never block process teardown
+        _log.debug("kourichat link exit sync skipped", exc_info=True)
+
+
+atexit.register(_kourichat_link_exit_sync)
 
 from hermes_cli.dashboard_auth.body_limit import AuthBodyLimitMiddleware
 
@@ -794,6 +809,7 @@ from hermes_cli.web_routers import (
     messaging_relay as _messaging_relay_routes,
     oauth as _oauth_routes,
     cron as _cron_routes,
+    kourichat_link as _kourichat_link_routes,
     mcp as _mcp_routes,
     ops as _ops_routes,
     skills as _skills_routes,
@@ -823,6 +839,7 @@ app.include_router(_local_models_routes.router)
 app.include_router(_status_routes.router)
 app.include_router(_actions_routes.router)
 app.include_router(_audio_routes.router)
+app.include_router(_kourichat_link_routes.router)
 app.include_router(_display_routes.router)
 app.include_router(_actions_routes.status_router)
 app.include_router(_sessions_routes.list_router)
