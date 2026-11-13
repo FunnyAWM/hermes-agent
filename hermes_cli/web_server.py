@@ -810,6 +810,7 @@ from hermes_cli.web_routers import (
     oauth as _oauth_routes,
     cron as _cron_routes,
     kourichat_link as _kourichat_link_routes,
+    memory_docs as _memory_docs_routes,
     mcp as _mcp_routes,
     ops as _ops_routes,
     skills as _skills_routes,
@@ -840,6 +841,7 @@ app.include_router(_status_routes.router)
 app.include_router(_actions_routes.router)
 app.include_router(_audio_routes.router)
 app.include_router(_kourichat_link_routes.router)
+app.include_router(_memory_docs_routes.router)
 app.include_router(_display_routes.router)
 app.include_router(_actions_routes.status_router)
 app.include_router(_sessions_routes.list_router)
