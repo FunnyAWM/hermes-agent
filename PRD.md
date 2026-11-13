@@ -175,6 +175,15 @@
 | `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
 | `agent/prompt_builder.py`、`agent/system_prompt.py` | 任务分派路由提示：记录/跟踪任务 → `todo_list`，指定时间/周期/提醒 → `cronjob_manage`；仅在两个工具都启用时注入，不改动既有 guidance 顺序 | §5.5、桌面单机器人与任务分派、T-21 | 低：新增一个常量与一个工具门控分支；上游改动 guidance 清单时按行 rebase |
 | `apps/desktop/electron/minimize-to-tray.ts`、`gateway-quit.ts`、`quit-guard.ts`、`main.ts` | 托盘默认驻留；真正退出时停本机 gateway，退出提示把本机工作视为会丢失；远程/Cloud 保持继续运行 | §5.5、托盘驻留与网关生命周期、T-23 | 中：与上游“gateway 脱离桌面端存活”相反；同步上游时保留本 fork 版本并重跑生命周期用例 |
+| `sync/**`（新增包）、`hermes_cli/subcommands/sync.py`、`hermes_cli/sync_cmd.py`、`hermes_cli/config_defaults_kourichat.py`、`hermes_cli/web_routers/kourichat_link.py`、`hermes_cli/main.py`、`hermes_cli/web_server.py`、`tui_gateway/{contracts/sync.py,methods_sync.py,server.py}`、`sync/discovery.py` | KouriChat Link 设备链的 PC 侧：24 词 BIP39 派生全部密钥；TLS 主设备服务端（27890）+ 从设备按需/定时拉取；AES-256-GCM 信封，AAD = `recordId\|hlc\|deviceId`；混合逻辑时钟定序、覆盖前归档到 `.versions/`；白名单只覆盖 `SOUL.md` / `memories/{MEMORY,USER}.md` / `notes/**.md` / `skills/**.md` / `sessions/<id>/`；配对无地址时用 mDNS（可选 `zeroconf`）发现候选并逐个握手，能过鉴权的才是同链 | 同 01–05、同 08、§6.4、T-27 | 中：新增独立包 + 一个 CLI 子命令 + 一个 REST 路由 + 一组 RPC 方法，内核现有路径只加挂载点；上游动 `web_server` 路由注册或 CLI 子命令表时按行 rebase。协议以 Android 为事实来源，两端只能同时改 |
+| `apps/desktop/src/app/capabilities/link/*`、`apps/desktop/src/api/kourichat-link.ts`、`apps/desktop/src/app/capabilities/index.tsx`、`apps/desktop/src/i18n/{en,types,zh,zh-hant}*` | 桌面 Capabilities → Link 页：配对（只填 24 词，主设备在局域网内自动发现）、同步状态与计数、主设备启停服务、周期同步与监听端口设置 | 同 01 / 08、T-27 | 低：新增页面与一个能力入口；上游改动 Capabilities 分页或 i18n 结构时按行 rebase |
+| `hermes_cli/web_routers/memory_docs.py`、`hermes_cli/web_server.py`、`apps/desktop/src/app/memory/*`、`apps/desktop/src/api/memory.ts`、`apps/desktop/src/app/contrib/surfaces.tsx`、`apps/desktop/src/app/chat/sidebar/{index,nav-items}.tsx`、`apps/desktop/src/i18n/{en,types,zh,zh-hant}*` | 桌面记忆页（侧栏「新建会话」与「技能与工具」之间）：列出 `SOUL.md` / `AGENTS.md` / `memories/{USER,MEMORY}.md` 与 `notes/` 的目录树，任何一项都可直接编辑并原子保存（`POST /api/memory/doc`，白名单 = 四份上下文文件 + `notes/**.md`）；`notes/docs/` 是导入原文，保持只读 | 记 07、T-27、§5.3 | 中：新增一个读写路由（上游无此页面）与一个桌面页面；上游改 `web_server` 路由注册、侧栏导航项或 i18n 结构时按行 rebase；写路径白名单与越界拒绝由 `tests/hermes_cli/test_memory_docs_router.py` 兜底 |
+| `hermes_notes/store.py`、`hermes_notes/lifecycle.py`、`hermes_notes/settings.py`（后两者新增）、`tools/file_tools.py`、`tools/file_tools_write_guards.py`、`tools/memory_tool_store.py`、`agent/{system_prompt,turn_context}.py` | 清单软上限 128（默认）+ 可选硬上限（默认不设），取代固定 64 截断；front matter 增 `expires` / `lastUsed` 严格解析（对齐 Android `NoteFrontMatter`，重复或非法值按未知处理）；超软上限时过期笔记先归档 `.versions/` 再删；`notes/docs/` 读取回写 `lastUsed` + `lastUsedBy: desktop`（同步来的 Android 轮次号不可比，只信任本机写入）、连续 N 轮未引用列候选经用户确认后删；模型写入 `memories/{MEMORY,USER}.md` 与 `notes/**.md` 覆盖前归档 `.versions/`（`SOUL.md` 与普通工程文件不归档）；`memory.*` 设置由 `hermes_notes/settings.py` 惰性读取（`config_defaults.py` 与 `agent_init.py` 已贴 FILE_LINES 上限，不再增长） | 记 04 / 05、§7.3 / §7.4、T-28 | 中：扫描模块加生命周期维护与写前归档；上游改 `hermes_notes`、`file_tools` 或设置读取处时按行 rebase；两端字段口径只能同时改 |
+| `agent/notes_organizer.py`（新增模块）、`agent/turn_context.py`、`hermes_notes/settings.py`、`tools/file_tools_write_guards.py` | 整理轮次 `memory.organize_turns`（默认 0 关闭）：每 X 轮用户消息另起独立整理请求，只做 `notes/` 维护（合并同类、修正描述、清理过期），不写 `MEMORY.md` / `USER.md` / `SOUL.md`——fork 的写工具白名单仅 `read_file/search_files/write_file/patch`，且以 ContextVar 限定只能落 `notes/<category>/*.md`；不引入 `.memory_incomplete` 标记（每次全量重建计划、失败下一轮自然重试，无需待办状态）；与 `background_review` 并存（事实提取仍归它），各自独占一轮避免并发辅助请求；线程经 `spawn_context_thread` 出生以继承 profile 作用域 | 记 06、T-29 | 中：新增独立模块与一个触发挂钩；上游改轮次收尾、工具白名单或设置读取处时按行 rebase；提示词注入只走 user 消息 / 工具结果，不动会话内冻结前缀 |
+| `tools/auto_review.py`（新增）、`tools/approval.py`、`tools/approval_context.py`、`agent/tool_executor.py`、`agent/terminal_approval_batch.py`、`hermes_cli/{approval_mode,commands,config_defaults,web_server_config,approvals_test}.py`、`gateway/session_tui_config.py`、`tui_gateway/{server,methods_config_set}.py`、`apps/desktop/src/{store/approval-mode.ts,app/shell/approval-mode-menu.tsx,app/settings/constants.ts,types/hermes.ts,i18n/*}` | 新增第四种审批模式 `approvals.mode: auto`：每个工具调用执行前用辅助 LLM 输出严格 JSON 风险判定（low+allow / medium+allow\|deny / high+deny），allow 直接执行、deny 转人工、high 硬拒绝、非法或失败 fail-closed；配置 `approvals.auto_review.{policy,history_messages,max_arg_chars,skip_tools}`，模型路由 `auxiliary.auto_review`。插件层做不到：`approvals.mode` 是安全设置，不能由可卸载/可禁用的用户插件承载，且必须与 `/approvals`、cron/unattended fail-closed、子 agent 继承同源 | 用户指令 2026-11-12（复刻 deepseek-harness Auto Review）；需求编号待补 | 中：执行器统一授权点是上游热点，按行 rebase；审批模式清单分散在 CLI/TUI/Web/Desktop，上游新增模式时需同步；`_run_approval_gate` 的 bypass 刻意不含 auto，避免 deny 转人工时被自身放行 |
+| `tools/environments/local_command_sandbox.py`、`apps/desktop/src/app/settings/{sandbox-profiles-panel.tsx,config-subpages.ts,constants.ts}`、`apps/desktop/src/app/chat/{use-chat-bar-state.ts,composer/controls.tsx,composer/sandbox-pill.tsx}`、`apps/desktop/src/i18n/*` | 沙箱档位扩展到 sandctl 完整策略面：档位可带 `backend`（L1/L2/L3 或具体后端名）与 `policy` 片段（fs/net/syscall/proc/secrets；列表与基线授权取并集，`read-only` 忽略 `policy.fs`）；Desktop 的 custom 档位卡片暴露网络、Syscall、隔离等级、资源上限与密钥处理，输入框模型左侧新增档位下拉（写入 `terminal.sandbox.profile`，下一条命令生效） | 用户指令 2026-11-13；T-31 | 中：策略生成是安全边界，任何放宽字段在 GUI 都要二次确认；上游改 `terminal.sandbox` 结构或 composer 控制行时按行 rebase；`test_local_command_sandbox.py` 兜住并集/只读守卫 |
+| `apps/desktop/src/app/chat/{use-chat-bar-state.ts,composer/types.ts,composer/sandbox-pill.tsx}`、`apps/desktop/src/i18n/*` | 输入框档位下拉新增 Auto Review 开关（与沙箱档位独立并存）：勾选写入 `approvals.mode: auto`，取消时恢复切换前的审批模式；换档不改变 `terminal.sandbox.profile`；写入走当前 profile 的网关路由，失败回滚并提示 | 用户指令 2026-11-13；T-34 | 低：复用既有审批模式 store 与 `config.set`；上游改 composer 控制行或审批模式清单时按行 rebase |
+| `tools/auto_review.py`、`tools/approval.py`、`tui_gateway/server.py`、`gateway/{session_pending_controls,session_ancillary,session_managed_worker}.py`、`gateway/platforms/api_server.py`、`apps/desktop/src/{store/prompts.ts,app/session/hooks/use-message-stream/gateway-event/server-requests.ts,components/assistant-ui/tool/approval.tsx,i18n/*}` | 审批卡展示待执行命令 + justification：Auto Review 转人工时把审查理由作为一等字段透传（`_run_approval_gate` / `_pending_result` / `request_tool_approval`），`REVIEW_POLICY` 要求理由使用最近一条用户消息的语言、直接对用户说话；所有网关出口经 `redact_approval_display` 脱敏后下发；桌面卡片在命令块之后渲染理由块，空则不渲染 | 用户指令 2026-11-13；T-35 | 低：字段沿既有审批 payload 加可选键，缺省不影响旧客户端；上游改审批 payload 字段白名单或卡片布局时按行 rebase；理由落库仅在 pending 队列存在期内 |
 
 每条补丁的底线要求：
 
@@ -235,9 +244,9 @@
 | 记 01 | 发送前重读记忆 | 每次发送消息前，从磁盘重新读取两份记忆文件与笔记清单，拼进系统提示词。不使用会话级快照 | 必做 |
 | 记 02 | 写入记忆 | 向模型暴露一个写入工具，语义为「整文件重写指定文件」。写入前先读当前内容，避免覆盖并发修改 | 必做 |
 | 记 03 | 超限拒绝 | 写入超过字符上限时，**拒绝并返回剩余可用字符数**，由模型自行删减后重试。禁止静默截断 | 必做 |
-| 记 04 | 笔记分片 | 长记忆写入 `notes/<category>/<topic>.md`，按语义分片，不按日期。每篇头部含名称与一行摘要 | 必做 |
-| 记 05 | 清单注入 | 系统提示词里只放笔记的「名称 + 一行摘要」，不放正文。模型判断相关后再调用读取工具取全文 | 必做 |
-| 记 06 | 超长处理 | PC 与手机均保持同一个持续会话，不因超长另开会话。接近上下文上限时先摘要、由常规记忆工具轮把长期事实写入 `notes/`，成功后原地压缩上下文并继续对话；会话 ID 不变，完整历史保留可查。**不要求压缩同轮抽取**（对齐 Android T-81 实现口径）；整理失败保留原上下文与已有文件。两端抽取格式一致 | 必做 |
+| 记 04 | 笔记分片 | 长记忆写入 `notes/<category>/<topic>.md`，按语义分片，不按日期。每篇头部含名称与一行摘要。**2026-11-10 补充（用户指示，移植 Android 生命周期）**：头部可选 `expires`（严格 `YYYY-MM-DD`）与 `lastUsed`（非负整数轮次），解析口径对齐 Android `NoteFrontMatter`（完整头部、字段唯一、严格合法，否则按未知）；清单超软上限时清理显式到期笔记（先归档 `.versions/` 再删除，留档失败不删）；`notes/docs/` 读取时回写 `lastUsed`，连续 N 轮未引用列为候选、用户确认后才删（逐份留档）；记忆与笔记工具覆盖前归档 `.versions/` | 必做 |
+| 记 05 | 清单注入 | 系统提示词里只放笔记的「名称 + 一行摘要」，不放正文。模型判断相关后再调用读取工具取全文。**2026-11-10 补充（用户指示，对齐 Android T-96）**：清单上限改为软上限（默认 128）+ 可选硬上限（默认不设）；软上限不截断清单，只触发维护（过期清理、合并引导）；设了硬上限才按 `updated` 倒序截断并明示条数 | 必做 |
+| 记 06 | 超长处理 | PC 与手机均保持同一个持续会话，不因超长另开会话。接近上下文上限时先摘要、由常规记忆工具轮把长期事实写入 `notes/`，成功后原地压缩上下文并继续对话；会话 ID 不变，完整历史保留可查。**不要求压缩同轮抽取**（对齐 Android T-81 实现口径）；整理失败保留原上下文与已有文件。两端抽取格式一致。**2026-11-10 补充（用户指示，移植 Android 整理轮次）**：新增 `memory.organize_turns`（默认 0 关闭）；设为 X 后每 X 轮回答完成后另起独立整理请求，只做 `notes/` 维护（合并同类、清理过期），**不写 `MEMORY.md` / `USER.md`**（两端 MEMORY.md 语义各自维持现状）；整理前写 `.memory_incomplete` 标记、成功后清除、失败保留并在下一轮补做；与既有 `background_review` 并存——事实提取仍由 background_review 负责（默认开），整理器只管 notes 维护（默认关） | 必做 |
 | 记 07 | 记忆页 | 列出两份记忆文件与全部笔记；支持查看、编辑、搜索、删除；编辑保存后下一轮对话立即生效 | 必做 |
 | 记 08 | 冲突留档 | 同步合并时被覆盖的版本存入 `.versions/`，保留最近若干版；合并结果在界面可见并可回滚 | 可选（依赖同步） |
 | 记 09 | 导出 | 提供一个「打包导出」按钮，产出一个可直接解压使用的压缩包 | 可选 |
@@ -411,6 +420,7 @@ updated: 2026-10-20
 ```
 
 - `name` 与 `description` 必须在一行内，`description` 不超过 40 字
+- 可选字段（2026-11-10，对齐 Android `NoteFrontMatter`）：`expires` 只接受完整头部中唯一且严格合法的 `YYYY-MM-DD`；`lastUsed` 只接受完整头部中唯一且严格合法的非负整数（`notes/docs/` 专用，记录最近被读取的轮次）；缺失、重复、非法一律按「未知」处理，不触发清理
 - 路径为 `notes/<category>/<topic>.md`：**子目录名即类别，文件名即主题**，两者都不写进 front matter，避免同一信息存两处
 - 目录名必须是 §7.1 枚举里的英文值；主题名在同类目内唯一，不做全局唯一（同名不同类不算冲突）
 - 正文只写**结论**，不写过程。「周三跑了 8 公里，配速 5'30"」是过程；「10 月起每周三次 8 公里，配速 5'30"」是结论
@@ -425,8 +435,8 @@ updated: 2026-10-20
 |---|---|
 | 单条格式 | `显示名/名称 — 摘要`（一行；显示名取 §7.1 枚举的对应值，目录名本身仍是英文） |
 | 单条成本 | 约 100 tokens |
-| 清单条数上限 | **64 条**（2026-10-28 定，暂定值，仍需按真实使用实测校准） |
-| 超限策略 | 按 `updated` 倒序保留最近 64 条；被截断的条数**明示**，不静默丢弃——手机在记忆页显示，桌面在清单尾部输出（`(-N older notes beyond this index's 64-entry cap; …)`，桌面无记忆页） |
+| 清单条数上限 | **软上限 128 条 + 可选硬上限（默认不设）**（2026-11-10 修订，对齐 Android T-96；原 64 条硬截断废止） |
+| 超限策略 | 软上限不截断清单：超过时触发维护——显式 `expires` 到期的笔记先归档 `.versions/` 再删除，并引导模型合并同类笔记；设了硬上限才按 `updated` 倒序截断，被截断条数**明示**（清单尾部输出 omitted 提示，桌面记忆页按目录树列出全部笔记，不展示这条提示） |
 | 命中后 | 模型调用读取工具取全文，单篇建议 5,000 tokens 内 |
 
 `notes/docs/` 条目同样计入清单，只显示「显示名/名称 — 一行总要点」；整理摘要与合并笔记不得改写、删并或转述该目录。
@@ -435,6 +445,8 @@ updated: 2026-10-20
 
 64 这个数的来路：它是「约 6,400 tokens 常驻」这个预算折回来的，不是随手挑的整数偏好。比 40 条多一半，
 仍在一份提示词能承受的量级内。真跑起来之后按实际笔记量与缓存成本校准，别当成终值。
+**2026-11-10 修订**：64 硬截断已被 Android 现行的「软 128 / 硬不设」取代（T-96）——软上限只触发维护、
+不截断清单，避免同步两端笔记数不一致时清单口径分叉；硬上限保留为可选配置，设了才截断并明示。
 
 ### 7.5 系统提示词拼装顺序（本 PRD 约定）
 
@@ -447,12 +459,18 @@ updated: 2026-10-20
 5. `USER.md`（使用者画像）
 6. 笔记清单（名称 + 摘要，含 `notes/docs/`）
 7. 本轮附件文本（标注来源文件名）
+8. 记忆写入提醒（`MEMORY_WRITE_REMINDER`，固定文案，桌面端置于整段提示词最末；仅当本轮存在可写表面——`memory` / `write_file` / `patch` 之一——时才出现）
 
 **为什么顺序重要**：同一份记忆、同一个问题，手机与桌面必须给出可比的答案。顺序不同、分隔符不同、计数口径不同，都会导致「同一份记忆两个答案」。这是一个可以测但必须持续守的成本。
 
 **桌面端落地状态（v0.16）**：根约定与共享顺序由 T-18 实现——`ROOT → SOUL → AGENTS → MEMORY → USER → 笔记清单`；`notes/` 清单由 T-04 注入，`notes/docs/` 随 T-18 计入。内核实际拼装里还有 PRD 未列的两段：skills 索引（位于笔记清单之后）与插件段。它们不改变前七项的相对顺序，
 但**升级上游时动拼装顺序仍会冲突**（见 §5.4 登记表）。会话内提示词是启动/压缩重建时的快照，
 磁盘上的记忆改动不会在会话中途重渲染（桌面端固有副作用，见 §5.3）。
+
+**第 8 项为什么放在最末**：根约定（第 1 项）说的是「记忆怎么分层」，模型在长对话里丢的是「什么时候该写」。
+Android T-88 的真实模型记录里，模型会在回复里讲「已记入 notes/」，文件却没写——补强三处提示词后 AC-03 才通过。
+桌面端把同一句写入触发提醒做成常量放在提示词末尾：离本轮对话最近、每会话只计一次前缀缓存
+（文本恒定，不随时钟或轮次变化），并且只在本轮真有写入工具时出现，读不到的智能体不会被要求写。
 
 ### 7.6 模型接口（本 PRD 约定）
 
@@ -545,6 +563,8 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | 记 04 / 05 | 就同一主题聊满五轮，观察笔记生成 | 生成 `notes/<category>/<topic>.md`，含名称与摘要；系统提示词里只有摘要不含正文 |
 | 记 06 | 持续对话直到接近上下文上限 | 先生成摘要，再将有价值的事实写入笔记，最后原地压缩；会话 ID 不变，原始历史仍可查，下一轮读到整理结果。无新事实时可不新建笔记；抽取或写入失败不得覆盖原上下文或已有文件 |
 | 记 07 | 编辑一条笔记并保存 | 下一轮对话即用到新内容 |
+| 记 04 / 05（2026-11-10） | 笔记数超过软上限 128，其中一篇头部 `expires` 已到期；另一篇 `expires` 非法（重复字段 / 非日期）；`notes/docs/` 一篇连续 N 轮未读 | 到期篇先归档 `.versions/` 再删除，非法 `expires` 篇不删；清单不截断、全部条目仍注入；未引用候选经确认后才删且逐份留档；覆盖前旧版可在 `.versions/` 找到 |
+| 记 06（2026-11-10） | `memory.organize_turns` 设为 2，连续对话两轮；整理中中断进程后重启再发一轮 | 第 2 轮回答完成后另起独立整理请求，只合并 / 清理 `notes/`，`MEMORY.md` / `USER.md` 修改时间不变；`.memory_incomplete` 成功后清除、中断后保留并在下一轮补做；设为 0 时不触发；`background_review` 行为不变 |
 | 聊 01 | 提问一个需要长回答的问题 | 逐字出现；出现首字符前有等待态；无长时间空白 |
 | 聊 02 | 生成中点停止 | 立即停止；已生成内容保留；可继续追问 |
 | 聊 04 | 分别填错密钥、填不存在的模型名、断网 | 三种情况给出不同提示，且都说明下一步动作 |
@@ -712,4 +732,6 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.17 | 2026-11-06 | §5.4 登记 `hermes_cli/lan_addresses.py` 与 `web_server.py` 的局域网横幅：非回环绑定打印可达 IPv4 地址与配对提示，默认回环绑定与鉴权门禁不变（T-09b 远 01） |
 | v0.18 | 2026-11-06 | 收尾三件事：① T-11 用真实 Electron NetLog 结案，发现并修掉内置主题远程字体外联（§5.4 新登记 `apps/desktop/src/themes/presets.ts`），采集器改为解析数字事件类型并优雅退出；② T-12 在本机用 NSIS 覆盖安装两次结案（隔离 `HERMES_HOME` 逐字节保留、真实 `~/.hermes` 不动、从不卸载），T-15 产物在干净提交 `56b7516be4` 重建并刷新哈希；③ T-16 的 65 项失败逐条分类到 `evidence/t16-failures.md`（58 项已修或改为带理由的门禁，7 项为既有 Windows/环境残余），新增统一验收入口 `scripts/pc_acceptance_manifest.json` + `scripts/verify_pc_acceptance.py` 与 `evidence/handoff/` 交接物 |
 | v0.19 | 2026-11-06 | 上游基座由 v0.22.5（`f5e0dd8e9b`）改钉到 **v0.23.0（`2bd378ed1b`）**：`origin/main` 先硬回退到上游，`main` 复位到 v0.23.0 并打本地 tag `v0.23.0`；fork 的 55 个提交正向重放（`git rebase --onto v0.23.0`）落在 `patches-v0.23.0` 分支，版本号随之改为 `0.23.0-fork.1` / `0.23.0+fork1`（换基座 N 归 1），补丁列重导出为 57 个补丁（56 个提交 + 1 个未跟踪交付物补丁）。桌面端两处行为差异按 fork 规则处理：单机器人面板不显示网关群聊（`groups.list` 的房间不再进列表），`pm/install.py` 的宿主工具复用与上游 `env_for` 单次依赖优先遍历合并保留两者 |
-| v0.20 | 2026-11-06 | §5.5 新增「本期只发 headless 包」裁决：完整版不进发行计划（受管包 3.6 GB 已离线备齐，密封后产物 3.7 GB 起），改由用户按需补环境，环境要求与安装步骤落到仓库根 `INSTALL.md`；headless 包在 v0.23.0 基座（干净提交 `ac3d203a74`）重建并实机启动验证，产物哈希与日志见 `evidence/t15-headless.md`（T-20 相应改为裁决不做，交付口径记入 T-26） |
+| v0.21 | 2026-11-09 | §7.5 增补第 8 项「记忆写入提醒」：引入 Android T-88 验证过的写入触发文案，作为常量置于提示词最末，并按可写工具门控；同时把 `memory` 工具描述里「任务中学到的东西放进 skill」改为「长期事实进 `notes/`、可复用流程进 skill」，消除提示词与工具描述互相打脸 |
+| v0.22 | 2026-11-09 | 记忆页从「只读查看器」改为可编辑：`/api/memory/docs` 增加 `editable` 标记，新增 `POST /api/memory/doc`（四份上下文文件 + `notes/**.md`，`notes/docs/` 保持只读，路径白名单 + 原子写 + 大小上限）；桌面页把笔记平铺列表改为 `notes/` 目录树，右侧改为按文件编辑（保存 / 撤销 / Ctrl+S / 未保存标记 / 切文件保留草稿）。编辑在下次会话或压缩后进入提示词（桌面提示词会话内冻结，见 §5.3）。§5.4 登记该路由与页面，§7.4 超限提示改为「桌面记忆页不展示」 |
+| v0.23 | 2026-11-10 | **移植 Android 笔记清单上限与生命周期、整理轮次（用户指示）**：§7.4 清单上限由固定 64 硬截断改为软 128 + 可选硬上限（默认不设），软上限只触发维护不截断；§7.3 front matter 增 `expires` / `lastUsed` 严格解析（对齐 Android `NoteFrontMatter`）；记 04 补生命周期（超软上限清理到期笔记先归档再删、docs 未引用候选经确认删除、工具覆盖前归档 `.versions/`）；记 06 补整理轮次 `memory.organize_turns`（默认 0 关闭，独立整理请求只做 notes 维护，不写 `MEMORY.md` / `USER.md`，`.memory_incomplete` 标记补做，与 `background_review` 并存）。两端 `MEMORY.md` 语义各自维持现状，不统一。§5.4 登记两条补丁，§9.1 增两条验收，`TODO.md` T-28 / T-29 |
