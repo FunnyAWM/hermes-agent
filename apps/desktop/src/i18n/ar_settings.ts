@@ -446,6 +446,107 @@ export const arSettings = {
         turnOffFailed: 'تعذّر إيقاف الحيوان الأليف.'
       }
     },
+    sandboxProfiles: {
+      title: 'ملفات تعريف الصندوق الرملي للأوامر',
+      activeTitle: 'الملف النشط',
+      activeDesc:
+        'كل أمر لا يستخدم الوصول الكامل يُنفَّذ داخل الملف النشط. يُقرأ الملف لكل أمر، لذا يسري التبديل على الأمر التالي دون إعادة تشغيل الجلسة.',
+      profileName: 'اسم الملف',
+      addProfile: 'إضافة ملف',
+      deleteProfile: 'حذف الملف',
+      readDirectories: 'مجلدات القراءة',
+      readDirectoriesDesc: 'مسارات إضافية يمكن لهذا الملف قراءتها، مسار واحد في كل سطر.',
+      writeDirectories: 'مجلدات الكتابة',
+      writeDirectoriesDesc: 'مسارات إضافية يمكن لهذا الملف الكتابة فيها، مسار واحد في كل سطر.',
+      pathsPlaceholder: 'مسار واحد في كل سطر',
+      presets: {
+        readOnly: {
+          title: 'قراءة فقط',
+          description: 'يقرأ مساحة العمل. تبقى كل عمليات الكتابة مغلقة، وكذلك الشبكة.'
+        },
+        workspaceWrite: {
+          title: 'مساحة عمل قابلة للكتابة',
+          description: 'يقرأ ويكتب مساحة العمل. تبقى الشبكة مغلقة.'
+        },
+        workspaceExec: {
+          title: 'مساحة عمل قابلة للتنفيذ',
+          description: 'يقرأ ويكتب وينفّذ أوامر مساحة العمل. تبقى الشبكة مغلقة.'
+        },
+        fullAccess: {
+          title: 'وصول كامل',
+          description: 'ينفّذ الأوامر خارج sandctl دون أي تقييد.'
+        },
+        custom: {
+          title: 'مخصص',
+          description: 'يقرأ ويكتب المسارات المدرجة فقط، مع تجاوزات sandctl أدناه.'
+        }
+      },
+      fullAccess: {
+        title: 'تمكين الوصول الكامل؟',
+        description:
+          'يشغّل الوصول الكامل الأوامر على هذا الجهاز دون تقييد sandctl. تابع فقط إذا كنت تثق بكل ما يشغّله الوكيل.',
+        confirmLabel: 'تمكين الوصول الكامل',
+        cancelLabel: 'إبقاء الصندوق'
+      },
+      widen: {
+        title: 'توسيع الصندوق؟',
+        description:
+          'يتيح هذا التغيير للأوامر تجاوز ما يسمح به الإعداد المسبق: تصبح الشبكة أو عامل تصفية syscall أو حقن الأسرار أوسع.',
+        confirmLabel: 'توسيع',
+        cancelLabel: 'إلغاء'
+      },
+      policy: {
+        title: 'تجاوزات سياسة sandctl',
+        subtitle: 'يُطبَّق فوق الإعداد المسبق. أي حقل تتركه فارغًا يحتفظ بقيمة الإعداد المسبق.',
+        isolation: 'مستوى العزل',
+        inheritGlobal: 'وراثة العام',
+        l1: 'L1 — حدود العملية',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — جهاز Kata',
+        syscall: 'عامل تصفية syscall',
+        inherit: 'وراثة الإعداد المسبق',
+        none: 'بلا (دون تصفية)',
+        platformDefault: 'افتراضي المنصة',
+        restricted: 'مقيّد',
+        strict: 'صارم',
+        networkMode: 'وضع الشبكة',
+        networkModeDefault: 'وراثة الإعداد المسبق',
+        networkModeAllowlist: 'قائمة السماح',
+        networkModeDenylist: 'قائمة الحظر',
+        networkDefault: 'إجراء الشبكة الافتراضي',
+        networkDefaultDefault: 'وراثة الإعداد المسبق',
+        deny: 'رفض',
+        allow: 'سماح',
+        allowedHosts: 'المضيفون المسموحون',
+        allowedHostsDesc:
+          'أسماء المضيفين التي يمكن لهذا الملف الوصول إليها، واحد في كل سطر. يُضاف إلى الإعداد المسبق فقط.',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: 'نطاقات CIDR المسموحة',
+        allowedCidrsDesc:
+          'نطاقات CIDR التي يمكن لهذا الملف الوصول إليها، واحد في كل سطر. يُضاف إلى الإعداد المسبق فقط.',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: 'الأهداف المحظورة',
+        blockedTargetsDesc: 'أسماء مضيفين أو نطاقات CIDR تُرفض، واحد في كل سطر.',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'وضع نظام الملفات',
+        fsModeDefault: 'وراثة الإعداد المسبق',
+        allowlist: 'قائمة السماح',
+        denylist: 'قائمة الحظر',
+        cpu: 'حد المعالج',
+        memory: 'حد الذاكرة',
+        pids: 'حد العمليات',
+        wallTime: 'حد الوقت الفعلي',
+        noNewPrivs: 'حظر رفع الصلاحيات',
+        noNewPrivsDesc: 'يضبط no_new_privs حتى لا يكتسب الأمر صلاحيات عبر برامج setuid.',
+        injectSecrets: 'حقن الأسرار',
+        injectSecretsDesc: 'يمرّر قيم الأسرار إلى بيئة الصندوق. أوسع من الإعداد المسبق.',
+        proxySecrets: 'أسرار عبر الوكيل',
+        proxySecretsDesc: 'يبقي الأسرار خارج الصندوق ويحقنها عند وكيل الخروج بدلًا من ذلك.',
+        allowedSecrets: 'الأسرار المسموحة',
+        allowedSecretsDesc: 'أسماء الأسرار التي يمكن لهذا الملف استخدامها، اسم واحد في كل سطر.',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: {
       model: 'النموذج الافتراضي',
       modelContextLength:
@@ -465,6 +566,9 @@ export const arSettings = {
       'terminal.timeout': 'مهلة الأوامر',
       'terminal.persistentShell': 'صدفة مستمرة',
       'terminal.envPassthrough': 'تمرير متغيرات البيئة',
+      'terminal.sandbox.enabled': 'صندوق الأوامر',
+      'terminal.sandbox.escalation': 'تصعيد لأمر واحد',
+      'terminal.sandbox.backend': 'مستوى عزل الصندوق',
       'terminal.dockerImage': 'صورة Docker',
       'terminal.singularityImage': 'صورة Singularity',
       'terminal.modalImage': 'صورة Modal',
@@ -477,6 +581,10 @@ export const arSettings = {
       'approvals.mode': 'نمط الموافقات',
       'approvals.timeout': 'مهلة الموافقة',
       'approvals.mcpReloadConfirm': 'تأكيد إعادة تحميل MCP',
+      'approvals.autoReview.policy': 'سياسة المراجعة التلقائية',
+      'approvals.autoReview.historyMessages': 'نافذة سجل المراجعة',
+      'approvals.autoReview.maxArgChars': 'حد وسائط المراجعة',
+      'approvals.autoReview.skipTools': 'الأدوات التي تتخطاها المراجعة',
       commandAllowlist: 'قائمة الأوامر المسموحة',
       'security.redactSecrets': 'إخفاء الأسرار',
       'security.allowPrivateUrls': 'السماح بالروابط الخاصة',
@@ -548,6 +656,12 @@ export const arSettings = {
       'terminal.cwd': 'مجلد المشروع الافتراضي لعمل الأدوات والطرفية.',
       'terminal.persistentShell': 'يحافظ على حالة الصدفة بين الأوامر عندما تدعمها الخلفية.',
       'terminal.envPassthrough': 'متغيرات البيئة التي تمرر إلى تنفيذ الأدوات.',
+      'terminal.sandbox.enabled':
+        'تشغيل كل أمر للوكيل داخل sandctl؛ الوصول الكامل يتجاوزه. جلسات الصندوق على Windows تستخدم PowerShell. الملف النشط أدناه يحدد ما تسمح به مساحة العمل، وكل الملفات تحظر الشبكة.',
+      'terminal.sandbox.escalation':
+        'يمكن للوكيل أن يطلب، لأمر واحد فقط، مستوى صندوق أوسع (حتى الوصول الكامل). توافق على كل طلب، ثم يعود الملف المهيّأ للأمر التالي.',
+      'terminal.sandbox.backend':
+        'مستوى العزل لكل أمر: l1 (حدود العملية) أو l2 (gVisor) أو l3 (جهاز Kata افتراضي)، أو اسم خلفية محددة. يمكن لملف الصندوق تجاوزه.',
       'terminal.dockerImage': 'صورة الحاوية المستخدمة عند اختيار Docker كخلفية تنفيذ.',
       'terminal.singularityImage': 'الصورة المستخدمة عند اختيار Singularity.',
       'terminal.modalImage': 'الصورة المستخدمة عند اختيار Modal.',
@@ -556,6 +670,11 @@ export const arSettings = {
       fileReadMaxChars: 'أقصى عدد أحرف يستطيع Hermes قراءته من ملف واحد في الطلب.',
       'approvals.mode': 'كيف يتعامل Hermes مع الأوامر التي تحتاج موافقة صريحة.',
       'approvals.timeout': 'مدة انتظار طلبات الموافقة قبل انتهاء المهلة.',
+      'approvals.autoReview.policy':
+        'قواعد إضافية للمراجع. نصك أنت ويُعدّ موثوقًا؛ أما استدعاء الأداة نفسه فغير موثوق دائمًا.',
+      'approvals.autoReview.historyMessages': 'عدد رسائل المحادثة الأخيرة التي يراها المراجع (0-50).',
+      'approvals.autoReview.maxArgChars': 'مقدار ما يُعرض للمراجع من وسائط كل أداة (500-20000 حرف).',
+      'approvals.autoReview.skipTools': 'أسماء الأدوات التي لا تُراجَع أبدًا. أدوات القراءة المحلية تُتخطى دائمًا.',
       'security.redactSecrets': 'يخفي الأسرار المكتشفة من المحتوى المرئي للنموذج قدر الإمكان.',
       'checkpoints.enabled': 'ينشئ لقطات رجوع قبل تعديلات الملفات.',
       'memory.memoryEnabled': 'يحفظ ذكريات دائمة يمكن أن تساعد الجلسات القادمة.',

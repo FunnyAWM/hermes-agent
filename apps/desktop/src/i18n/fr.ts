@@ -1152,6 +1152,105 @@ export const frOverrides = {
         turnOffFailed: "Impossible de désactiver l'animal."
       }
     },
+    sandboxProfiles: {
+      title: 'Profils de sandbox des commandes',
+      activeTitle: 'Profil actif',
+      activeDesc:
+        "Toute commande hors accès complet s'exécute dans le profil actif. Le profil est lu à chaque commande : un changement s'applique donc à la commande suivante, sans redémarrer la session.",
+      profileName: 'Nom du profil',
+      addProfile: 'Ajouter un profil',
+      deleteProfile: 'Supprimer le profil',
+      readDirectories: 'Répertoires en lecture',
+      readDirectoriesDesc: 'Chemins supplémentaires que ce profil peut lire, un par ligne.',
+      writeDirectories: 'Répertoires en écriture',
+      writeDirectoriesDesc: 'Chemins supplémentaires que ce profil peut écrire, un par ligne.',
+      pathsPlaceholder: 'Un chemin par ligne',
+      presets: {
+        readOnly: {
+          title: 'Lecture seule',
+          description: 'Lit l’espace de travail. Toute écriture reste bloquée, tout comme le réseau.'
+        },
+        workspaceWrite: {
+          title: 'Espace de travail inscriptible',
+          description: 'Lit et écrit l’espace de travail. Le réseau reste bloqué.'
+        },
+        workspaceExec: {
+          title: 'Espace de travail exécutable',
+          description: 'Lit, écrit et exécute les commandes de l’espace de travail. Le réseau reste bloqué.'
+        },
+        fullAccess: {
+          title: 'Accès complet',
+          description: 'Exécute les commandes hors de sandctl, sans aucune restriction.'
+        },
+        custom: {
+          title: 'Personnalisé',
+          description: 'Lit et écrit uniquement les chemins indiqués, plus les remplacements sandctl ci-dessous.'
+        }
+      },
+      fullAccess: {
+        title: 'Activer l’accès complet ?',
+        description:
+          'L’accès complet exécute les commandes sur cette machine sans la restriction de sandctl. Ne continuez que si vous faites confiance à tout ce que l’agent exécute.',
+        confirmLabel: 'Activer l’accès complet',
+        cancelLabel: 'Garder le sandbox'
+      },
+      widen: {
+        title: 'Élargir le sandbox ?',
+        description:
+          'Ce changement permet aux commandes d’aller plus loin que le préréglage : le réseau, le filtre de syscalls ou l’injection de secrets deviennent plus permissifs.',
+        confirmLabel: 'Élargir',
+        cancelLabel: 'Annuler'
+      },
+      policy: {
+        title: 'Remplacements de la politique sandctl',
+        subtitle: 'S’ajoute au préréglage. Un champ laissé vide conserve la valeur du préréglage.',
+        isolation: 'Niveau d’isolation',
+        inheritGlobal: 'Hériter du global',
+        l1: 'L1 — frontière de processus',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — VM Kata',
+        syscall: 'Filtre de syscalls',
+        inherit: 'Hériter du préréglage',
+        none: 'Aucun (sans filtre)',
+        platformDefault: 'Par défaut de la plateforme',
+        restricted: 'Restreint',
+        strict: 'Strict',
+        networkMode: 'Mode réseau',
+        networkModeDefault: 'Hériter du préréglage',
+        networkModeAllowlist: 'Liste blanche',
+        networkModeDenylist: 'Liste noire',
+        networkDefault: 'Action réseau par défaut',
+        networkDefaultDefault: 'Hériter du préréglage',
+        deny: 'Refuser',
+        allow: 'Autoriser',
+        allowedHosts: 'Hôtes autorisés',
+        allowedHostsDesc: 'Noms d’hôtes que ce profil peut joindre, un par ligne. S’ajoute seulement au préréglage.',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: 'CIDR autorisés',
+        allowedCidrsDesc: 'Plages CIDR que ce profil peut joindre, une par ligne. S’ajoute seulement au préréglage.',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: 'Cibles bloquées',
+        blockedTargetsDesc: 'Noms d’hôtes ou CIDR à refuser, un par ligne.',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'Mode du système de fichiers',
+        fsModeDefault: 'Hériter du préréglage',
+        allowlist: 'Liste blanche',
+        denylist: 'Liste noire',
+        cpu: 'Limite CPU',
+        memory: 'Limite mémoire',
+        pids: 'Limite de processus',
+        wallTime: 'Limite de temps réel',
+        noNewPrivs: 'Bloquer l’élévation de privilèges',
+        noNewPrivsDesc: 'Active no_new_privs pour qu’une commande ne puisse pas gagner de privilèges via des binaires setuid.',
+        injectSecrets: 'Injecter les secrets',
+        injectSecretsDesc: 'Transmet les valeurs des secrets dans l’environnement du sandbox. Plus large que le préréglage.',
+        proxySecrets: 'Secrets via proxy',
+        proxySecretsDesc: 'Garde les secrets hors du sandbox et les injecte au niveau du proxy de sortie.',
+        allowedSecrets: 'Secrets autorisés',
+        allowedSecretsDesc: 'Noms de secrets que ce profil peut utiliser, un par ligne.',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: 'Modèle par défaut',
       modelContextLength: 'Fenêtre de contexte du modèle principal (forçage)',
@@ -1180,6 +1279,11 @@ export const frOverrides = {
         timeout: "Délai d'expiration de la commande",
         persistentShell: 'Shell persistant',
         envPassthrough: "Transmission de l'environnement",
+        sandbox: {
+          enabled: 'Sandbox des commandes',
+          escalation: 'Élévation ponctuelle',
+          backend: "Niveau d'isolation du sandbox"
+        },
         dockerImage: 'Image Docker',
         singularityImage: 'Image Singularity',
         modalImage: 'Image Modal',
@@ -1195,7 +1299,13 @@ export const frOverrides = {
       approvals: {
         mode: "Mode d'approbation",
         timeout: "Délai d'expiration de l'approbation",
-        mcpReloadConfirm: 'Confirmer les rechargements MCP'
+        mcpReloadConfirm: 'Confirmer les rechargements MCP',
+        autoReview: {
+          policy: 'Politique de revue automatique',
+          historyMessages: 'Fenêtre d’historique de revue',
+          maxArgChars: 'Limite d’arguments de revue',
+          skipTools: 'Outils ignorés par la revue'
+        }
       },
       commandAllowlist: "Liste d'autorisation des commandes",
       security: {
@@ -1355,6 +1465,14 @@ export const frOverrides = {
         cwd: 'Dossier de projet par défaut pour les outils et le terminal.',
         persistentShell: "Conserve l'état du shell entre les commandes lorsque le backend le permet.",
         envPassthrough: "Variables d'environnement à transmettre à l'exécution des outils.",
+        sandbox: {
+          enabled:
+            "Exécute chaque commande de l'agent dans sandctl ; l'accès complet le contourne. Sous Windows, les sessions sandbox utilisent PowerShell. Le profil actif décide de ce que permet l'espace de travail, et tous les profils bloquent le réseau.",
+          escalation:
+            "L'agent peut demander, pour une seule commande, un niveau de sandbox plus large (jusqu'à l'accès complet). Vous approuvez chaque demande, puis le profil configuré revient pour la commande suivante.",
+          backend:
+            "Niveau d'isolation de chaque commande : l1 (frontière de processus), l2 (gVisor) ou l3 (VM Kata), ou le nom d'un backend concret. Un profil de sandbox peut le remplacer."
+        },
         dockerImage: "Image de conteneur utilisée lorsque le backend d'exécution est Docker.",
         singularityImage: "Image utilisée lorsque le backend d'exécution est Singularity.",
         modalImage: "Image utilisée lorsque le backend d'exécution est Modal.",
@@ -1366,7 +1484,14 @@ export const frOverrides = {
       fileReadMaxChars: 'Nombre maximal de caractères que Hermes peut lire dans une demande de fichier.',
       approvals: {
         mode: 'Comment Hermes gère les commandes nécessitant une approbation explicite.',
-        timeout: "Durée d'attente des invites d'approbation avant expiration."
+        timeout: "Durée d'attente des invites d'approbation avant expiration.",
+        autoReview: {
+          policy:
+            'Règles supplémentaires pour le réviseur. Elles viennent de vous et sont considérées comme fiables ; l’appel d’outil reste toujours non fiable.',
+          historyMessages: 'Nombre de messages récents de la conversation que le réviseur voit (0-50).',
+          maxArgChars: 'Quantité de chaque argument d’outil montrée au réviseur (500-20000 caractères).',
+          skipTools: 'Noms d’outils jamais révisés. Les outils locaux en lecture seule sont toujours ignorés.'
+        }
       },
       security: {
         redactSecrets: "Masque les secrets détectés du contenu visible par le modèle lorsque c'est possible."
@@ -2415,6 +2540,7 @@ export const frOverrides = {
   skills: {
     tabSkills: 'Skills',
     tabToolsets: 'Outils',
+    tabLink: 'Liaison',
     configuringProfile: 'Configuration de :',
     all: 'Tout',
     searchSkills: 'Rechercher des skills...',
@@ -3788,6 +3914,18 @@ export const frOverrides = {
     speaking: 'Parle',
     transcribing: 'Transcription',
     thinking: 'Réfléchit',
+    sandboxProfile: 'Profil de sandbox',
+    autoReview: 'Auto Review',
+    autoReviewDescription: "Chaque appel d'outil est examiné par un modèle auxiliaire avant exécution ; un appel refusé vous demande confirmation.",
+    autoReviewSaveFailed: "Impossible de modifier Auto Review.",
+    sandboxProfileHint:
+      'Chaque commande s’exécute dans le profil sélectionné ; le choix s’applique à la commande suivante.',
+    sandboxProfileSaveFailed: 'Impossible de changer le profil de sandbox.',
+    sandboxProfileFullAccessTitle: 'Activer l’accès complet ?',
+    sandboxProfileFullAccessDesc:
+      'L’accès complet supprime le sandbox de commandes pour ce profil : les commandes s’exécutent avec votre compte et un accès réseau, et les outils de fichiers peuvent écrire partout sur la machine. Ne l’activez que si vous faites confiance au travail de l’agent.',
+    sandboxProfileFullAccessConfirm: 'Activer l’accès complet',
+    sandboxProfileCancel: 'Garder le sandbox',
     muted: 'Coupe',
     listening: 'Écoute',
     muteMic: 'Couper le microphone',
@@ -4567,6 +4705,8 @@ export const frOverrides = {
       manualDescription: 'Demander avant les actions nécessitant une approbation',
       smart: 'Intelligent',
       smartDescription: 'Évaluer automatiquement les actions et demander quand nécessaire',
+      auto: 'Automatique',
+      autoDescription: "Examiner chaque appel d'outil et demander en cas de refus",
       off: 'Désactivé',
       offDescription: "Exécuter sans invites d'approbation"
     },
@@ -5147,6 +5287,7 @@ export const frOverrides = {
       moreOptions: "Plus d'options d'approbation",
       allowSession: 'Autoriser cette session',
       alwaysAllowMenu: 'Toujours autoriser…',
+      justification: 'Justification',
       jumpToApproval: 'Approbation requise',
       reject: 'Rejeter',
       alwaysTitle: 'Toujours autoriser cette commande ?',

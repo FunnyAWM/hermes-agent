@@ -1148,6 +1148,105 @@ export const esOverrides = {
         turnOffFailed: 'No se pudo desactivar la mascota.'
       }
     },
+    sandboxProfiles: {
+      title: 'Perfiles de sandbox de comandos',
+      activeTitle: 'Perfil activo',
+      activeDesc:
+        'Todo comando que no sea de acceso total se ejecuta dentro del perfil activo. El perfil se lee por comando, así que un cambio se aplica al siguiente comando sin reiniciar la sesión.',
+      profileName: 'Nombre del perfil',
+      addProfile: 'Añadir perfil',
+      deleteProfile: 'Eliminar perfil',
+      readDirectories: 'Directorios de lectura',
+      readDirectoriesDesc: 'Rutas adicionales que este perfil puede leer, una por línea.',
+      writeDirectories: 'Directorios de escritura',
+      writeDirectoriesDesc: 'Rutas adicionales que este perfil puede escribir, una por línea.',
+      pathsPlaceholder: 'Una ruta por línea',
+      presets: {
+        readOnly: {
+          title: 'Solo lectura',
+          description: 'Lee el espacio de trabajo. Toda escritura permanece bloqueada, igual que la red.'
+        },
+        workspaceWrite: {
+          title: 'Espacio de trabajo escribible',
+          description: 'Lee y escribe el espacio de trabajo. La red permanece bloqueada.'
+        },
+        workspaceExec: {
+          title: 'Espacio de trabajo ejecutable',
+          description: 'Lee, escribe y ejecuta comandos del espacio de trabajo. La red permanece bloqueada.'
+        },
+        fullAccess: {
+          title: 'Acceso total',
+          description: 'Ejecuta comandos fuera de sandctl, sin ninguna restricción.'
+        },
+        custom: {
+          title: 'Personalizado',
+          description: 'Solo lee y escribe las rutas indicadas, más las sobrescrituras de sandctl de abajo.'
+        }
+      },
+      fullAccess: {
+        title: '¿Activar el acceso total?',
+        description:
+          'El acceso total ejecuta comandos en este equipo sin la restricción de sandctl. Continúa solo si confías en todo lo que ejecute el agente.',
+        confirmLabel: 'Activar acceso total',
+        cancelLabel: 'Mantener el sandbox'
+      },
+      widen: {
+        title: '¿Ampliar el sandbox?',
+        description:
+          'Este cambio permite que los comandos lleguen más lejos de lo que permite el preajuste: la red, el filtro de syscalls o la inyección de secretos se vuelven más permisivos.',
+        confirmLabel: 'Ampliar',
+        cancelLabel: 'Cancelar'
+      },
+      policy: {
+        title: 'Sobrescrituras de la política de sandctl',
+        subtitle: 'Se aplica sobre el preajuste. Lo que dejes vacío conserva el valor del preajuste.',
+        isolation: 'Nivel de aislamiento',
+        inheritGlobal: 'Heredar global',
+        l1: 'L1 — límite de proceso',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — VM Kata',
+        syscall: 'Filtro de syscalls',
+        inherit: 'Heredar preajuste',
+        none: 'Ninguno (sin filtrar)',
+        platformDefault: 'Predeterminado de la plataforma',
+        restricted: 'Restringido',
+        strict: 'Estricto',
+        networkMode: 'Modo de red',
+        networkModeDefault: 'Heredar preajuste',
+        networkModeAllowlist: 'Lista de permitidos',
+        networkModeDenylist: 'Lista de bloqueados',
+        networkDefault: 'Acción de red predeterminada',
+        networkDefaultDefault: 'Heredar preajuste',
+        deny: 'Denegar',
+        allow: 'Permitir',
+        allowedHosts: 'Hosts permitidos',
+        allowedHostsDesc: 'Nombres de host que este perfil puede alcanzar, uno por línea. Solo suma al preajuste.',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: 'CIDR permitidos',
+        allowedCidrsDesc: 'Rangos CIDR que este perfil puede alcanzar, uno por línea. Solo suma al preajuste.',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: 'Destinos bloqueados',
+        blockedTargetsDesc: 'Nombres de host o CIDR que se deniegan, uno por línea.',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'Modo del sistema de archivos',
+        fsModeDefault: 'Heredar preajuste',
+        allowlist: 'Lista de permitidos',
+        denylist: 'Lista de bloqueados',
+        cpu: 'Límite de CPU',
+        memory: 'Límite de memoria',
+        pids: 'Límite de procesos',
+        wallTime: 'Límite de tiempo real',
+        noNewPrivs: 'Bloquear la elevación de privilegios',
+        noNewPrivsDesc: 'Activa no_new_privs para que un comando no gane privilegios mediante binarios setuid.',
+        injectSecrets: 'Inyectar secretos',
+        injectSecretsDesc: 'Pasa los valores de los secretos al entorno del sandbox. Es más amplio que el preajuste.',
+        proxySecrets: 'Secretos por proxy',
+        proxySecretsDesc: 'Mantiene los secretos fuera del sandbox y los inyecta en el proxy de salida.',
+        allowedSecrets: 'Secretos permitidos',
+        allowedSecretsDesc: 'Nombres de secretos que este perfil puede usar, uno por línea.',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: 'Modelo predeterminado',
       modelContextLength: 'Ventana de contexto del modelo principal (forzada)',
@@ -1176,6 +1275,11 @@ export const esOverrides = {
         timeout: 'Tiempo límite de comandos',
         persistentShell: 'Shell persistente',
         envPassthrough: 'Paso de variables de entorno',
+        sandbox: {
+          enabled: 'Sandbox de comandos',
+          escalation: 'Elevación por comando',
+          backend: 'Nivel de aislamiento del sandbox'
+        },
         dockerImage: 'Imagen de Docker',
         singularityImage: 'Imagen de Singularity',
         modalImage: 'Imagen de Modal',
@@ -1191,7 +1295,13 @@ export const esOverrides = {
       approvals: {
         mode: 'Modo de aprobación',
         timeout: 'Tiempo límite de aprobación',
-        mcpReloadConfirm: 'Confirmar recargas de MCP'
+        mcpReloadConfirm: 'Confirmar recargas de MCP',
+        autoReview: {
+          policy: 'Política de revisión automática',
+          historyMessages: 'Ventana de historial de revisión',
+          maxArgChars: 'Límite de argumentos de revisión',
+          skipTools: 'Herramientas omitidas por la revisión'
+        }
       },
       commandAllowlist: 'Lista de comandos permitidos',
       security: {
@@ -1352,6 +1462,14 @@ export const esOverrides = {
         cwd: 'Carpeta de proyecto predeterminada para herramientas y terminal.',
         persistentShell: 'Mantiene el estado de la shell entre comandos cuando el backend lo admite.',
         envPassthrough: 'Variables de entorno que se pasan a la ejecución de herramientas.',
+        sandbox: {
+          enabled:
+            'Ejecuta cada comando del agente dentro de sandctl; el acceso total lo omite. En Windows las sesiones con sandbox usan PowerShell. El perfil activo decide qué permite el espacio de trabajo, y todos los perfiles bloquean la red.',
+          escalation:
+            'El agente puede pedir, para un solo comando, un nivel de sandbox más amplio (hasta acceso total). Tú apruebas cada solicitud y luego vuelve a aplicarse el perfil configurado.',
+          backend:
+            'Nivel de aislamiento para cada comando: l1 (límite de proceso), l2 (gVisor) o l3 (VM Kata), o el nombre de un backend concreto. Un perfil de sandbox puede sobrescribirlo.'
+        },
         dockerImage: 'Imagen de contenedor usada cuando el backend de ejecución es Docker.',
         singularityImage: 'Imagen usada cuando el backend de ejecución es Singularity.',
         modalImage: 'Imagen usada cuando el backend de ejecución es Modal.',
@@ -1363,7 +1481,14 @@ export const esOverrides = {
       fileReadMaxChars: 'Máximo de caracteres que Hermes puede leer en una solicitud de archivo.',
       approvals: {
         mode: 'Cómo maneja Hermes los comandos que necesitan aprobación explícita.',
-        timeout: 'Cuánto esperan los prompts de aprobación antes de vencer.'
+        timeout: 'Cuánto esperan los prompts de aprobación antes de vencer.',
+        autoReview: {
+          policy:
+            'Reglas adicionales para el revisor. Provienen de ti y se consideran de confianza; la llamada a la herramienta siempre es no confiable.',
+          historyMessages: 'Cuántos mensajes recientes de la conversación ve el revisor (0-50).',
+          maxArgChars: 'Cuánto de cada argumento de herramienta se muestra al revisor (500-20000 caracteres).',
+          skipTools: 'Nombres de herramientas que nunca se revisan. Las herramientas locales de solo lectura siempre se omiten.'
+        }
       },
       security: {
         redactSecrets: 'Oculta secretos detectados del contenido visible para el modelo cuando sea posible.'
@@ -2397,6 +2522,7 @@ export const esOverrides = {
   skills: {
     tabSkills: 'Skills',
     tabToolsets: 'Conjuntos de herramientas',
+    tabLink: 'Enlace',
     configuringProfile: 'Configurando:',
     all: 'Todo',
     searchSkills: 'Buscar skills...',
@@ -3770,6 +3896,18 @@ export const esOverrides = {
     transcribing: 'Transcribiendo',
     thinking: 'Pensando',
     muted: 'Silenciado',
+    sandboxProfile: 'Perfil de sandbox',
+    autoReview: 'Auto Review',
+    autoReviewDescription: 'Cada llamada de herramienta se revisa con un modelo auxiliar antes de ejecutarse; una llamada denegada te pregunta.',
+    autoReviewSaveFailed: 'No se pudo cambiar Auto Review.',
+    sandboxProfileHint:
+      'Cada comando se ejecuta dentro del perfil seleccionado; la elección se aplica al siguiente comando.',
+    sandboxProfileSaveFailed: 'No se pudo cambiar el perfil de sandbox.',
+    sandboxProfileFullAccessTitle: '¿Activar acceso total?',
+    sandboxProfileFullAccessDesc:
+      'El acceso total elimina el sandbox de comandos para este perfil: los comandos se ejecutan con tu cuenta de usuario y acceso a la red, y las herramientas de archivos pueden escribir en cualquier parte del equipo. Actívalo solo si confías en el trabajo que ejecutará el agente.',
+    sandboxProfileFullAccessConfirm: 'Activar acceso total',
+    sandboxProfileCancel: 'Mantener el sandbox',
     listening: 'Escuchando',
     muteMic: 'Silenciar micrófono',
     unmuteMic: 'Activar micrófono',
@@ -4542,6 +4680,8 @@ export const esOverrides = {
       manualDescription: 'Preguntar antes de acciones que requieran aprobación',
       smart: 'Inteligente',
       smartDescription: 'Evaluar automáticamente las acciones y preguntar cuando sea necesario',
+      auto: 'Automático',
+      autoDescription: 'Revisar cada llamada de herramienta y preguntar si se rechaza',
       off: 'Desactivado',
       offDescription: 'Ejecutar sin solicitudes de aprobación'
     },
@@ -5123,6 +5263,7 @@ export const esOverrides = {
       moreOptions: 'Más opciones de aprobación',
       allowSession: 'Permitir esta sesión',
       alwaysAllowMenu: 'Permitir siempre…',
+      justification: 'Justificación',
       jumpToApproval: 'Aprobación necesaria',
       reject: 'Rechazar',
       alwaysTitle: '¿Permitir siempre este comando?',

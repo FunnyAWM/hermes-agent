@@ -422,6 +422,18 @@ export const arChrome = {
       viewAllLogs: 'عرض كل السجلات',
       messagingPlatforms: 'منصات المراسلة'
     },
+    approvalMode: {
+      title: 'وضع الموافقة',
+      ariaLabel: mode => `وضع الموافقة: ${mode}`,
+      manual: 'يدوي',
+      manualDescription: 'اسأل قبل الإجراءات التي تتطلب موافقة',
+      smart: 'ذكي',
+      smartDescription: 'قيّم الإجراءات تلقائيًا واسأل عند الحاجة',
+      auto: 'تلقائي',
+      autoDescription: 'راجع كل استدعاء أداة واسأل عندما يُرفض الاستدعاء',
+      off: 'معطل',
+      offDescription: 'التشغيل دون مطالبات موافقة'
+    },
     statusbar: {
       unknown: 'غير معروف',
       restart: 'إعادة تشغيل',
