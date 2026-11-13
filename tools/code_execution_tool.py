@@ -769,6 +769,16 @@ def execute_code(
     from tools.terminal_tool import _get_env_config, _docker_has_host_access
     _env_config = _get_env_config()
     env_type = _env_config["env_type"]
+    # The local session kernel is a host Python process (arbitrary os.system/subprocess inside
+    # cells), so it sits outside LocalEnvironment's sandctl gate; refuse rather than escape.
+    if env_type == "local":
+        from tools.environments import local_command_sandbox
+        if local_command_sandbox.active():
+            return tool_error(
+                "execute_code will not run while the command sandbox is enabled: its Python "
+                "kernel would run outside the sandbox boundary. Please use terminal for "
+                "commands and the file tools for edits, or use Full Access for execute_code."
+            )
     # Arbitrary Python never passes through terminal()/DANGEROUS_PATTERNS, so guard the whole
     # script before either dispatch path spawns it — in this (tool-executor) thread, which holds
     # the session context. A Docker sandbox with host bind mounts gets no container fast-path.

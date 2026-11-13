@@ -101,7 +101,9 @@ client (`mcp_tool_*.py`: config, discovery, transport, registration, content, er
 (`tts_tool_providers.py`, `tts_command_provider.py`), skills hub sources (`skills_hub_official.py`
 `OptionalSkillSource`). Adding a backend = a new sibling or provider entry in the existing table,
 never an `elif` on a backend name (root shape rules). Remote-backend file visibility problems are
-fixed at the mount, not by adding a tool.
+fixed at the mount, not by adding a tool. Local commands can opt into a `sandctl` boundary
+(`terminal.sandbox` → `local_command_sandbox.py`, enforced in `LocalEnvironment`); on Windows that
+confined shell is PowerShell, not msys bash.
 
 **Native vision embeds are history, not one-shot payloads.** `vision_tools.py::_vision_analyze_native`
 (and the browser screenshot twin in `browser_use_cli.py`) bake the image

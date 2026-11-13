@@ -652,6 +652,11 @@ class BaseEnvironment(ABC):
         result["output"] = cleaned
 
     # --- Hooks ---
+    def _posix_rewrites_enabled(self) -> bool:
+        """Whether the command may be rewritten with bash-shaped syntax rules (``A && B &``).
+        A backend whose shell for THIS command is not a POSIX shell returns False."""
+        return True
+
     def _before_execute(self) -> None:
         """Hook before each command. Remote backends (SSH, Modal, Daytona)
         trigger their FileSyncManager here; bind-mount backends and Local don't."""
@@ -692,7 +697,7 @@ class BaseEnvironment(ABC):
         exec_command, sudo_stdin = self._prepare_command(command)
         # Guard against the `A && B &` subshell-wait trap by default; callers
         # that already produce shell-safe wrappers (spawn_via_env) pass False.
-        if rewrite_compound_background:
+        if rewrite_compound_background and self._posix_rewrites_enabled():
             from tools.terminal_tool_sudo import _rewrite_compound_background
             exec_command = _rewrite_compound_background(exec_command)
         effective_timeout = timeout or self.timeout

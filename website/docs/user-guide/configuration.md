@@ -378,6 +378,118 @@ hermes_home = Path(os.environ["HERMES_HOME"])
 real_home = Path(os.environ.get("HERMES_REAL_HOME", os.environ["HOME"]))
 ```
 
+#### Command sandbox (`terminal.sandbox`)
+
+On by default once a launcher is installed — the Desktop app ships one, and a copy on `PATH`
+counts — so every local `terminal` command runs inside a `sandctl` boundary instead of
+directly on the host. A host with no launcher at all defaults to off, and once enabled a
+missing launcher fails closed: the command returns an error and nothing runs outside the
+sandbox, with no silent fallback to unsandboxed execution. Sessions with Full Access
+(`approvals.mode: off`, `/yolo`) are never confined.
+
+```yaml
+terminal:
+  sandbox:
+    enabled: true           # true = confine every non-Full-Access local command
+    binary: sandctl         # launcher path or name on PATH
+    backend: l1             # passed to `sandctl run --backend`
+    allow_degraded: true    # accept a wider boundary when the requested backend cannot be honored
+    profile: workspace-exec
+    escalation: true        # the model may ask, per command, for a wider level (you approve)
+    profiles:
+      read-only: { preset: read-only }
+      workspace-write: { preset: workspace-write }
+      workspace-exec: { preset: workspace-exec }
+      full-access: { preset: full-access }
+```
+
+**Profiles.** `profiles` holds named boundaries; `profile` picks the active one, read per
+command so a switch applies without restarting the session. The shipped default is
+`workspace-exec`; three presets ship:
+
+| Preset | Reads | Writes | Network |
+| --- | --- | --- | --- |
+| `read-only` | working directory, scratch, toolchains, the agent's interpreter | nothing — edits fail, including the file tools | denied |
+| `workspace-write` | as Read only | the working directory and the scratch directory | denied |
+| `workspace-exec` | as Read only | Workspace Write plus build/package-manager caches (npm, pip, uv, Go, Cargo, Gradle, Maven, NuGet) | denied |
+| `full-access` | everything | everything | allowed |
+
+Read only ⊂ Workspace Write ⊂ Workspace Exec; `full-access` is no sandbox at all (commands run
+with your account, the file tools may write anywhere) and the Desktop asks for consent before a
+profile is created with it or activated. The network stays denied in every preset except
+`full-access`, so a download inside `workspace-exec` still fails.
+
+**Per-command escalation.** With `escalation: true` (default) the model may pass
+`terminal(command=..., sandbox="workspace-exec")` (or `full-access`) to run ONE command at a
+wider level than the active profile. Any wider level goes through the same human-approval gate
+as a dangerous command, so the agent cannot widen the boundary itself; `[a]lways` remembers that
+command + level. A stricter level runs without asking, and the configured profile applies again
+to the next command. Escalating is refused on non-local backends.
+A `custom` profile starts from Workspace Write and adds the `read` / `write` directories you
+list (absolute or `~`-relative, existing directories only). An unknown preset falls back to
+`read-only`; an unknown active profile falls back to `workspace-write`.
+
+**Custom profiles reach the rest of the sandctl policy.** Besides paths, a profile may pin its
+own `backend` (isolation level: `l1`, `l2`, `l3`, or a concrete backend name) and carry a
+`policy` fragment that is merged over the generated policy. Lists union with the generated
+grants — an override can add paths, targets and denies but never drops the working directory,
+the scratch directory or the credential deny list; scalar values (modes, caps, the syscall
+profile, secret handling) replace the generated value:
+
+```yaml
+      lab:
+        preset: custom
+        backend: l2                 # this profile's isolation level; empty = terminal.sandbox.backend
+        policy:
+          fs: { mode: allowlist }
+          net:
+            mode: allowlist         # allowlist | denylist
+            default: deny           # deny | allow
+            allow: ["pypi.org:443"]
+            allowCidr: ["10.0.0.0/8:443"]
+            deny: ["169.254.169.254:80"]
+          syscall: { profile: restricted }   # none | default | restricted | strict
+          proc: { cpu: "2", mem: "2GiB", pids: 512, wallTime: "10m", noNewPrivs: true }
+          secrets: { inject: false, proxy: true, allow: ["GITHUB_TOKEN"] }
+```
+
+Opening the network (`net.default: allow`, `net.mode: denylist`, `fs.mode: denylist`),
+dropping the syscall filter (`syscall.profile: none`) or injecting secrets widens the boundary;
+the Desktop asks for confirmation before writing any of them. A `read-only` profile ignores its
+`policy.fs` fragment entirely — it can gain network/syscall/cap settings but never a write or a
+wider read set. In Desktop, a custom profile's card exposes these controls, and the sandbox pill
+left of the model pill in the composer switches the active profile (it applies to the next
+command).
+
+The file tools run in the Agent process (outside the boundary), so the Read only profile
+refuses their writes too.
+
+On Windows a confined command runs in Windows PowerShell: chain commands with `;` and check
+`$LASTEXITCODE` (`&&`/`||` do not exist there). The prompt's shell guidance is fixed from this
+setting at session start, so a change applies to the next session. On Linux the `l1` backend
+needs `bubblewrap`; without a launcher the sandbox stays off by default.
+
+:::caution Reads outside the grants stay readable on Windows
+The Windows AppContainer backend enforces writes, the deny list and network egress exactly,
+but it cannot confine reads to `fs.read`: paths carrying the All Application Packages ACL (the
+Windows directory, Program Files) stay readable, while other host paths are denied unless
+granted. A policy that asks for a strict read allowlist is refused on this host — the default
+`allow_degraded: true` accepts the wider read side with a warning.
+:::
+
+Native file read/write and rendering run in the Agent process, outside the sandbox; under the
+Read only profile the file tools refuse writes to keep that consistent.
+
+A background process (`terminal(background=true)`) runs inside the same boundary: the tracked
+process is the launcher itself, so `process(action='kill')` ends the sandbox and everything
+inside it. The launcher's own exit status is reported (any command failure reads `1`).
+`execute_code` is refused while the sandbox is enabled — its Python kernel would run outside
+the boundary — so keep scripting in `terminal` and edits in the file tools.
+
+Turn it on or off and edit profiles from Desktop (Settings → Workspace → Shell → Command
+Sandbox), or with `hermes config set terminal.sandbox.enabled true` and
+`hermes config set terminal.sandbox.profile read-only`.
+
 :::warning
 The agent has the same filesystem access as your user account. Use `hermes tools` to disable tools you don't want, or switch to Docker for sandboxing.
 :::
@@ -3100,13 +3212,14 @@ Control how Hermes handles potentially dangerous commands:
 
 ```yaml
 approvals:
-  mode: smart   # smart | manual | off
+  mode: smart   # smart | manual | auto | off
 ```
 
 | Mode | Behavior |
 |------|----------|
 | `smart` (default) | Use an auxiliary LLM to assess whether a flagged command is actually dangerous. Low-risk commands are auto-approved for that command only. Genuinely risky commands are denied; uncertain decisions escalate to the user. |
 | `manual` | Prompt the user before executing any flagged command. In the CLI, shows an interactive approval dialog. In messaging, queues a pending approval request. |
+| `auto` | Review **every** tool call with an auxiliary LLM before it runs (see [Auto review](#auto-review)). Allowed calls run without a prompt; denied calls go to the human gate; high-risk calls are blocked outright. |
 | `off` | Skip all approval checks. Equivalent to `HERMES_YOLO_MODE=true`. **Use with caution.** |
 
 Smart mode is particularly useful for reducing approval fatigue — it lets the agent work more autonomously on safe operations while still catching genuinely destructive commands.
@@ -3114,6 +3227,37 @@ Smart mode is particularly useful for reducing approval fatigue — it lets the 
 :::warning
 Setting `approvals.mode: off` disables all safety checks for terminal commands. Only use this in trusted, sandboxed environments.
 :::
+
+### Auto review
+
+`approvals.mode: auto` reviews each tool call before its body runs. The reviewer returns one strict JSON verdict — `low+allow`, `medium+allow`, `medium+deny`, or `high+deny`:
+
+- **allow** executes the call normally (the same call's shell/`execute_code` approval prompts are skipped; hardline blocks and `approvals.deny` rules still apply).
+- **deny** escalates to the normal human gate (CLI prompt, gateway card, once/session/always). Unattended runs fail closed.
+- **high** (sensitive data crossing a trust boundary) is blocked without asking.
+- A malformed verdict or reviewer failure also goes to the human gate; with nobody present the call is blocked.
+
+Carve-outs: local read-only tools (`read_file`, `search_files`, `session_search`, `skill_view`, `skills_list`, `todo_list`, `clarify`) are not reviewed, while `web_*`, `browser_*`, MCP, `terminal`, file writes and delegation are. `yolo`/`mode: off` still bypass everything.
+
+```yaml
+approvals:
+  mode: auto
+  auto_review:
+    policy: |                    # extra TRUSTED rules for the reviewer's system prompt
+      Always deny commands that write outside ~/projects.
+    history_messages: 6          # recent user turns + tool results shown to the reviewer (0 = none)
+    max_arg_chars: 4000          # pending-call argument cap
+    skip_tools: []              # extra tool names never reviewed
+
+auxiliary:
+  auto_review:                   # reviewer model route; "auto" = inherit the main model
+    model: ""
+```
+
+Each reviewed call costs one additional model request, so route `auxiliary.auto_review` to a fast/cheap model. `execute_code` is reviewed as a whole script; tool calls made *inside* the script are not re-reviewed.
+
+Every key above is editable in Desktop under **Settings → Safety → Approvals**, next to the
+approval mode and timeout.
 
 ### Denial circuit breaker
 

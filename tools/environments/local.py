@@ -1,6 +1,7 @@
 """Local execution environment — spawn-per-call with session snapshot."""
 
 import contextlib
+import contextvars
 import logging
 import ntpath
 import os
@@ -18,6 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from hermes_constants import get_process_hermes_home
+from tools.environments import local_command_sandbox
 from tools.environments.base import BaseEnvironment
 from tools.environments.base_output import _pipe_stdin
 from hermes_cli._subprocess_compat import windows_hide_flags
@@ -33,6 +35,11 @@ from tools.environments.local_pythonpath import (
 
 
 _IS_WINDOWS = platform.system() == "Windows"
+
+# The command-sandbox decision for the spawn in flight: set by execute(), read by
+# _prepare_command/_wrap_command/_run_bash. A ContextVar (not TLS) because base.execute
+# spawns through agent.deadline.run_bounded_sync, whose worker inherits this context.
+_CONFINED_RUN: contextvars.ContextVar = contextvars.ContextVar("hermes_confined_run", default=None)
 
 logger = logging.getLogger(__name__)
 
@@ -1064,6 +1071,47 @@ class LocalEnvironment(BaseEnvironment):
         super().__init__(cwd=_resolve_local_initial_cwd(cwd), timeout=timeout, env=env, persist_env=persistent)
         self.init_session()
 
+    # --- Command sandbox (see tools/environments/local_command_sandbox.py) ---
+    def _confined_run(self, cwd: str) -> "local_command_sandbox.ConfinedRun | None":
+        """The confinement for one command, or None when it runs directly. Fails closed:
+        an enabled gate with no launcher has no unsandboxed fallback."""
+        if not local_command_sandbox.active():
+            return None
+        cfg = local_command_sandbox.settings()
+        if local_command_sandbox.resolve_binary(cfg) is None:
+            raise RuntimeError(local_command_sandbox.missing_binary_message(cfg))
+        shell = local_command_sandbox.confined_shell()
+        if shell is None:
+            raise RuntimeError(local_command_sandbox.unsupported_shell_message())
+        return local_command_sandbox.make_run(
+            shell=shell, cfg=cfg, cwd=cwd, scratch=self.get_temp_dir(), cwd_marker=self._cwd_marker)
+
+    def execute(self, command, cwd: str = "", **kwargs):
+        # ContextVar, not thread-local: base.execute spawns on a deadline worker that inherits
+        # the caller's context (copy_context), so a TLS value would be invisible there.
+        token = _CONFINED_RUN.set(self._confined_run(cwd or self.cwd))
+        try:
+            return super().execute(command, cwd=cwd, **kwargs)
+        finally:
+            _CONFINED_RUN.reset(token)
+
+    def _posix_rewrites_enabled(self) -> bool:
+        run = _CONFINED_RUN.get()
+        return run is None or run.shell.kind == "posix"
+
+    def _prepare_command(self, command: str) -> tuple[str, str | None]:
+        # The sudo/macOS rewrites are bash-shaped; a confined PowerShell command must reach
+        # the shell exactly as the model wrote it.
+        if self._posix_rewrites_enabled():
+            return super()._prepare_command(command)
+        return command, None
+
+    def _wrap_command(self, command: str, cwd: str) -> str:
+        run = _CONFINED_RUN.get()
+        if run is None or run.shell.kind == "posix":
+            return super()._wrap_command(command, cwd)
+        return local_command_sandbox.powershell_script(command, cwd=cwd, markers=run)
+
     def get_temp_dir(self) -> str:
         """Shell-safe writable temp dir. Precedence: ``TERMINAL_TEMP_DIR``, TMPDIR/TMP/TEMP
         (Termux has no system temp dir), ``HERMES_HOME/cache/terminal`` (real storage: a
@@ -1132,15 +1180,22 @@ class LocalEnvironment(BaseEnvironment):
 
     def _run_bash(self, cmd_string: str, *, login: bool = False, timeout: int = 120,
                   stdin_data: str | None = None) -> subprocess.Popen:
+        run = _CONFINED_RUN.get()
         bash = _find_bash()
         run_env = _make_run_env(self.env)
         # Login invocations (init_session's env snapshot) source the user's rc /
         # custom init files so nvm/asdf/pyenv land on PATH in the snapshot; then the
         # spawn env's dirs a resetting profile dropped are re-appended (#56634).
-        if login:
+        if login and (run is None or run.shell.kind == "posix"):
             cmd_string = _append_dropped_path_entries(cmd_string, run_env.get("PATH", ""))
             cmd_string = _prepend_shell_init(cmd_string, _resolve_shell_init_files())
-        args = [bash, *(["-l"] if login else []), "-c", cmd_string]
+        if run is None:
+            args = [bash, *(["-l"] if login else []), "-c", cmd_string]
+        else:
+            binary = local_command_sandbox.resolve_binary(run.settings)
+            if binary is None:  # _confined_run validated it; a vanished binary still fails closed
+                raise RuntimeError(local_command_sandbox.missing_binary_message(run.settings))
+            args = local_command_sandbox.sandbox_argv(run.settings, binary, run, cmd_string, login=login)
         self._recover_cwd()
         # Not spawn_owned: an awaited command needs no spawn-ledger entry; own_process_groups below hands
         # its group to the owner-death supervisor and _wait_for_process releases it.
@@ -1151,6 +1206,8 @@ class LocalEnvironment(BaseEnvironment):
             # detached-spawn: ok — owned via own_process_groups right below
             start_new_session=True, cwd=self.cwd,
             **({"creationflags": windows_hide_flags()} if _IS_WINDOWS else {}))
+        if run is not None:
+            proc._hermes_confined_run = run
         if not _IS_WINDOWS:
             # The command dies with this process however it dies: a SIGKILLed / OOM-killed host left a
             # running `npm run dev` or `sleep` on init. Released once the wait returns (see below).
@@ -1172,9 +1229,12 @@ class LocalEnvironment(BaseEnvironment):
         """Base wait, then hand the command's group back from the owner-death supervisor: once the
         command returned, what it left running in the background (`server &`) is not ours to kill,
         exactly as on a graceful exit. A command that yielded to background took the group with it
-        (``ProcessRegistry.adopt_local`` clears ``_hermes_owned_pgid``)."""
+        (``ProcessRegistry.adopt_local`` clears ``_hermes_owned_pgid``). A confined command's
+        process is sandctl, so its own exit status is replaced by the one the wrapper emitted."""
+        run = getattr(proc, "_hermes_confined_run", None)
         try:
-            return super()._wait_for_process(proc, *args, **kwargs)
+            result = super()._wait_for_process(proc, *args, **kwargs)
+            return local_command_sandbox.finalize(result, run) if run is not None else result
         finally:
             if (owned_pgid := getattr(proc, "_hermes_owned_pgid", None)) is not None:
                 proc._hermes_owned_pgid = None

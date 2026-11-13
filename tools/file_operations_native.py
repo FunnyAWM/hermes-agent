@@ -76,10 +76,12 @@ def atomic_write(path: str, data: bytes) -> Optional[str]:
         return f"{e.strerror or e}: {e.filename or target}"
     try:
         if mode is not None:
-            try:
-                os.fchmod(fd, mode)  # before any content: the bytes never sit in a wider file
-            except OSError:
-                pass  # best effort, as in the shell script (the temp then stays 0o600)
+            fchmod = getattr(os, "fchmod", None)  # absent on Windows, where modes are advisory
+            if fchmod is not None:
+                try:
+                    fchmod(fd, mode)  # before any content: the bytes never sit in a wider file
+                except OSError:
+                    pass  # best effort, as in the shell script (the temp then stays 0o600)
         with open(fd, "wb") as fh:
             fh.write(data)
         os.replace(tmp, target)

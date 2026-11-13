@@ -1098,6 +1098,61 @@ class _Rejected(Exception):
         self.result_json = result_json
 
 
+_SANDBOX_LEVELS = ("read-only", "workspace-write", "workspace-exec", "full-access")
+
+
+def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str):
+    """Context manager applying a one-command ``sandbox`` level to the local gate.
+
+    A level wider than the active profile goes through the same human-approval gate as a
+    dangerous command (the model cannot widen the boundary on its own); ``[a]lways``
+    persists for that command + level. A tighter level runs without asking. Raises
+    :class:`_Rejected` when the request cannot be honored.
+    """
+    from contextlib import nullcontext
+
+    level = (level or "").strip().lower()
+    if not level:
+        return nullcontext()
+    from tools.environments import local_command_sandbox as gate
+
+    if level not in _SANDBOX_LEVELS:
+        raise _Rejected(_error_json(
+            f"sandbox must be one of {', '.join(_SANDBOX_LEVELS)}.", status="error"))
+    if env_type != "local":
+        raise _Rejected(_error_json(
+            "sandbox levels apply to the local backend only; this session runs commands "
+            "in its own sandbox.", status="error"))
+    cfg = gate.settings()
+    if not cfg.enabled:
+        raise _Rejected(_error_json(
+            "sandbox levels need terminal.sandbox.enabled: the command sandbox is off, so "
+            "every command already runs unconfined and a level cannot be applied.", status="error"))
+    if not gate.widening(level):
+        return gate.escalation(level)
+    if not cfg.escalation:
+        raise _Rejected(_error_json(
+            f"Escalating to the {level} sandbox level is turned off (terminal.sandbox.escalation); "
+            "run the command inside the active profile or ask the user to change it.", status="error"))
+    import hashlib
+
+    from tools.approval import request_tool_approval
+
+    current = gate.active_profile(cfg).preset
+    preview = " ".join(command.split())[:160]
+    approval = request_tool_approval(
+        "terminal",
+        f"run one command at the wider '{level}' sandbox level (active: '{current}'): {preview}",
+        rule_key=f"sandbox_escalation:{level}:{hashlib.sha1(preview.encode('utf-8')).hexdigest()[:12]}",
+        approval_callback=_get_approval_callback(),
+    )
+    if not approval.get("approved"):
+        raise _Rejected(_error_json(
+            approval.get("message") or "The user did not approve the wider sandbox level.",
+            status="blocked"))
+    return gate.escalation(level)
+
+
 @dataclass
 class _ApprovalVerdict:
     """Outcome of the pre-exec guard pass.
@@ -1484,6 +1539,7 @@ def terminal_tool(
     _completion_output_chars: int = 0,
     heartbeat: int = 0,
     persist_on_release: bool = False,
+    sandbox: Optional[str] = None,
 ) -> str:
     """Execute *command* in the configured terminal environment; returns a JSON string.
 
@@ -1505,6 +1561,9 @@ def terminal_tool(
     spawner whose output is the payload (a bot DM's reply); 0 keeps the usual tail.
     ``_host_local`` forces the local backend for Hermes-owned control-plane
     children (kept in a separate env cache from the configured backend).
+    ``sandbox`` is a one-command level override for the local command sandbox
+    (``read-only`` / ``workspace-write`` / ``workspace-exec`` / ``full-access``);
+    a wider level needs the user's approval and never outlives this call.
     """
     from hermes_cli.observability.shared_metrics_loop import record_terminal_backend as _metered
     plan = None
@@ -1569,28 +1628,29 @@ def terminal_tool(
                 # Promotion implies notify_on_complete; watch_patterns is a background-only flag the
                 # caller could not have meant for a foreground call, and the two are exclusive anyway.
                 background, notify_on_complete, watch_patterns = True, True, None
-            if background:
-                result = spawn_background_process(
-                    command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
-                    task_id=task_id, session_key=session_key, workdir=workdir, cwd=cwd,
-                    mounted_host=getattr(env, "host_cwd", None) or plan.host_cwd,
-                    effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
-                    watch_patterns=watch_patterns, approval_note=verdict.note,
-                    pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
-                    completion_output_chars=_completion_output_chars,
-                    heartbeat_seconds=heartbeat,
-                    persist_on_release=persist_on_release,
-                    auto_backgrounded=auto_bg is not None and plan.promoted_from_foreground_timeout is None,
-                )
-                if plan.promoted_from_foreground_timeout is not None:
-                    result = _with_promoted_note(result, plan.promoted_from_foreground_timeout)
-                return _metered(None if _host_local else plan, result)
-            return _metered(None if _host_local else plan, _run_foreground(
-                command, env, plan,
-                task_id=task_id, session_id=session_id, session_key=session_key,
-                workdir=workdir, approval_note=verdict.note, clear_interrupt=verdict.approved_run,
-                metered=not _host_local,
-            ))
+            with _sandbox_escalation_scope(sandbox, env_type, command):
+                if background:
+                    result = spawn_background_process(
+                        command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
+                        task_id=task_id, session_key=session_key, workdir=workdir, cwd=cwd,
+                        mounted_host=getattr(env, "host_cwd", None) or plan.host_cwd,
+                        effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
+                        watch_patterns=watch_patterns, approval_note=verdict.note,
+                        pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
+                        completion_output_chars=_completion_output_chars,
+                        heartbeat_seconds=heartbeat,
+                        persist_on_release=persist_on_release,
+                        auto_backgrounded=auto_bg is not None and plan.promoted_from_foreground_timeout is None,
+                    )
+                    if plan.promoted_from_foreground_timeout is not None:
+                        result = _with_promoted_note(result, plan.promoted_from_foreground_timeout)
+                    return _metered(None if _host_local else plan, result)
+                return _metered(None if _host_local else plan, _run_foreground(
+                    command, env, plan,
+                    task_id=task_id, session_id=session_id, session_key=session_key,
+                    workdir=workdir, approval_note=verdict.note, clear_interrupt=verdict.approved_run,
+                    metered=not _host_local,
+                ))
     except _Rejected as r:
         return r.result_json
     except EnvironmentConnectionError as e:
@@ -1660,6 +1720,11 @@ TERMINAL_SCHEMA = {
                 "type": "boolean",
                 "default": False,
                 "description": "With background=true: survive session end, /new, compression and other cleanup (not host exit). Only for jobs the user explicitly wants to outlive the conversation."
+            },
+            "sandbox": {
+                "type": "string",
+                "enum": ["read-only", "workspace-write", "workspace-exec", "full-access"],
+                "description": "Local command sandbox: run THIS command at another level. Ask for a wider level when the active profile blocks the command — the user must approve it, and the configured profile applies again to the next call. 'full-access' runs this one command outside the sandbox."
             }
             # Legacy aliases (unadvertised, still accepted): notify_on_complete
             # (bool) and watch_patterns (list). notify=true|[...] maps onto
@@ -1744,6 +1809,7 @@ def _handle_terminal(args, **kw):
         watch_patterns=watch_patterns,
         heartbeat=heartbeat,
         persist_on_release=persist_on_release,
+        sandbox=args.get("sandbox"),
     )
 
 

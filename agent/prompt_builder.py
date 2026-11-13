@@ -821,6 +821,39 @@ _WINDOWS_BASH_SHELL_HINT = (
     "driving prompts."
 )
 
+_WINDOWS_SANDBOX_SHELL_HINT = (
+    "Shell: on this Windows host your `terminal` tool runs inside the command sandbox, and the sandbox runs "
+    "Windows PowerShell — write native PowerShell syntax directly, not bash. The sandbox allows reads under the "
+    "current working directory and the scratch directory, denies the network, and refuses anything outside the "
+    "active profile's grants: the default Workspace Exec profile writes the working and scratch "
+    "directories plus build caches, and Read only writes nothing, so keep file work inside the working directory. "
+    "Host loopback (`localhost`, 127.0.0.1) is unreachable inside the sandbox, so a local dev server or database "
+    "cannot be reached from a confined command. "
+    "File tools take native paths (`C:\\Users\\<user>\\...`), "
+    "never MSYS paths like `/c/Users/...`. `&&` and `||` do not exist in Windows PowerShell: chain commands with "
+    "`;` and check `$LASTEXITCODE` after each. "
+    "A background process (`terminal(background=true)`) runs inside the same sandbox, and `execute_code` is "
+    "refused while the sandbox is enabled — keep scripting in `terminal` and edits in the file tools. "
+    "If the active profile blocks a command you need, pass `sandbox='workspace-exec'` (or `'full-access'`) "
+    "on that one `terminal` call to request a wider level: the user is asked to approve it, and the "
+    "configured profile applies again to the next command."
+)
+
+
+def _command_sandbox_active() -> bool:
+    """One answer per session (the prompt must stay byte-stable): is a non-Full-Access local command confined?
+
+    Late import: ``tools.environments`` pulls in the tool stack, and a probe failure must never cost the
+    system prompt — degrade to the unsandboxed hint the host would otherwise get.
+    """
+    try:
+        from tools.environments import local_command_sandbox
+
+        return bool(local_command_sandbox.active())
+    except Exception:
+        logger.debug("Command sandbox probe failed; keeping the unsandboxed shell hint", exc_info=True)
+        return False
+
 
 def _tenv_read(name: str, default: str = "") -> str:
     """Scope-aware TERMINAL_* read: the multiplexing gateway's per-turn scope carries
@@ -940,7 +973,10 @@ def _local_host_hints() -> list[str]:
         "Note: on Windows, the machine hostname (e.g. from `hostname` or uname) is NOT the username. "
         "Use the 'User home directory' above to construct paths under C:\\Users\\<user>\\, never the hostname."
     )
-    # Windows-local terminal runs bash, not PowerShell — without this the model issues PowerShell syntax.
+    # Windows-local terminal normally runs bash, not PowerShell — without this the model issues PowerShell syntax.
+    # When the command sandbox is on, the confined Windows shell IS PowerShell, so the hint has to follow it.
+    if _command_sandbox_active():
+        return ["\n".join(host_lines), _WINDOWS_SANDBOX_SHELL_HINT]
     return ["\n".join(host_lines), _WINDOWS_BASH_SHELL_HINT]
 
 

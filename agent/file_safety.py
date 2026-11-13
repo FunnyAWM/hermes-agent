@@ -7,12 +7,15 @@ clear denial for models that respect tool errors plus a visible audit trail.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from contextlib import suppress
 from typing import Optional
 
 from hermes_cli.home_data_layout import SECRET_CACHE_STORES
+
+logger = logging.getLogger(__name__)
 
 
 def _constants_path(getter_name: str) -> Path:
@@ -253,7 +256,8 @@ _HERMES_PROTECTED_SUBPATHS = (
 
 
 def _classify_write_denial(path: str, *, entry: bool = False) -> Optional[str]:
-    """Return ``'credential'``, ``'safe_root'``, ``'nt_namespace'``, or ``None`` if writes are allowed.
+    """Return ``'credential'``, ``'safe_root'``, ``'nt_namespace'``, ``'sandbox_read_only'``, or
+    ``None`` if writes are allowed.
 
     ``entry=True`` is for ops that unlink/rename the directory entry itself (a
     symlink, not its target): the entry — parent realpath'd, final component
@@ -304,7 +308,24 @@ def _classify_resolved_write_denial(homes: set[str], resolved: str) -> Optional[
     if safe_roots and not any(_is_under(resolved, root) for root in safe_roots):
         return "safe_root"
 
+    # The file tools run in-process, outside the sandbox boundary, so a read-only
+    # sandbox profile must also refuse here or edits would slip past the policy.
+    if _sandbox_read_only():
+        return "sandbox_read_only"
+
     return None
+
+
+def _sandbox_read_only() -> bool:
+    """The command sandbox is active and its profile grants no writes. Late import: the
+    gate module pulls the terminal stack, and a probe failure must not block file tools."""
+    try:
+        from tools.environments.local_command_sandbox import file_writes_read_only
+
+        return file_writes_read_only()
+    except Exception:
+        logger.debug("sandbox read-only probe failed; allowing the write", exc_info=True)
+        return False
 
 
 def is_write_denied(path: str) -> bool:
@@ -324,6 +345,12 @@ def get_write_denied_error(path: str, *, verb: str = "Write", entry: bool = Fals
         )
     if denial == "nt_namespace":
         return get_nt_namespace_error(path, verb=verb)
+    if denial == "sandbox_read_only":
+        return (
+            f"{verb} denied: '{path}' is inside a read-only workspace. The active command "
+            "sandbox profile (Read only) grants no file writes. Please pick a profile that "
+            "allows writes in Settings → Workspace → Shell."
+        )
     return f"{verb} denied: '{path}' is a protected system/credential file." if denial else None
 
 
