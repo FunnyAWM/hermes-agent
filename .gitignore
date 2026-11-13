@@ -56,7 +56,6 @@ run_datagen_kimik2-thinking.sh
 run_datagen_megascience_glm4-6.sh
 run_datagen_sonnet.sh
 source-data/*
-run_datagen_megascience_glm4-6.sh
 data/*
 MagicMock/
 # No trailing slash: also matches node_modules SYMLINKS (worktrees often
@@ -70,7 +69,6 @@ agent-browser/
 *.pem
 privvy*
 images/
-__pycache__/
 hermes_agent.egg-info/
 wandb/
 testlogs
@@ -341,3 +339,11 @@ apps/desktop/.dist-build*
 
 # Local agent state (repo wiki cache and session metadata)
 /.qoder/
+/.zcode/
+
+# before-pack keeps the previous dist under this name; it is a build artifact
+apps/desktop/.dist-previous*
+
+# Mimosa security-scan plugin state (hook transcripts, baselines) — tool-local, never repo content
+/.mimosa/
+apps/desktop/.mimosa/
