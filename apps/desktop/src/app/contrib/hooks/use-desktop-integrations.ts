@@ -11,6 +11,7 @@ import { $diskPluginsScanPending } from '@/contrib/runtime-loader'
 import { getSession } from '@/hermes'
 import { resolveDeepLinkAction } from '@/lib/deeplink-routes'
 import { pathFromHermesDeepLink, resolveHermesOpenPath } from '@/lib/hermes-open-target'
+import { invalidateSessionListQueries } from '@/lib/query-client'
 import { storedSessionIdForNotification } from '@/lib/session-ids'
 import { announceNewSessionDraftKey } from '@/store/composer'
 import { recordAction } from '@/store/desktop-metrics'
@@ -557,13 +558,21 @@ export function useDesktopIntegrations({
     return () => unsubscribe?.()
   }, [])
 
-  // Another window mutated the shared session list -> re-pull the sidebar.
+  // Another window mutated the shared session list -> re-pull the sidebar and
+  // drop the cached server pages (the /resume picker, the command palette).
+  // Even a secondary/browser window subscribes: it holds no sidebar to refresh,
+  // but the bus is also where the sender's removal tombstones land, and those
+  // must be applied in every renderer that can list sessions.
   useEffect(() => {
-    if (isSecondaryWindow() || isBrowserWindow()) {
-      return
-    }
+    const rendersSidebar = !isSecondaryWindow() && !isBrowserWindow()
 
-    return onSessionsChanged(() => void refreshSessions())
+    return onSessionsChanged(() => {
+      invalidateSessionListQueries()
+
+      if (rendersSidebar) {
+        void refreshSessions()
+      }
+    })
   }, [refreshSessions])
 
   // A gateway that connects after the list was drawn adds its rows to it.

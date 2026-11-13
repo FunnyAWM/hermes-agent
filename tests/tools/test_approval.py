@@ -48,8 +48,8 @@ class TestApprovalModeParsing:
         assert _normalize_approval_mode("  SMART  ") == "smart"
         assert _normalize_approval_mode(True) == "manual"
         assert _normalize_approval_mode("") == "manual"
-        assert _normalize_approval_mode("auto") == "manual"
-
+        assert _normalize_approval_mode("auto") == "auto"
+        assert _normalize_approval_mode("auto-review") == "manual"
 
     def test_config_bool_false_maps_to_off(self):
         with mock_patch("hermes_cli.config.load_config_readonly", return_value={"approvals": {"mode": False}}):

@@ -37,7 +37,13 @@ beforeAll(() => {
 function setRequest(
   command = 'rm -rf /tmp/x',
   allowPermanent?: boolean,
-  extra: { choices?: string[]; requestId?: string; serverRequestId?: string; smartDenied?: boolean } = {}
+  extra: {
+    choices?: string[]
+    justification?: string
+    requestId?: string
+    serverRequestId?: string
+    smartDenied?: boolean
+  } = {}
 ) {
   $activeSessionId.set('sess-1')
   setApprovalRequest({ allowPermanent, command, description: 'dangerous command', sessionId: 'sess-1', ...extra })
@@ -106,6 +112,22 @@ describe('PendingApprovalStack', () => {
     expect(screen.getByText(/Plugin requires approval for terminal: run/)).toBeTruthy()
     expect(screen.getByText(/pwd/)).toBeTruthy()
     expect(screen.queryByText(/plugin approval rule/)).toBeNull()
+  })
+
+  it('shows the pending command and the reviewer justification together', () => {
+    // Auto Review escalations carry the actual call plus the reviewer's reason
+    // (already in the user's language): the card must show both, so the user
+    // judges the effect instead of a synthetic rule label.
+    setRequest('terminal {"command": "rm -rf build"}', undefined, {
+      justification: 'This deletes build output this session did not create.',
+      requestId: 'apr-justified'
+    })
+    render(<PendingApprovalStack />)
+
+    expect(screen.getByText('terminal {"command": "rm -rf build"}')).toBeTruthy()
+    expect(screen.getByText('Justification')).toBeTruthy()
+    expect(screen.getByText('This deletes build output this session did not create.')).toBeTruthy()
+    expect(screen.queryByText('dangerous command')).toBeNull()
   })
 
   it('keeps showing the real command for ordinary dangerous-command approvals', () => {

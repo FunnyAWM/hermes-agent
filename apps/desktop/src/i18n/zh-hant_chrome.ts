@@ -84,6 +84,7 @@ export const zhHantChrome = {
     },
     nav: {
       'new-session': '新工作階段',
+      memory: '記憶',
       capabilities: '技能與工具',
       messaging: '訊息平台',
       artifacts: '成品',
@@ -332,6 +333,8 @@ export const zhHantChrome = {
       manualDescription: '執行需要核准的操作前詢問',
       smart: '智慧',
       smartDescription: '自動評估操作，並在需要時詢問',
+      auto: '自動',
+      autoDescription: '逐次審查工具呼叫，被拒絕時詢問',
       off: '關閉',
       offDescription: '不顯示核准提示，直接執行'
     },

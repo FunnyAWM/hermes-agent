@@ -235,6 +235,23 @@ interface ApprovalCardProps {
   stack: CardStackAction
 }
 
+/** The reviewer's / rule's reason, in the user's language, beside what would run: the card must
+ *  let the user judge the effect itself, not just a risk label. Absent for plain command gates. */
+function ApprovalJustification({ label, text }: { label: string; text?: string }) {
+  const reason = text?.trim()
+
+  if (!reason) {
+    return null
+  }
+
+  return (
+    <div className="min-w-0 px-2.5 pb-1.5" data-slot="tool-approval-justification">
+      <div className="text-[0.6875rem] font-medium text-(--ui-text-secondary)">{label}</div>
+      <p className="m-0 whitespace-pre-wrap break-words text-xs leading-relaxed text-(--ui-text-primary)">{reason}</p>
+    </div>
+  )
+}
+
 const ApprovalCard: FC<ApprovalCardProps> = ({ request, total, position, stack }) => {
   const { t } = useI18n()
   const copy = t.assistant.approval
@@ -282,15 +299,13 @@ const ApprovalCard: FC<ApprovalCardProps> = ({ request, total, position, stack }
   const allowSession = choices ? choices.includes('session') : true
   const allowAlways = choices ? choices.includes('always') : allowPermanent
   const hasMoreOptions = allowSession || allowAlways
-  const hasCommand = request.command.trim().length > 0
   // A plugin `approve` rule escalates through the same gate with a synthetic
   // display target (`<tool> (plugin approval rule)`) while the real command /
   // change lives in `description` — the user approves a label they cannot act
   // on otherwise. Show the description whenever the command is missing or one
   // of these synthetic labels; a real command keeps rendering as the command.
   const SYNTHETIC_COMMAND_RE = /^<[^>]+> \(/
-
-  const showsDescription = !hasCommand || SYNTHETIC_COMMAND_RE.test(request.command.trim())
+  const showsDescription = !request.command.trim() || SYNTHETIC_COMMAND_RE.test(request.command.trim())
 
   const details = showsDescription ? request.description.trim() : request.command.trim()
 
@@ -348,6 +363,7 @@ const ApprovalCard: FC<ApprovalCardProps> = ({ request, total, position, stack }
           {details}
         </pre>
       )}
+      <ApprovalJustification label={copy.justification} text={request.justification} />
       <div className="flex items-center justify-end gap-1.5 px-2 pb-2 pt-1" data-slot="tool-approval-actions">
         <Button data-approval-deny="" disabled={busy} onClick={() => void respond('deny')} size="sm" variant="text">
           {submitting === 'deny' ? <Loader2 className="size-3 animate-spin" /> : copy.reject}

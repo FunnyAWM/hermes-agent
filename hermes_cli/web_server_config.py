@@ -79,6 +79,12 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
         "description": "Context window override (0 = auto-detect from model metadata)",
         "category": "general",
     },
+    # A free-form paragraph: the desktop generic editor would otherwise render it as a
+    # one-line input while empty.
+    "approvals.auto_review.policy": {
+        "type": "text",
+        "description": "Extra trusted rules for the automatic tool-call reviewer",
+    },
     "terminal.backend": _select(
         "Terminal execution backend",
         "local", "docker", "ssh", "modal", "daytona", "vercel_sandbox",
@@ -140,7 +146,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     ),
     "display.resume_display": _select("How resumed sessions display history", "minimal", "full", "off"),
     "display.busy_input_mode": _select("Input behavior while agent is running", "interrupt", "queue", "steer"),
-    "approvals.mode": _select("Dangerous command approval mode", "manual", "smart", "off"),
+    "approvals.mode": _select("Dangerous command approval mode", "manual", "smart", "auto", "off"),
     "context.engine": _select("Context management engine", "default", "custom"),
     "human_delay.mode": _select("Simulated typing delay mode", "off", "typing", "fixed"),
     "logging.level": _select("Log level for agent.log", "DEBUG", "INFO", "WARNING", "ERROR"),

@@ -45,6 +45,11 @@ const SYSTEM_MONO =
 
 export const DEFAULT_TYPOGRAPHY: DesktopThemeTypography = { fontSans: SYSTEM_SANS, fontMono: SYSTEM_MONO }
 
+// Built-in themes must not set `fontUrl`: it injects a remote stylesheet, which
+// makes a default-config desktop reach fonts.googleapis.com (T-11 default-egress
+// gate). Imported third-party themes may still carry one — that is an explicit
+// user action, not default behaviour.
+
 /**
  * Nous — the canonical Hermes desktop identity, forked from the GitHub VS Code
  * theme (github.github-vscode-theme). Light is GitHub Light Default, dark is
@@ -71,8 +76,7 @@ export const githubTheme: DesktopTheme = {
   ...THEME_PRESET_PALETTES.github,
   typography: {
     fontSans: SYSTEM_SANS,
-    fontMono: SYSTEM_MONO,
-    fontUrl: 'https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap'
+    fontMono: SYSTEM_MONO
   },
   terminal: {
     foreground: '#1f2328',
@@ -134,8 +138,7 @@ export const nousTheme: DesktopTheme = {
   ...THEME_PRESET_PALETTES.nous,
   typography: {
     fontSans: SYSTEM_SANS,
-    fontMono: SYSTEM_MONO,
-    fontUrl: 'https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap'
+    fontMono: SYSTEM_MONO
   },
   terminal: {
     foreground: '#1f2328',
@@ -334,8 +337,7 @@ export const nousAltTheme: DesktopTheme = {
   ...THEME_PRESET_PALETTES['nous-alt'],
   typography: {
     fontSans: SYSTEM_SANS,
-    fontMono: SYSTEM_MONO,
-    fontUrl: 'https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap'
+    fontMono: SYSTEM_MONO
   }
 }
 
@@ -394,8 +396,7 @@ export const midnightTheme: DesktopTheme = {
   description: 'Deep blue-violet with cool accents',
   ...THEME_PRESET_PALETTES.midnight,
   typography: {
-    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
-    fontUrl: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap'
+    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`
   }
 }
 
@@ -405,8 +406,7 @@ export const emberTheme: DesktopTheme = {
   description: 'Warm crimson and bronze — forge vibes',
   ...THEME_PRESET_PALETTES.ember,
   typography: {
-    fontMono: `"IBM Plex Mono", ${SYSTEM_MONO}`,
-    fontUrl: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap'
+    fontMono: `"IBM Plex Mono", ${SYSTEM_MONO}`
   }
 }
 

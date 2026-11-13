@@ -292,6 +292,7 @@ export const arAssistant = {
       moreOptions: 'خيارات إضافية',
       allowSession: 'السماح لهذه الجلسة',
       alwaysAllowMenu: 'السماح دائما',
+      justification: 'المبرر',
       jumpToApproval: 'الموافقة مطلوبة',
       reject: 'رفض',
       alwaysTitle: 'السماح دائما',

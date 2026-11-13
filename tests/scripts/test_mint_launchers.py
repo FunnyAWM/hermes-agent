@@ -26,6 +26,12 @@ from pathlib import Path
 
 import pytest
 
+# The mint imports pip's vendored distlib; the payload interpreter ships pip,
+# but a uv-created dev venv legitimately does not.
+pytest.importorskip(
+    "pip._vendor.distlib.scripts", reason="launcher mint needs pip's vendored distlib"
+)
+
 _REPO = Path(__file__).resolve().parents[2]
 _MINT = _REPO / "scripts" / "build" / "mint_launchers.py"
 

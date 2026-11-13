@@ -676,6 +676,17 @@ def _pre_tool_block(agent, ref: _ToolCallRef):
         return None, ref.args
 
 
+def _auto_review_block(ref, *, messages: list | None,
+                       authorization_gate: _ConcurrentToolAuthorizationGate | None):
+    """``approvals.mode: auto`` gate for one call; returns ``(block_body, error_type)``."""
+    from tools.auto_review import gate_tool_call
+
+    return gate_tool_call(
+        ref.name, ref.args, messages=messages,
+        serialize=None if authorization_gate is None else authorization_gate.run,
+    )
+
+
 def _dispatch_authorized_once(
     agent,
     state: _ManagedToolResult,
@@ -686,8 +697,10 @@ def _dispatch_authorized_once(
     display_index: int | None,
     begin_execution,
     authorization_gate: _ConcurrentToolAuthorizationGate | None,
+    messages: list | None = None,
 ) -> Any:
-    """Hermes policy (scope → plugin pre-hooks → pruned-arg check → guardrails) then the one real dispatch.
+    """Hermes policy (scope → plugin pre-hooks → pruned-arg check → auto review → guardrails) then
+    the one real dispatch.
 
     Plugin ``modify`` hooks may rewrite ``ref.args`` (mirrored into ``state.args``).
     ``begin_execution`` (concurrent start-order gate) is advanced exactly once on every
@@ -725,6 +738,13 @@ def _dispatch_authorized_once(
                 "argument_paths": pruned_paths,
             }
             block_error_type = _PRUNED_TOOL_ARGUMENTS_ERROR
+
+    if block_body is None:
+        block_body, error_type = _auto_review_block(
+            ref, messages=messages, authorization_gate=authorization_gate,
+        )
+        if block_body is not None:
+            block_error_type = error_type
 
     guardrail_decision = None
     if block_body is None:
@@ -770,6 +790,7 @@ def _run_agent_tool_execution_middleware(
     middleware_trace: list[dict[str, Any]] | None = None,
     begin_execution=None,
     authorization_gate: _ConcurrentToolAuthorizationGate | None = None,
+    messages: list | None = None,
 ) -> _ManagedToolResult:
     """Run Relay rewrites before Hermes policy and dispatch exactly once."""
     from agent import relay_tools
@@ -808,6 +829,7 @@ def _run_agent_tool_execution_middleware(
             display_index=display_index,
             begin_execution=begin_execution,
             authorization_gate=authorization_gate,
+            messages=messages,
         )
 
     from agent.terminal_approval_batch import bind_prepared_dispatch
@@ -919,6 +941,7 @@ def _run_sequential_tool_execution_middleware(
     scope_block: str | None = None,
     display_index: int | None = None,
     middleware_trace: list[dict[str, Any]] | None = None,
+    messages: list | None = None,
 ) -> _ManagedToolResult:
     """Run one sequential call on a worker thread under the concurrent executor's deadline.
     Interactive tools (``clarify``) own their wait via ``agent.clarify_timeout``; the
@@ -930,7 +953,8 @@ def _run_sequential_tool_execution_middleware(
     timeout_s = None if function_name in _SEQUENTIAL_DEADLINE_EXEMPT_TOOLS else _resolve_sequential_tool_timeout()
     timeout_s = _extend_tool_timeout(function_name, timeout_s)
     ref = _ToolCallRef(function_name, function_args, effective_task_id, tool_call_id, middleware_trace)
-    kwargs = dict(ref.middleware_kwargs(), execute=execute, scope_block=scope_block, display_index=display_index)
+    kwargs = dict(ref.middleware_kwargs(), execute=execute, scope_block=scope_block,
+                  display_index=display_index, messages=messages)
     from agent.terminal_approval_batch import take_prepared_call
     prepared = take_prepared_call(tool_call_id)
     if prepared is not None:
@@ -1377,6 +1401,7 @@ class _ConcurrentBatch:
                 display_index=index + 1,
                 begin_execution=start_gate.advance,
                 authorization_gate=self.authorization_gate,
+                messages=self.messages,
             )
             result, ref.args, ref.trace = managed.result, managed.args, managed.middleware_trace
             blocked, dispatched, data_use = managed.blocked, managed.dispatched, managed.data_use
@@ -1798,6 +1823,7 @@ def _run_sequential_call(
             execute=dispatch.execute,
             scope_block=scope_block,
             display_index=display_index,
+            messages=messages,
         )
         ref.args = managed.args
         _spinner_result = managed.result

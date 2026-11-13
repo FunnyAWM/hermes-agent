@@ -373,7 +373,8 @@ def _prompt_frame(authority, ref, row, worker, frame):
     if len(controls.remote_responders) >= 16:
         raise RuntimeStoreError('worker_control_backpressure')
     if kind == 'approval':
-        fields = {'request_id', 'command', 'description', 'allow_session', 'allow_permanent', 'smart_denied', 'edit'}
+        fields = {'request_id', 'command', 'description', 'justification', 'allow_session', 'allow_permanent',
+                  'smart_denied', 'edit'}
         data = frame.get('data')
         if set(frame) != {'type', 'data'} or not isinstance(data, dict) or set(data) - fields:
             raise RuntimeStoreError('invalid_worker_frame')

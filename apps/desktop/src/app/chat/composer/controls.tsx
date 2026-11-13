@@ -16,6 +16,7 @@ import { ACTIVE_ICON_BTN, GHOST_ICON_BTN, PRIMARY_ICON_BTN } from './control-cla
 import type { ConversationStatus } from './hooks/use-voice-conversation'
 import { ModelPill } from './model-pill'
 import { ReasoningPill } from './reasoning-pill'
+import { SandboxPill } from './sandbox-pill'
 import { StartVoiceButton } from './start-voice-button'
 import type { ChatBarState, VoiceStatus } from './types'
 import { VoiceFan } from './voice-fan'
@@ -147,6 +148,7 @@ export function ComposerControls({
         <>
           {hideModelPill ? null : (
             <>
+              <SandboxPill compact={compactModelPill} disabled={disabled} sandbox={state.sandbox} />
               <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
               {compactModelPill ? null : <ReasoningPill disabled={disabled} model={state.model} />}
             </>

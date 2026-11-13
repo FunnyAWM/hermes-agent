@@ -1152,6 +1152,105 @@ export const deOverrides = {
         turnOffFailed: 'Das Haustier konnte nicht ausgeschaltet werden.'
       }
     },
+    sandboxProfiles: {
+      title: 'Befehlssandbox-Profile',
+      activeTitle: 'Aktives Profil',
+      activeDesc:
+        'Jeder Befehl außer Vollzugriff läuft im aktiven Profil. Das Profil wird pro Befehl gelesen, daher gilt ein Wechsel ab dem nächsten Befehl ohne Neustart der Sitzung.',
+      profileName: 'Profilname',
+      addProfile: 'Profil hinzufügen',
+      deleteProfile: 'Profil löschen',
+      readDirectories: 'Leseverzeichnisse',
+      readDirectoriesDesc: 'Zusätzliche Pfade, die dieses Profil lesen darf, einer pro Zeile.',
+      writeDirectories: 'Schreibverzeichnisse',
+      writeDirectoriesDesc: 'Zusätzliche Pfade, die dieses Profil schreiben darf, einer pro Zeile.',
+      pathsPlaceholder: 'Ein Pfad pro Zeile',
+      presets: {
+        readOnly: {
+          title: 'Nur lesen',
+          description: 'Liest den Arbeitsbereich. Jedes Schreiben bleibt gesperrt, ebenso das Netzwerk.'
+        },
+        workspaceWrite: {
+          title: 'Arbeitsbereich beschreibbar',
+          description: 'Liest und schreibt den Arbeitsbereich. Das Netzwerk bleibt gesperrt.'
+        },
+        workspaceExec: {
+          title: 'Arbeitsbereich ausführbar',
+          description: 'Liest, schreibt und führt Befehle im Arbeitsbereich aus. Das Netzwerk bleibt gesperrt.'
+        },
+        fullAccess: {
+          title: 'Vollzugriff',
+          description: 'Führt Befehle außerhalb von sandctl ohne Einschränkung aus.'
+        },
+        custom: {
+          title: 'Benutzerdefiniert',
+          description: 'Liest und schreibt nur die aufgeführten Pfade, plus die sandctl-Überschreibungen unten.'
+        }
+      },
+      fullAccess: {
+        title: 'Vollzugriff aktivieren?',
+        description:
+          'Vollzugriff führt Befehle auf diesem Rechner ohne sandctl-Einschränkung aus. Fahre nur fort, wenn du allem vertraust, was der Agent ausführt.',
+        confirmLabel: 'Vollzugriff aktivieren',
+        cancelLabel: 'Sandbox behalten'
+      },
+      widen: {
+        title: 'Sandbox erweitern?',
+        description:
+          'Diese Änderung lässt Befehle weiter reichen als das Preset erlaubt: Netzwerk, Syscall-Filter oder Secret-Injektion werden großzügiger.',
+        confirmLabel: 'Erweitern',
+        cancelLabel: 'Abbrechen'
+      },
+      policy: {
+        title: 'sandctl-Richtlinien-Überschreibungen',
+        subtitle: 'Gilt zusätzlich zum Preset. Leer gelassene Felder behalten den Preset-Wert.',
+        isolation: 'Isolationsstufe',
+        inheritGlobal: 'Global erben',
+        l1: 'L1 — Prozessgrenze',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — Kata-VM',
+        syscall: 'Syscall-Filter',
+        inherit: 'Preset erben',
+        none: 'Keiner (ungefiltert)',
+        platformDefault: 'Plattformstandard',
+        restricted: 'Eingeschränkt',
+        strict: 'Streng',
+        networkMode: 'Netzwerkmodus',
+        networkModeDefault: 'Preset erben',
+        networkModeAllowlist: 'Positivliste',
+        networkModeDenylist: 'Sperrliste',
+        networkDefault: 'Netzwerk-Standardaktion',
+        networkDefaultDefault: 'Preset erben',
+        deny: 'Verweigern',
+        allow: 'Erlauben',
+        allowedHosts: 'Erlaubte Hosts',
+        allowedHostsDesc: 'Hostnamen, die dieses Profil erreichen darf, einer pro Zeile. Ergänzt nur das Preset.',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: 'Erlaubte CIDRs',
+        allowedCidrsDesc: 'CIDR-Bereiche, die dieses Profil erreichen darf, einer pro Zeile. Ergänzt nur das Preset.',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: 'Blockierte Ziele',
+        blockedTargetsDesc: 'Hostnamen oder CIDRs, die verweigert werden, einer pro Zeile.',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'Dateisystemmodus',
+        fsModeDefault: 'Preset erben',
+        allowlist: 'Positivliste',
+        denylist: 'Sperrliste',
+        cpu: 'CPU-Limit',
+        memory: 'Speicherlimit',
+        pids: 'Prozesslimit',
+        wallTime: 'Laufzeitlimit',
+        noNewPrivs: 'Rechteausweitung blockieren',
+        noNewPrivsDesc: 'Setzt no_new_privs, damit ein Befehl über setuid-Binaries keine Rechte gewinnen kann.',
+        injectSecrets: 'Secrets injizieren',
+        injectSecretsDesc: 'Übergibt Secret-Werte in die Sandbox-Umgebung. Weiter als das Preset.',
+        proxySecrets: 'Secrets über Proxy',
+        proxySecretsDesc: 'Hält Secrets aus der Sandbox heraus und injiziert sie stattdessen am Egress-Proxy.',
+        allowedSecrets: 'Erlaubte Secrets',
+        allowedSecretsDesc: 'Secret-Namen, die dieses Profil nutzen darf, einer pro Zeile.',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: 'Standardmodell',
       modelContextLength: 'Kontextfenster',
@@ -1180,6 +1279,11 @@ export const deOverrides = {
         timeout: 'Befehls-Timeout',
         persistentShell: 'Persistente Shell',
         envPassthrough: 'Umgebungsvariablen-Durchreichung',
+        sandbox: {
+          enabled: 'Befehlssandbox',
+          escalation: 'Einmalige Befehlsfreigabe',
+          backend: 'Sandbox-Isolationsstufe'
+        },
         dockerImage: 'Docker-Image',
         singularityImage: 'Singularity-Image',
         modalImage: 'Modal-Image',
@@ -1195,7 +1299,13 @@ export const deOverrides = {
       approvals: {
         mode: 'Genehmigungsmodus',
         timeout: 'Genehmigungs-Timeout',
-        mcpReloadConfirm: 'MCP-Neuladen bestätigen'
+        mcpReloadConfirm: 'MCP-Neuladen bestätigen',
+        autoReview: {
+          policy: 'Auto-Review-Richtlinie',
+          historyMessages: 'Verlaufsfenster der Prüfung',
+          maxArgChars: 'Argumentlimit der Prüfung',
+          skipTools: 'Von der Prüfung übersprungene Tools'
+        }
       },
       commandAllowlist: 'Befehls-Whitelist',
       security: {
@@ -1354,6 +1464,14 @@ export const deOverrides = {
         cwd: 'Standard-Projektordner für Tool- und Terminal-Arbeit.',
         persistentShell: 'Shell-Zustand zwischen Befehlen beibehalten, wenn das Backend es unterstützt.',
         envPassthrough: 'Umgebungsvariablen, die in die Tool-Ausführung durchgereicht werden.',
+        sandbox: {
+          enabled:
+            'Jeden Agent-Befehl in sandctl ausführen; Vollzugriff umgeht sie. Sandbox-Sitzungen unter Windows nutzen PowerShell. Das aktive Profil unten entscheidet, was der Arbeitsbereich erlaubt, und jedes Profil blockiert das Netzwerk.',
+          escalation:
+            'Der Agent kann für einen einzelnen Befehl eine weitere Sandbox-Stufe anfragen (bis Vollzugriff). Du bestätigst jede Anfrage, danach gilt wieder das konfigurierte Profil.',
+          backend:
+            'Isolationsstufe für jeden Befehl: l1 (Prozessgrenze), l2 (gVisor) oder l3 (Kata-VM), oder ein konkreter Backend-Name. Ein Sandbox-Profil kann sie überschreiben.'
+        },
         dockerImage: 'Container-Image, das verwendet wird, wenn das Ausführungs-Backend Docker ist.',
         singularityImage: 'Image, das verwendet wird, wenn das Ausführungs-Backend Singularity ist.',
         modalImage: 'Image, das verwendet wird, wenn das Ausführungs-Backend Modal ist.',
@@ -1365,7 +1483,14 @@ export const deOverrides = {
       fileReadMaxChars: 'Maximale Zeichenzahl, die Hermes aus einer Dateianfrage lesen kann.',
       approvals: {
         mode: 'Wie Hermes Befehle behandelt, die eine explizite Genehmigung benötigen.',
-        timeout: 'Wie lange Genehmigungsaufforderungen warten, bevor sie ablaufen.'
+        timeout: 'Wie lange Genehmigungsaufforderungen warten, bevor sie ablaufen.',
+        autoReview: {
+          policy:
+            'Zusätzliche Regeln für den Prüfer. Sie stammen von dir und gelten als vertrauenswürdig; der Tool-Aufruf selbst bleibt immer nicht vertrauenswürdig.',
+          historyMessages: 'Wie viele der letzten Konversationsnachrichten der Prüfer sieht (0–50).',
+          maxArgChars: 'Wie viel jedes Tool-Arguments dem Prüfer gezeigt wird (500–20000 Zeichen).',
+          skipTools: 'Tool-Namen, die nie geprüft werden. Lokale Nur-Lese-Tools werden immer übersprungen.'
+        }
       },
       security: {
         redactSecrets: 'Erkannte Geheimnisse nach Möglichkeit aus modellsichtbarem Inhalt ausblenden.'
@@ -2422,6 +2547,7 @@ export const deOverrides = {
   skills: {
     tabSkills: 'Skills',
     tabToolsets: 'Tools',
+    tabLink: 'Link',
     configuringProfile: 'Konfiguriert:',
     all: 'Alle',
     searchSkills: 'Skills durchsuchen...',
@@ -3795,6 +3921,17 @@ export const deOverrides = {
     transcribing: 'Transkribiert',
     thinking: 'Denkt',
     muted: 'Stummgeschaltet',
+    sandboxProfile: 'Sandbox-Profil',
+    autoReview: 'Auto Review',
+    autoReviewDescription: 'Jeder Werkzeugaufruf wird vor der Ausführung von einem Hilfsmodell geprüft; eine abgelehnte Aktion fragt dich.',
+    autoReviewSaveFailed: 'Auto Review konnte nicht geändert werden.',
+    sandboxProfileHint: 'Jeder Befehl läuft im gewählten Profil; eine Auswahl gilt ab dem nächsten Befehl.',
+    sandboxProfileSaveFailed: 'Das Sandbox-Profil konnte nicht geändert werden.',
+    sandboxProfileFullAccessTitle: 'Vollzugriff aktivieren?',
+    sandboxProfileFullAccessDesc:
+      'Vollzugriff hebt die Befehlssandbox für dieses Profil auf: Befehle laufen mit deinem Benutzerkonto und Netzwerkzugriff, und die Dateiwerkzeuge dürfen überall auf dem Rechner schreiben. Aktiviere es nur, wenn du der Arbeit des Agenten vertraust.',
+    sandboxProfileFullAccessConfirm: 'Vollzugriff aktivieren',
+    sandboxProfileCancel: 'Sandbox behalten',
     listening: 'Hört zu',
     muteMic: 'Mikrofon stummschalten',
     unmuteMic: 'Mikrofon einschalten',
@@ -4153,7 +4290,7 @@ export const deOverrides = {
     discontinuedBody:
       'Dieser Hermes-Build wird nicht mehr unterstützt und funktioniert möglicherweise nicht mehr — deinstallieren Sie ihn. Ihre Daten bleiben auf dem Datenträger.',
     channels: { stable: 'Stabil', canary: 'Canary' },
-    appName: 'Hermes',
+    appName: 'KouriChat Next',
     availableBodyRelease: tag => `Version ${tag} ist bereit zur Installation.`,
     releaseAvailable: tag => `Version ${tag} ist verfügbar.`,
     checkingShort: 'Wird geprüft…',
@@ -4571,6 +4708,8 @@ export const deOverrides = {
       manualDescription: 'Nachfragen bei Aktionen, die eine Genehmigung erfordern',
       smart: 'Smart',
       smartDescription: 'Aktionen automatisch beurteilen und bei Bedarf nachfragen',
+      auto: 'Automatisch',
+      autoDescription: 'Jeden Tool-Aufruf prüfen und bei Ablehnung nachfragen',
       off: 'Aus',
       offDescription: 'Ohne Genehmigungs-Abfragen ausführen'
     },
@@ -5152,6 +5291,7 @@ export const deOverrides = {
       moreOptions: 'Weitere Genehmigungsoptionen',
       allowSession: 'Diese Session erlauben',
       alwaysAllowMenu: 'Immer erlauben…',
+      justification: 'Begründung',
       jumpToApproval: 'Genehmigung erforderlich',
       reject: 'Ablehnen',
       alwaysTitle: 'Diesen Befehl immer erlauben?',

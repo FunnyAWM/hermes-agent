@@ -660,6 +660,105 @@ export const jaOverrides = {
         turnOffFailed: 'ペットをオフにできませんでした。'
       }
     },
+    sandboxProfiles: {
+      title: 'コマンドサンドボックスプロファイル',
+      activeTitle: '有効なプロファイル',
+      activeDesc:
+        'フルアクセス以外のすべてのコマンドは有効なプロファイル内で実行されます。プロファイルはコマンドごとに読み込まれるため、切り替えはセッションを再起動せず次のコマンドから適用されます。',
+      profileName: 'プロファイル名',
+      addProfile: 'プロファイルを追加',
+      deleteProfile: 'プロファイルを削除',
+      readDirectories: '読み取りディレクトリ',
+      readDirectoriesDesc: 'このプロファイルが読み取れる追加パス（1 行に 1 つ）。',
+      writeDirectories: '書き込みディレクトリ',
+      writeDirectoriesDesc: 'このプロファイルが書き込める追加パス（1 行に 1 つ）。',
+      pathsPlaceholder: '1 行に 1 パス',
+      presets: {
+        readOnly: {
+          title: '読み取り専用',
+          description: 'ワークスペースを読み取ります。すべての書き込みは遮断され、ネットワークも遮断されます。'
+        },
+        workspaceWrite: {
+          title: 'ワークスペース書き込み可',
+          description: 'ワークスペースを読み書きします。ネットワークは遮断されたままです。'
+        },
+        workspaceExec: {
+          title: 'ワークスペース実行可',
+          description: 'ワークスペースを読み書きし、コマンドを実行します。ネットワークは遮断されたままです。'
+        },
+        fullAccess: {
+          title: 'フルアクセス',
+          description: 'sandctl の外で、制限なしにコマンドを実行します。'
+        },
+        custom: {
+          title: 'カスタム',
+          description: '一覧のパスのみを読み書きし、下の sandctl 上書きを適用します。'
+        }
+      },
+      fullAccess: {
+        title: 'フルアクセスを有効にしますか？',
+        description:
+          'フルアクセスは sandctl の制限なしにこのマシンでコマンドを実行します。エージェントが実行するすべてを信頼できる場合のみ続行してください。',
+        confirmLabel: 'フルアクセスを有効にする',
+        cancelLabel: 'サンドボックスを維持'
+      },
+      widen: {
+        title: 'サンドボックスを広げますか？',
+        description:
+          'この変更により、コマンドはプリセットの範囲を超えて到達できます：ネットワーク、Syscall フィルター、シークレット注入がより緩くなります。',
+        confirmLabel: '広げる',
+        cancelLabel: 'キャンセル'
+      },
+      policy: {
+        title: 'sandctl ポリシー上書き',
+        subtitle: 'プリセットに重ねて適用されます。空欄の項目はプリセット値を保持します。',
+        isolation: '分離レベル',
+        inheritGlobal: 'グローバルを継承',
+        l1: 'L1 — プロセス境界',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — Kata VM',
+        syscall: 'Syscall フィルター',
+        inherit: 'プリセットを継承',
+        none: 'なし（フィルター無効）',
+        platformDefault: 'プラットフォーム既定',
+        restricted: '制限付き',
+        strict: '厳格',
+        networkMode: 'ネットワークモード',
+        networkModeDefault: 'プリセットを継承',
+        networkModeAllowlist: '許可リスト',
+        networkModeDenylist: '拒否リスト',
+        networkDefault: 'ネットワーク既定動作',
+        networkDefaultDefault: 'プリセットを継承',
+        deny: '拒否',
+        allow: '許可',
+        allowedHosts: '許可ホスト',
+        allowedHostsDesc: 'このプロファイルが到達できるホスト名（1 行に 1 つ）。プリセットに追加するだけです。',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: '許可 CIDR',
+        allowedCidrsDesc: 'このプロファイルが到達できる CIDR 範囲（1 行に 1 つ）。プリセットに追加するだけです。',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: '拒否する対象',
+        blockedTargetsDesc: '拒否するホスト名または CIDR（1 行に 1 つ）。',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'ファイルシステムモード',
+        fsModeDefault: 'プリセットを継承',
+        allowlist: '許可リスト',
+        denylist: '拒否リスト',
+        cpu: 'CPU 上限',
+        memory: 'メモリ上限',
+        pids: 'プロセス数上限',
+        wallTime: '実行時間上限',
+        noNewPrivs: '権限昇格を禁止',
+        noNewPrivsDesc: 'no_new_privs を設定し、setuid バイナリ経由でコマンドが権限を得られないようにします。',
+        injectSecrets: 'シークレットを注入',
+        injectSecretsDesc: 'シークレット値をサンドボックス環境へ渡します。プリセットより広い権限です。',
+        proxySecrets: 'シークレットをプロキシ',
+        proxySecretsDesc: 'シークレットをサンドボックスに入れず、出口プロキシで注入します。',
+        allowedSecrets: '許可シークレット',
+        allowedSecretsDesc: 'このプロファイルが使用できるシークレット名（1 行に 1 つ）。',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: 'デフォルトモデル',
       modelContextLength:
@@ -689,6 +788,11 @@ export const jaOverrides = {
         timeout: 'コマンドタイムアウト',
         persistentShell: '永続シェル',
         envPassthrough: '環境変数の引き継ぎ',
+        sandbox: {
+          enabled: 'コマンドサンドボックス',
+          escalation: '1 コマンド単位の昇格',
+          backend: 'サンドボックス分離レベル'
+        },
         dockerImage: 'Docker イメージ',
         singularityImage: 'Singularity イメージ',
         modalImage: 'Modal イメージ',
@@ -706,7 +810,13 @@ export const jaOverrides = {
       approvals: {
         mode: '承認モード',
         timeout: '承認タイムアウト',
-        mcpReloadConfirm: 'MCP 再読み込みの確認'
+        mcpReloadConfirm: 'MCP 再読み込みの確認',
+        autoReview: {
+          policy: '自動レビューポリシー',
+          historyMessages: 'レビュー履歴ウィンドウ',
+          maxArgChars: 'レビュー引数上限',
+          skipTools: 'レビューを省略するツール'
+        }
       },
       commandAllowlist: 'コマンド許可リスト',
       security: {
@@ -850,7 +960,15 @@ export const jaOverrides = {
       terminal: {
         cwd: 'ツールとターミナル作業のデフォルトプロジェクトフォルダーです。',
         persistentShell: 'バックエンドが対応している場合、コマンド間でシェル状態を保持します。',
-        envPassthrough: 'ツール実行へ渡す環境変数です。'
+        envPassthrough: 'ツール実行へ渡す環境変数です。',
+        sandbox: {
+          enabled:
+            'エージェントの各コマンドを sandctl 内で実行します。フルアクセスはこれを迂回します。Windows のサンドボックスセッションは PowerShell を使います。下の有効なプロファイルがワークスペースで許可する範囲を決め、どのプロファイルもネットワークを遮断します。',
+          escalation:
+            'エージェントは 1 つのコマンドに限り、より広いサンドボックス段階（最大でフルアクセス）を要求できます。要求ごとに承認すると、次のコマンドでは設定済みのプロファイルに戻ります。',
+          backend:
+            'すべてのコマンドの分離レベル：l1（プロセス境界）、l2（gVisor）、l3（Kata VM）、または具体的なバックエンド名。サンドボックスプロファイルで個別に上書きできます。'
+        }
       },
       codeExecution: {
         mode: 'コード実行を現在のプロジェクトにどれだけ厳密に制限するかを設定します。'
@@ -858,7 +976,14 @@ export const jaOverrides = {
       fileReadMaxChars: 'Hermes が 1 回のファイル読み取りで取得できる最大文字数です。',
       approvals: {
         mode: '明示的な承認が必要なコマンドを Hermes がどう扱うかを設定します。',
-        timeout: '承認プロンプトがタイムアウトするまで待つ時間です。'
+        timeout: '承認プロンプトがタイムアウトするまで待つ時間です。',
+        autoReview: {
+          policy:
+            'レビュアーへの追加ルールです。あなたが書いた信頼済みのテキストとして扱われ、ツール呼び出し自体は常に信頼されません。',
+          historyMessages: 'レビュアーが見る直近の会話メッセージ数（0〜50）。',
+          maxArgChars: 'レビュアーに表示する各ツール引数の長さ（500〜20000 文字）。',
+          skipTools: 'レビューしないツール名。ローカルの読み取り専用ツールは常に省略されます。'
+        }
       },
       security: {
         redactSecrets: '検出したシークレットを、可能な限りモデルから見える内容から隠します。'
@@ -1347,6 +1472,7 @@ export const jaOverrides = {
     },
     tabSkills: 'スキル',
     tabToolsets: 'ツールセット',
+    tabLink: 'リンク',
     all: 'すべて',
     searchSkills: 'スキルを検索...',
     searchToolsets: 'ツールセットを検索...',
@@ -2330,6 +2456,18 @@ export const jaOverrides = {
     transcribing: '文字起こし中',
     thinking: '考え中',
     muted: 'ミュート',
+    sandboxProfile: 'サンドボックスプロファイル',
+    autoReview: 'Auto Review',
+    autoReviewDescription: '各ツール呼び出しは実行前に補助モデルが審査します。拒否された呼び出しは確認を求めます。',
+    autoReviewSaveFailed: 'Auto Review を変更できませんでした。',
+    sandboxProfileHint:
+      'すべてのコマンドは選択したプロファイル内で実行されます。選択は次のコマンドから適用されます。',
+    sandboxProfileSaveFailed: 'サンドボックスプロファイルを変更できませんでした。',
+    sandboxProfileFullAccessTitle: 'フルアクセスを有効にしますか？',
+    sandboxProfileFullAccessDesc:
+      'フルアクセスにすると、このプロファイルのコマンドサンドボックスが解除されます。コマンドはあなたのユーザーアカウントとネットワークアクセスで実行され、ファイルツールはマシン上のどこにでも書き込めます。エージェントの作業を信頼できる場合のみ有効にしてください。',
+    sandboxProfileFullAccessConfirm: 'フルアクセスを有効にする',
+    sandboxProfileCancel: 'サンドボックスを維持',
     listening: '聴いています',
     muteMic: 'マイクをミュート',
     unmuteMic: 'マイクのミュートを解除',
@@ -2991,6 +3129,8 @@ export const jaOverrides = {
       manualDescription: '承認が必要な操作の前に確認します',
       smart: 'スマート',
       smartDescription: '必要な場合にのみ確認します',
+      auto: '自動',
+      autoDescription: 'ツール呼び出しごとに審査し、拒否された場合に確認します',
       off: 'オフ',
       offDescription: '承認プロンプトなしで実行します'
     },
@@ -3477,6 +3617,7 @@ export const jaOverrides = {
       moreOptions: 'その他の承認オプション',
       allowSession: 'このセッションで許可',
       alwaysAllowMenu: '常に許可…',
+      justification: '理由',
       jumpToApproval: '承認が必要',
       reject: '拒否',
       alwaysTitle: 'このコマンドを常に許可しますか？',

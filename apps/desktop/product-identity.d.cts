@@ -7,6 +7,11 @@ interface ProductIdentity {
   displayName: string
   /** OS-level app identity. e.g. "com.nousresearch.hermes-light" */
   appId: string
+  /** Stable headless only: the pinned userData directory name. The display name now
+   *  matches the regular app, and Electron derives userData from the product name —
+   *  without the pin, an existing headless install would silently start reading the
+   *  regular app's state (and vice versa). */
+  userDataDirName?: string
   /** app name in pascal case. e.g. "HermesLight" */
   appNamePascal: string
   /** Artifact prefix stays compatible with release archive consumers. */

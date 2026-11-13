@@ -266,6 +266,22 @@ class TestCodingContextBlock:
         assert "coding agent" not in _stable_prompt(agent)
 
 
+def test_memory_blocks_precede_skills_in_volatile_prompt(monkeypatch):
+    memory = SimpleNamespace(format_for_system_prompt=lambda target: {
+        "memory": "MEMORY_MARKER",
+        "user": "USER_MARKER",
+    }.get(target))
+    agent = _make_agent(
+        valid_tool_names=["skills_list"],
+        _memory_store=memory,
+        _memory_enabled=True,
+        _user_profile_enabled=True,
+    )
+    with patch("agent.system_prompt._skills_prompt", return_value="SKILLS_MARKER"):
+        volatile = build_system_prompt_parts(agent)["volatile"]
+    assert volatile.index("MEMORY_MARKER") < volatile.index("USER_MARKER") < volatile.index("SKILLS_MARKER")
+
+
 def test_shared_project_context_precedes_worktree_bytes(monkeypatch, tmp_path):
     import os
 
@@ -514,6 +530,7 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         "unless the user explicitly directs you to."
     )
     expected = "\n\n".join((
+        system_prompt.MEMORY_ROOT_PROMPT,
         "IDENTITY",
         "HELP",
         "STEER",
@@ -544,7 +561,9 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         prompt = build_system_prompt(agent, system_message="SYSTEM_MESSAGE")
 
     assert prompt == expected
-    assert agent._cached_system_prompt_static == "\n\n".join(expected.split("\n\n")[:4])
+    assert agent._cached_system_prompt_static == "\n\n".join((
+        system_prompt.MEMORY_ROOT_PROMPT, "IDENTITY", "HELP", "STEER", "CODING_STABLE",
+    ))
 
 
 class TestTelegramRichMessagesHint:

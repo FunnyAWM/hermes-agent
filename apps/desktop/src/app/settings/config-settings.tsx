@@ -63,6 +63,7 @@ import { OnboardingSettings } from './onboarding-settings'
 import { EmptyState, ListRow, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import { SettingsProfileScope } from './profile-scope'
 import { QuickEntrySettings } from './quick-entry-settings'
+import { SandboxProfilesPanel } from './sandbox-profiles-panel'
 import { SETTING_IDS, settingElementId } from './settings-manifest'
 import { SharedMetricsSettings } from './shared-metrics-settings'
 import { useSettingDeepLink } from './use-setting-deep-link'
@@ -532,6 +533,12 @@ function ConfigSettingsInner({
         sectionId={activeSectionId}
         subpage={subpage}
         writeScope={writeScope}
+      />
+      <SandboxProfilesPanel
+        activeSectionId={activeSectionId}
+        config={config}
+        onChange={updateConfig}
+        subpage={subpage}
       />
       {activeSectionId === 'voice' ? (
         <>

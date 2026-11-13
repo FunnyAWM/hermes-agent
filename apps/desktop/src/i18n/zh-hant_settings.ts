@@ -440,6 +440,105 @@ export const zhHantSettings = {
         turnOffFailed: '無法關閉寵物。'
       }
     },
+    sandboxProfiles: {
+      title: '指令沙箱設定',
+      activeTitle: '目前設定',
+      activeDesc:
+        '除完全存取外，每條指令都在目前設定內執行。設定會依指令讀取，切換後下一條指令即生效，無需重開工作階段。',
+      profileName: '設定名稱',
+      addProfile: '新增設定',
+      deleteProfile: '刪除設定',
+      readDirectories: '可讀目錄',
+      readDirectoriesDesc: '此設定額外可讀的路徑，每行一個。',
+      writeDirectories: '可寫目錄',
+      writeDirectoriesDesc: '此設定額外可寫的路徑，每行一個。',
+      pathsPlaceholder: '每行一個路徑',
+      presets: {
+        readOnly: {
+          title: '唯讀',
+          description: '可讀取工作區。所有寫入保持關閉，網路同樣關閉。'
+        },
+        workspaceWrite: {
+          title: '工作區可寫',
+          description: '可讀寫工作區。網路保持關閉。'
+        },
+        workspaceExec: {
+          title: '工作區可執行',
+          description: '可讀寫並執行工作區指令。網路保持關閉。'
+        },
+        fullAccess: {
+          title: '完全存取',
+          description: '在 sandctl 之外執行指令，不受任何限制。'
+        },
+        custom: {
+          title: '自訂',
+          description: '只能讀寫下列路徑，並疊加下方的 sandctl 覆寫項。'
+        }
+      },
+      fullAccess: {
+        title: '啟用完全存取？',
+        description:
+          '完全存取會在本機直接執行指令，不受 sandctl 限制。只有在你信任代理程式執行的一切時才繼續。',
+        confirmLabel: '啟用完全存取',
+        cancelLabel: '保留沙箱'
+      },
+      widen: {
+        title: '放寬沙箱限制？',
+        description:
+          '此變更會讓指令權限超出預設範圍：網路、Syscall 過濾或密鑰注入會變得更寬鬆。',
+        confirmLabel: '放寬限制',
+        cancelLabel: '取消'
+      },
+      policy: {
+        title: 'sandctl 原則覆寫',
+        subtitle: '疊加在預設之上。留空的項目維持預設值。',
+        isolation: '隔離等級',
+        inheritGlobal: '跟隨全域',
+        l1: 'L1 — 處理序邊界',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — Kata 虛擬機',
+        syscall: 'Syscall 過濾',
+        inherit: '跟隨預設',
+        none: '不過濾',
+        platformDefault: '平台預設',
+        restricted: '受限',
+        strict: '嚴格',
+        networkMode: '網路模式',
+        networkModeDefault: '跟隨預設',
+        networkModeAllowlist: '允許清單',
+        networkModeDenylist: '封鎖清單',
+        networkDefault: '網路預設動作',
+        networkDefaultDefault: '跟隨預設',
+        deny: '拒絕',
+        allow: '允許',
+        allowedHosts: '允許的主機',
+        allowedHostsDesc: '此設定可存取的主機名稱，每行一個。只會疊加到預設之上。',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: '允許的 CIDR',
+        allowedCidrsDesc: '此設定可存取的 CIDR 範圍，每行一個。只會疊加到預設之上。',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: '拒絕的目標',
+        blockedTargetsDesc: '要拒絕的主機名稱或 CIDR，每行一個。',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: '檔案系統模式',
+        fsModeDefault: '跟隨預設',
+        allowlist: '允許清單',
+        denylist: '封鎖清單',
+        cpu: 'CPU 上限',
+        memory: '記憶體上限',
+        pids: '處理序數上限',
+        wallTime: '實際耗時上限',
+        noNewPrivs: '禁止提權',
+        noNewPrivsDesc: '設定 no_new_privs，讓指令無法透過 setuid 執行檔取得新權限。',
+        injectSecrets: '注入密鑰',
+        injectSecretsDesc: '把密鑰值直接注入沙箱環境。比預設更寬鬆。',
+        proxySecrets: '代理密鑰',
+        proxySecretsDesc: '密鑰不進入沙箱，改由出口代理注入。',
+        allowedSecrets: '允許的密鑰',
+        allowedSecretsDesc: '此設定可使用的密鑰名稱，每行一個。',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: '預設模型',
       modelContextLength:
@@ -469,6 +568,11 @@ export const zhHantSettings = {
         timeout: '指令逾時',
         persistentShell: '持久化 Shell',
         envPassthrough: '環境變數傳遞',
+        sandbox: {
+          enabled: '指令沙箱',
+          escalation: '單次指令提權',
+          backend: '沙箱隔離等級'
+        },
         dockerImage: 'Docker 映像',
         singularityImage: 'Singularity 映像',
         modalImage: 'Modal 映像',
@@ -486,7 +590,13 @@ export const zhHantSettings = {
       approvals: {
         mode: '批准模式',
         timeout: '批准逾時',
-        mcpReloadConfirm: '確認 MCP 重新載入'
+        mcpReloadConfirm: '確認 MCP 重新載入',
+        autoReview: {
+          policy: '自動審查策略',
+          historyMessages: '審查歷史視窗',
+          maxArgChars: '審查參數上限',
+          skipTools: '跳過審查的工具'
+        }
       },
       commandAllowlist: '指令允許清單',
       security: {
@@ -641,6 +751,14 @@ export const zhHantSettings = {
         cwd: '工具與終端機操作的預設專案資料夾。',
         persistentShell: '後端支援時，在指令之間保留 Shell 狀態。',
         envPassthrough: '傳入工具執行的環境變數。',
+        sandbox: {
+          enabled:
+            '讓每條代理程式指令都在 sandctl 內執行；完全存取會繞過它。Windows 沙箱工作階段使用 PowerShell。下方啟用的設定決定工作區允許做什麼，所有設定都禁止網路。',
+          escalation:
+            '代理程式可以針對單條指令要求更高的沙箱等級（最高到完全存取）。你逐次核准，之後設定的等級繼續對下一條指令生效。',
+          backend:
+            '所有指令的隔離等級：l1（處理序邊界）、l2（gVisor）或 l3（Kata 虛擬機），也可以填具體後端名稱。沙箱設定可個別覆寫。'
+        },
         dockerImage: '執行後端為 Docker 時使用的容器映像。',
         singularityImage: '執行後端為 Singularity 時使用的映像。',
         modalImage: '執行後端為 Modal 時使用的映像。',
@@ -652,7 +770,13 @@ export const zhHantSettings = {
       fileReadMaxChars: 'Hermes 單次檔案讀取可讀取的最大字元數。',
       approvals: {
         mode: 'Hermes 如何處理需要明確批准的指令。',
-        timeout: '批准提示逾時前等待的時間。'
+        timeout: '批准提示逾時前等待的時間。',
+        autoReview: {
+          policy: '審查器的附加規則。這段文字來自你，視為可信；工具呼叫本身始終不可信。',
+          historyMessages: '審查器可見的最近對話訊息數（0-50）。',
+          maxArgChars: '審查器可見的每條工具參數長度（500-20000 字元）。',
+          skipTools: '永不審查的工具名稱。本機唯讀工具始終跳過。'
+        }
       },
       security: {
         redactSecrets: '盡可能從模型可見內容中隱藏偵測到的密鑰。'

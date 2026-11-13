@@ -91,7 +91,10 @@ def stage_host_python(python: Path) -> Path:
 
 
 def _run(command, *, cwd: Path, env: dict) -> str:
-    result = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True, timeout=60, check=False)
+    result = subprocess.run(
+        command, cwd=cwd, env=env, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=60, check=False,
+    )
     assert result.returncode == 0, result.stderr
     return result.stdout.strip()
 

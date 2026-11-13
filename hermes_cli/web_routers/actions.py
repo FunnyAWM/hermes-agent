@@ -334,14 +334,16 @@ async def check_hermes_update(force: bool = False, profile: Optional[str] = None
         from hermes_cli.source_check import check_for_updates
 
         with _config_profile_scope(profile):
-            status = await asyncio.to_thread(check_for_updates, force=force)
+            status = await asyncio.to_thread(check_for_updates, force=force, passive=not force)
         behind = status.get("behind")
     except Exception:
         _log.exception("Update check failed")
         behind = None
 
     payload["behind"] = behind
-    if behind is None:
+    if status.get("reason") == "disabled":
+        payload.update(reason="disabled", message=status["message"])
+    elif behind is None:
         payload["message"] = "Couldn't reach the update source — try again later."
     elif behind == 0 and status.get("held"):
         version = status.get("sourceVersion")

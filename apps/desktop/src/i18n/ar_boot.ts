@@ -114,7 +114,7 @@ export const arBoot = {
     tryAgain: 'إعادة المحاولة',
     notAvailableTitle: 'التحديث غير متاح',
     unsupportedMessage: 'لا يمكن لهذا الإصدار من Hermes تحديث نفسه من داخل التطبيق.',
-    appName: 'Hermes Desktop',
+    appName: 'KouriChat Next',
     version: value => `الإصدار ${value}`,
     versionUnavailable: 'الإصدار غير متاح',
     bundleOutOfSync: 'إصدار التطبيق قديم',

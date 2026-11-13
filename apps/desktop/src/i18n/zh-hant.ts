@@ -11,6 +11,7 @@ import { zhHantCommon } from './zh-hant_common'
 import { zhHantConnectors } from './zh-hant_connectors'
 import { zhHantDiagnostics } from './zh-hant_diagnostics'
 import { zhHantFirstRun } from './zh-hant_first_run'
+import { zhHantLinkSync } from './zh-hant_link_sync'
 import { zhHantSettings } from './zh-hant_settings'
 
 export const zhHantOverrides = {
@@ -18,6 +19,33 @@ export const zhHantOverrides = {
     opening: "正在開啟群組聊天…",
     lookupFailed: "無法在閘道上查找此群組，請重試。",
     missing: "此群組聊天已不存在。"
+  },
+  linkSync: zhHantLinkSync,
+  memoryPanel: {
+    title: '記憶',
+    subtitle: 'Bot 每一輪都會載入的內容,以及它能讀到的全部筆記。可以直接在這裡編輯。',
+    refresh: '重新整理',
+    loading: '正在讀取記憶檔案…',
+    loadFailed: '無法讀取記憶檔案。',
+    retry: '重試',
+    documents: '上下文檔案',
+    notes: '筆記',
+    emptyNote: '這個檔案是空的。',
+    missing: '尚未建立。',
+    missingHint: '尚未建立,儲存後會新建。',
+    tooLarge: '檔案過大,無法在此預覽。',
+    noNotes: '尚無筆記。',
+    noteMissing: '這則筆記已不存在。',
+    save: '儲存',
+    saving: '正在儲存…',
+    saved: '已儲存',
+    revert: '復原變更',
+    unsaved: '未儲存',
+    saveFailed: '無法儲存該檔案。',
+    readOnly: '匯入文件,唯讀',
+    bytes: count => `${count} 位元組`,
+    updated: ms => new Date(ms).toLocaleString(),
+    selectPrompt: '選擇左側的檔案或筆記,即可檢視並編輯。'
   },
 
   catalog: {

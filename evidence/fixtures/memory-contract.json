@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "updated": "2026-11-06",
+  "source": "kourichat-next docs/PRD_ANDROID.md (记 03/04/05, D6-D9) + hermes_charcount.py",
+  "entry_delimiter": "\n§\n",
+  "memory_char_limit": 3000,
+  "memory_char_limit_zero_means": "unlimited",
+  "user_char_limit": 0,
+  "user_char_limit_zero_means": "unlimited",
+  "combined_limit": null,
+  "counting": {
+    "unit": "code point + cluster tail",
+    "cluster_tail": [
+      "combining marks",
+      "emoji modifiers",
+      "variation selectors",
+      "zero-width-joiner sequences",
+      "regional-indicator pairs",
+      "tag sequences"
+    ],
+    "emoji_sequence_counts_as": 1,
+    "probes": {
+      "plain": "ab",
+      "combining": "e\u0301",
+      "family_zwj": "\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67\u200d\ud83d\udc66",
+      "flag": "\ud83c\udde8\ud83c\uddf3",
+      "tag_sequence": "\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f"
+    },
+    "expected_counts": {
+      "plain": 2,
+      "combining": 1,
+      "family_zwj": 1,
+      "flag": 1,
+      "tag_sequence": 1
+    }
+  },
+  "categories": ["work", "study", "life", "health", "finance", "people", "other"],
+  "readonly_categories": ["docs"],
+  "docs_rules": {
+    "flat": true,
+    "source_filename": true,
+    "read_only": true,
+    "in_index": true,
+    "in_summary": false,
+    "in_merge": false
+  },
+  "root_prompt": {
+    "required": true,
+    "position": "first in the stable tier, before SOUL",
+    "anchor": "running inside Hermes' local memory system"
+  }
+}

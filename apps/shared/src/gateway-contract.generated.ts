@@ -3811,6 +3811,61 @@ export interface LlmOneshotParams {
 export interface LlmOneshotResult {
   text: string
 }
+export interface SyncStatusParams {
+  profile?: string | null
+}
+export interface SyncStatusResult {
+  role: 'disabled' | 'master' | 'secondary'
+  paired: boolean
+  device_id?: string | null
+  master_endpoint?: string
+  listen_port?: number
+  auto_sync_minutes?: number
+  pinned_fingerprint?: string | null
+  last_sync_at_ms?: number | null
+  last_sync_error?: string | null
+  applied_count?: number
+  archived_count?: number
+  tracked_files?: number
+  syncable_files?: number
+  serving?: boolean
+}
+export interface SyncCreateChainParams {
+  profile?: string | null
+}
+/** The 24 words are shown exactly once (paper backup) and stored only in .env. */
+export interface SyncCreateChainResult {
+  words: string[]
+}
+export interface SyncPairParams {
+  profile?: string | null
+  endpoint?: string | null
+  words: string[]
+}
+export interface SyncPairResult {
+  device_id: string
+  pinned_fingerprint: string
+  master_endpoint?: string
+}
+export interface SyncNowParams {
+  profile?: string | null
+}
+export interface SyncNowResult {
+  role: 'disabled' | 'master' | 'secondary'
+  records: number
+  applied: number
+}
+export interface SyncServeParams {
+  profile?: string | null
+  start: boolean
+}
+export interface SyncServeResult {
+  serving: boolean
+  port?: number | null
+}
+export interface SyncAckResult {
+  ok?: boolean
+}
 export interface SystemBatteryParams {
   profile?: string | null
 }
@@ -6776,6 +6831,20 @@ export interface RpcMethods {
   'subscription.state': { params: ProfileParams; result: SubscriptionStateResult }
   /** Prorate, charge and flip the plan (billing:manage, idempotent). */
   'subscription.upgrade': { params: SubscriptionUpgradeParams; result: SubscriptionUpgradeResult }
+  /** Become the chain master: generate the 24-word mnemonic (shown once). */
+  'sync.create_chain': { params: SyncCreateChainParams; result: SyncCreateChainResult }
+  /** Leave the chain (secondary): pairing is discarded, synced files stay. */
+  'sync.disconnect': { params: SyncCreateChainParams; result: SyncAckResult }
+  /** Sync once: refresh the record log as master, pull+apply as secondary. */
+  'sync.now': { params: SyncNowParams; result: SyncNowResult }
+  /** Join a chain as secondary: full pull + apply, then persist the pairing (all-or-nothing). */
+  'sync.pair': { params: SyncPairParams; result: SyncPairResult }
+  /** Kill the chain (master): stop serving and discard this device's pairing. */
+  'sync.reset_chain': { params: SyncCreateChainParams; result: SyncAckResult }
+  /** Start or stop the master-role TLS sync server inside this backend process. */
+  'sync.serve': { params: SyncServeParams; result: SyncServeResult }
+  /** Pairing and sync state for one profile's KouriChat Link membership. */
+  'sync.status': { params: SyncStatusParams; result: SyncStatusResult }
   /** Host battery for the status bar; always resolves, ``available: false`` when unreadable. */
   'system.battery': { params: SystemBatteryParams; result: SystemBatteryResult }
   /** Record the client's column width for server-side rendering. */
@@ -7066,6 +7135,13 @@ export const RPC_METHODS = [
   'subscription.resume',
   'subscription.state',
   'subscription.upgrade',
+  'sync.create_chain',
+  'sync.disconnect',
+  'sync.now',
+  'sync.pair',
+  'sync.reset_chain',
+  'sync.serve',
+  'sync.status',
   'system.battery',
   'terminal.resize',
   'tools.configure',

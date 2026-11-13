@@ -21,6 +21,7 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 import { syncCatalogArcs } from './catalog/catalog-arc'
 import { prefetchCatalogWhenIdle } from './catalog/catalog-data'
 import { ConnectorsTab } from './connectors/connectors-tab'
+import { LinkTab } from './link/link-tab'
 import { PluginsTab } from './plugins/plugins-tab'
 import { CapabilityScopeSelector, useCapabilityScope } from './scope-selector'
 import { SKILLS_QUERY_KEY, useSkillsQuery } from './skills/skills-data'
@@ -31,7 +32,7 @@ import { ToolsetsTab } from './toolsets/toolsets-tab'
 
 // Skills Hub browsing lives inside the Skills tab. Legacy `?tab=hub`
 // links fall back to 'skills' via useRouteEnumParam.
-const CAPABILITY_MODES = ['skills', 'plugins', 'connectors', 'toolsets'] as const
+const CAPABILITY_MODES = ['skills', 'plugins', 'connectors', 'toolsets', 'link'] as const
 
 type CapabilityMode = (typeof CAPABILITY_MODES)[number]
 
@@ -163,7 +164,9 @@ export function CapabilitiesView({
     ),
     toolsets: () => (
       <ToolsetsTab hints={toolsetHints} key={`toolsets-${scope.key}`} onQueryChange={setQuery} profile={scope.profile} query={query} toolsets={toolsets ?? []} />
-    )
+    ),
+    // KouriChat Link device-chain sync for the scoped profile.
+    link: () => <LinkTab key={`link-${scope.key}`} profile={scope.profile} />
   } satisfies Record<CapabilityMode, () => React.ReactNode>
 
   return (
@@ -180,7 +183,8 @@ export function CapabilitiesView({
         { id: 'skills', label: t.skills.tabSkills, meta: skills?.length ?? null },
         { id: 'plugins', label: t.skills.tabPlugins },
         { id: 'connectors', label: t.connectorsPage.title },
-        { id: 'toolsets', label: t.skills.tabToolsets, meta: toolsets ? visibleToolsetCount(toolsets) : null }
+        { id: 'toolsets', label: t.skills.tabToolsets, meta: toolsets ? visibleToolsetCount(toolsets) : null },
+        { id: 'link', label: t.skills.tabLink }
       ]}
       tabsAlign="start"
     >

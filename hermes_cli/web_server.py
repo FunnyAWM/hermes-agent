@@ -9,6 +9,7 @@ Usage: ``python -m hermes_cli.main web [--port 8080]``.
 from contextlib import asynccontextmanager
 
 import asyncio
+import atexit
 from collections import deque
 import hmac
 import logging
@@ -208,6 +209,20 @@ def _get_pty_active_session_files(app: FastAPI) -> dict[str, Path]:
 
 
 app = FastAPI(title="Hermes Agent", version=get_version_info().base_version, lifespan=app_lifespan)
+
+
+def _kourichat_link_exit_sync() -> None:
+    """When the desktop backend leaves, try to find the chain and sync once (the user's
+    exit-sync requirement). Best-effort: never raises, never blocks shutdown long."""
+    try:
+        from hermes_cli.sync_cmd import _exit_sync_once
+
+        _exit_sync_once()
+    except Exception:  # health: allow BLE001 -- shutdown hook: the exit sync is best-effort by contract and must never block process teardown
+        _log.debug("kourichat link exit sync skipped", exc_info=True)
+
+
+atexit.register(_kourichat_link_exit_sync)
 
 from hermes_cli.dashboard_auth.body_limit import AuthBodyLimitMiddleware
 
@@ -796,6 +811,8 @@ from hermes_cli.web_routers import (
     messaging_relay as _messaging_relay_routes,
     oauth as _oauth_routes,
     cron as _cron_routes,
+    kourichat_link as _kourichat_link_routes,
+    memory_docs as _memory_docs_routes,
     mcp as _mcp_routes,
     ops as _ops_routes,
     skills as _skills_routes,
@@ -829,6 +846,8 @@ app.include_router(_local_models_routes.router)
 app.include_router(_status_routes.router)
 app.include_router(_actions_routes.router)
 app.include_router(_audio_routes.router)
+app.include_router(_kourichat_link_routes.router)
+app.include_router(_memory_docs_routes.router)
 app.include_router(_display_routes.router)
 app.include_router(_actions_routes.status_router)
 app.include_router(_sessions_routes.list_router)
@@ -1307,10 +1326,12 @@ def _on_server_started(
         # Auth-gated JSON-RPC/WS only — announce the bind, not a URL. flush:
         # a piped stdout otherwise surfaces this minutes after the sentinel.
         print(f"  Hermes backend listening on {host}:{actual_port}", flush=True)
+        _print_lan_banner(host, actual_port)
     else:
         from hermes_cli.url_utils import format_url_host
 
         print(f"  Hermes Web UI → http://{format_url_host(host)}:{actual_port}")
+        _print_lan_banner(host, actual_port)
     _maybe_open_browser(host, actual_port, open_browser, initial_profile)
 
     if start_mcp_discovery_after_bind:
@@ -1412,6 +1433,14 @@ def _run_serve(serve, config, host: str, port: int) -> None:
             _report_port_in_use(host, port)
             raise SystemExit(PORT_IN_USE_EXIT_CODE) from None
         raise
+
+
+def _print_lan_banner(host: str, port: int) -> None:
+    """Announce reachable LAN URLs for a non-loopback bind (T-09b / 远 01)."""
+    from hermes_cli.lan_addresses import lan_banner_lines
+
+    for line in lan_banner_lines(host, port):
+        print(line, flush=True)
 
 
 def start_server(*args, **kwargs):

@@ -509,6 +509,8 @@ class Scenario:
     session_id: str = "compaction-e2e"
     platform: str = "cli"
     window: int | None = None  # provider-enforced context window (tokens); None = unlimited
+    toolsets: tuple[str, ...] = ("file",)
+    skip_memory: bool = True
     history: list[dict[str, Any]] = field(default_factory=list)
     sent_markers: list[str] = field(default_factory=list)
     summary_calls: list = field(default_factory=list)
@@ -553,7 +555,7 @@ class Scenario:
         self.agent = AIAgent(
             provider="custom", base_url=self.server.base_url, api_key="sk-fake-e2e", model=MODEL_ID,
             session_db=self.db, session_id=self.session_id, quiet_mode=True, platform=self.platform,
-            enabled_toolsets=["file"], skip_context_files=True, skip_memory=True,
+            enabled_toolsets=list(self.toolsets), skip_context_files=True, skip_memory=self.skip_memory,
             status_callback=lambda *a, **_k: self.statuses.append(tuple(a)),
         )
         return self.agent

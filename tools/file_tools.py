@@ -33,7 +33,8 @@ from tools.file_tools_paths import (
     _resolve_path_for_task)
 from tools.file_tools_write_guards import (
     _READ_DEDUP_STATUS_MESSAGE, _check_approval_required_write, _check_binary_document_write,
-    _check_cross_profile_path, _check_protected_instruction_write, _check_sensitive_path,
+    _check_cross_profile_path, _check_notes_docs_readonly, _check_notes_write_scope,
+    _check_protected_instruction_write, _check_sensitive_path,
     _is_internal_file_tool_content, _stale_overwrite_blocker, _stale_write_refusal)
 from tools.file_tools_read_tracking import (
     _bump_consecutive, _cap_read_tracker_data, _carry_full_write_baselines, _check_file_staleness,
@@ -721,6 +722,11 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
         if _err or result_dict.get("is_binary"):
             return json.dumps(result_dict, ensure_ascii=False)
 
+        # notes/docs reads feed the stale-document lifecycle (Android 设 13); best effort.
+        from hermes_notes.lifecycle import note_document_read
+
+        note_document_read(resolved_str)
+
         # Char budget on the FORMATTED content (what enters context), BEFORE
         # redaction (skip the regex pass on huge content); truncate gracefully
         # with a next_offset instead of rejecting.
@@ -795,6 +801,23 @@ def _resolve_or_none(filepath: str, task_id: str, *, entry: bool = False) -> str
         return None
 
 
+def _archive_memory_surface_before_write(resolved: str | None) -> None:
+    """Snapshot memories/ or notes/ Markdown into ``.versions/`` before the agent rewrites it.
+
+    Android 记 05 parity (T-28): a bad model rewrite stays recoverable on disk. Anything outside
+    that surface — SOUL.md, project files — is untouched.
+    """
+    if not resolved:
+        return
+    try:
+        from hermes_constants import get_hermes_home
+        from hermes_notes.lifecycle import archive_before_overwrite
+
+        archive_before_overwrite(Path(str(get_hermes_home())), resolved)
+    except (ImportError, OSError, ValueError) as error:
+        logger.debug("memory-surface archive skipped for %s: %s", resolved, error)
+
+
 def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: str,
                           cross_profile: bool) -> str | None:
     """Run the shared write/patch guards in order; return the first error string.
@@ -804,8 +827,10 @@ def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: s
     prompt covers every path of a multi-file patch.
     """
     for p in paths:
-        err = _check_sensitive_path(p, task_id) or (
-            None if cross_profile else _check_cross_profile_path(p, task_id))
+        err = (_check_sensitive_path(p, task_id)
+               or _check_notes_docs_readonly(p, task_id)
+               or _check_notes_write_scope(p, task_id)
+               or (None if cross_profile else _check_cross_profile_path(p, task_id)))
         if err:
             return err
     for p in content_paths:
@@ -898,6 +923,8 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
     """
     # write_file checks the binary-document guard before the mirror guard.
     err = (_check_sensitive_path(path, task_id)
+           or _check_notes_docs_readonly(path, task_id)
+           or _check_notes_write_scope(path, task_id)
            or _check_binary_document_write(path, task_id)
            or _check_protected_instruction_write([path], task_id)
            or _check_approval_required_write([path], task_id)
@@ -926,6 +953,7 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
                 return json.dumps(_stale_write_refusal(path, blocker, _resolved), ensure_ascii=False)
             warnings = _edit_warnings([path], path_to_resolved, task_id)
             rewrite_hint = _whole_file_rewrite_hint(task_id, _resolved, content)
+            _archive_memory_surface_before_write(_resolved)
             result = _get_file_ops(task_id).write_file(_resolved or path, content)
             result_dict = result.to_dict()
             if warnings:
@@ -1019,6 +1047,8 @@ def patch_tool(mode: str = "replace", path: str | None = None, old_string: str |
             # Whole-file knowledge held BEFORE the patch reads, under the same locks. Like
             # every baseline check it stats the host path, so a sandbox path carries nothing.
             _known = _known_full_content_sha256(_path_to_resolved.values(), task_id)
+            for _target in _path_to_resolved.values():
+                _archive_memory_surface_before_write(_target)
 
             # Hand the shell layer the RESOLVED targets so both layers agree on
             # which file is edited even when the shell's cwd differs.

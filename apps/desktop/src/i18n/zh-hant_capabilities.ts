@@ -34,6 +34,7 @@ export const zhHantCapabilities = {
     },
     tabSkills: '技能',
     tabToolsets: '工具集',
+    tabLink: '同步',
     all: '全部',
     searchSkills: '搜尋技能...',
     searchToolsets: '搜尋工具集...',

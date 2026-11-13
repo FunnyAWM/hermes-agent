@@ -87,6 +87,9 @@ export interface ApprovalRequest extends KeyedPrompt {
   choices?: string[]
   command: string
   description: string
+  /** Why the backend (an automatic review or a plugin rule) wants this call; shown next to
+   *  the command so the user decides on the actual effect, not just a risk label. */
+  justification?: string
   requestId?: string
   serverRequestId?: string
   smartDenied?: boolean
@@ -101,6 +104,7 @@ interface PendingApprovalPayload {
   choices?: unknown
   command?: unknown
   description?: unknown
+  justification?: unknown
   request_id?: unknown
   smart_denied?: boolean
 }
@@ -329,6 +333,7 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
           : undefined,
         command: typeof pending.command === 'string' ? pending.command : '',
         description: typeof pending.description === 'string' ? pending.description : 'dangerous command',
+        justification: typeof pending.justification === 'string' ? pending.justification : undefined,
         requestId: pending.request_id,
         sessionId,
         smartDenied: pending.smart_denied === true

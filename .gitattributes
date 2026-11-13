@@ -40,3 +40,6 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+
+# `git am` consumes the raw patch bytes; CRLF checkout corrupts them.
+patches/*.patch -text

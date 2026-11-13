@@ -284,6 +284,7 @@ import {
   saveGatewayDownload
 } from './gateway-file-download'
 import { downloadViaOauthSessionToFile, downloadViaTokenToFile } from './gateway-file-download-transport'
+import { stopGatewayForQuit } from './gateway-quit'
 import { stopGatewayBeforeUpdate } from './gateway-stop-before-update'
 import { resolveGatewayVersion } from './gateway-version'
 import { probeGatewayWebSocket } from './gateway-ws-probe'
@@ -312,6 +313,7 @@ import {
   tightenSecretFileMode,
   writeSecretFileAtomic
 } from './hardening'
+import { explicitSourceBackend, headlessRuntimeRoot, refuseBootstrap } from './headless-runtime'
 import { isHermesProcess } from './hermes-process'
 import { assertNotPassiveSpawn } from './host-backend-singleton'
 import { HERMES_HUB_FALLBACK_ORIGIN, HERMES_HUB_ORIGIN, isHermesHubClipboardWrite } from './hub-iframe-policy'
@@ -571,7 +573,12 @@ import {
 } from './session-windows'
 import { ensureLoginShellPath } from './shell-path'
 import { removeStaleSingletonLock } from './singleton-lock'
-import { createSourcePythonBackend, resolveSourceInstallationBackend, type SourceBackend } from './source-backend'
+import {
+  isHermesSourceRoot,
+  resolveSourceInstallationBackend,
+  type SourceBackend,
+  sourceBackendAt
+} from './source-backend'
 import { resolveSourcePython } from './source-python'
 import { registerSpellcheckDictionaryIpc } from './spellcheck-dictionary-ipc'
 import { resolveSshBinary } from './ssh-binary'
@@ -1791,7 +1798,7 @@ if (IS_WINDOWS) {
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
   applicationVersion: nativeAboutVersion(appVersionInfo(INSTALL_STAMP, '', app.getVersion())),
-  copyright: 'Copyright © 2026 Nous Research'
+  copyright: 'Copyright © 2026 FunnyAWM'
 })
 
 // Custom scheme for streaming audio/video into the renderer. Local paths read
@@ -2972,10 +2979,6 @@ function looksLikeDesktopAppBinary(commandPath) {
   return (
     fs.existsSync(path.join(resourcesDir, 'app.asar')) || directoryExists(path.join(resourcesDir, 'app.asar.unpacked'))
   )
-}
-
-function isHermesSourceRoot(root) {
-  return directoryExists(root) && fileExists(path.join(root, 'hermes_cli', 'main.py'))
 }
 
 async function findPythonForRoot(root: string): Promise<string | null> {
@@ -4842,21 +4845,13 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
     }
   }
 
-  // 1. Explicit override -- HERMES_DESKTOP_HERMES_ROOT points at a developer
-  //    checkout. Honour it as-is (no bootstrap; the user is driving).
-  const overrideRoot: string | undefined =
-    process.env.HERMES_DESKTOP_HERMES_ROOT && path.resolve(process.env.HERMES_DESKTOP_HERMES_ROOT)
+  // 1-1b. Explicit override, then the checkout a headless build recorded; later rungs recover.
+  const explicitBackend: SourceBackend | null = await explicitSourceBackend(INSTALL_STAMP, process.env, {
+    backendFor: (root) => sourceBackendAt(root, backendArgs, findPythonForRoot), log: rememberLog
+  })
 
-  if (overrideRoot && isHermesSourceRoot(overrideRoot)) {
-    const backend: SourceBackend | null = createSourcePythonBackend(
-      overrideRoot,
-      await findPythonForRoot(overrideRoot),
-      backendArgs
-    )
-
-    if (backend) {
-      return backend
-    }
+  if (explicitBackend) {
+    return explicitBackend
   }
 
   // 2. Development source -- when running `pnpm run dev` from a checkout, the
@@ -4864,11 +4859,7 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
   //    installed `hermes` on PATH so local Python edits are actually exercised.
   //    (In dev with no checkout, SOURCE_REPO_ROOT won't pass isHermesSourceRoot.)
   if (!IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT)) {
-    const backend: SourceBackend | null = createSourcePythonBackend(
-      SOURCE_REPO_ROOT,
-      await findPythonForRoot(SOURCE_REPO_ROOT),
-      backendArgs
-    )
+    const backend: SourceBackend | null = await sourceBackendAt(SOURCE_REPO_ROOT, backendArgs, findPythonForRoot)
 
     if (backend) {
       return backend
@@ -4991,6 +4982,9 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
   //    resolveHermesBackend was the old "no payload" path and forced the
   //    user into a dead end. With the bootstrap protocol, "no install yet"
   //    is a recoverable state the GUI can drive through.
+  // A headless artifact never installs a runtime: no local install is a hard stop.
+  refuseBootstrap(INSTALL_STAMP)
+
   return {
     kind: 'bootstrap-needed',
     label: 'Hermes Agent not installed yet; bootstrap required',
@@ -11380,9 +11374,7 @@ function reapInstallRootedStragglers(excludePids: number[]): void {
   }
 }
 
-// Closing Desktop never stops the detached gateway: only processes this app
-// still owns are torn down, and the straggler reap protects every live Hermes
-// runtime tree (package-process-reap.ts).
+// Desktop owns the local gateway's lifetime: tray-resident while open, stopped on quit.
 const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void> => {
   const ownedChildren = IS_WINDOWS ? collectOwnedBackendChildren() : []
   const localShutdown = localBackendLifecycle.shutdown()
@@ -11392,6 +11384,7 @@ const backendShutdown = createBackendShutdownCoordinator(async (): Promise<void>
 
   // Bounded: a backend that ignores SIGTERM must not wedge app quit (main's 7 s teardown budget).
   await waitForTeardown([localShutdown, primaryStop, pooledStops], 7_000)
+  stopGatewayForQuit([headlessRuntimeRoot(INSTALL_STAMP, resolveUpdateRoot), resolveUpdateRoot()], HERMES_HOME, rememberLog)
 
   reapInstallRootedStragglers(Number.isInteger(primary?.pid) ? [primary.pid] : [])
 
@@ -16961,7 +16954,7 @@ function showAboutPanelFresh(): void {
     app.setAboutPanelOptions({
       applicationName: APP_NAME,
       applicationVersion: skew.outOfSync ? `${display} — app build out of date, update the desktop app` : display,
-      copyright: 'Copyright © 2026 Nous Research'
+      copyright: 'Copyright © 2026 FunnyAWM'
     })
     app.showAboutPanel()
   })
@@ -17086,6 +17079,13 @@ function resolveHermesRuntime() {
 
   if (stamp?.payload === 'bundled') {
     return { type: 'embedded' }
+  }
+
+  const headlessRoot = headlessRuntimeRoot(stamp, resolveUpdateRoot)
+
+  if (headlessRoot) {
+    // The runtime is this machine's own checkout, not code this artifact ships.
+    return { type: 'external', source: { type: 'source', root: headlessRoot } }
   }
 
   const root = resolveUpdateRoot()

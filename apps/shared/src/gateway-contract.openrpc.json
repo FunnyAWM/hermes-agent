@@ -4273,6 +4273,132 @@
       }
     },
     {
+      "name": "sync.create_chain",
+      "summary": "Become the chain master: generate the 24-word mnemonic (shown once).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncCreateChainParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncCreateChainResult"
+        }
+      }
+    },
+    {
+      "name": "sync.disconnect",
+      "summary": "Leave the chain (secondary): pairing is discarded, synced files stay.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncCreateChainParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncAckResult"
+        }
+      }
+    },
+    {
+      "name": "sync.now",
+      "summary": "Sync once: refresh the record log as master, pull+apply as secondary.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncNowParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncNowResult"
+        }
+      }
+    },
+    {
+      "name": "sync.pair",
+      "summary": "Join a chain as secondary: full pull + apply, then persist the pairing (all-or-nothing).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncPairParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncPairResult"
+        }
+      }
+    },
+    {
+      "name": "sync.reset_chain",
+      "summary": "Kill the chain (master): stop serving and discard this device's pairing.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncCreateChainParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncAckResult"
+        }
+      }
+    },
+    {
+      "name": "sync.serve",
+      "summary": "Start or stop the master-role TLS sync server inside this backend process.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncServeParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncServeResult"
+        }
+      }
+    },
+    {
+      "name": "sync.status",
+      "summary": "Pairing and sync state for one profile's KouriChat Link membership.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/SyncStatusParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SyncStatusResult"
+        }
+      }
+    },
+    {
       "name": "system.battery",
       "summary": "Host battery for the status bar; always resolves, ``available: false`` when unreadable.",
       "params": [
@@ -45567,6 +45693,355 @@
           "session_id"
         ],
         "title": "SudoRequestParams",
+        "type": "object"
+      },
+      "SyncAckResult": {
+        "additionalProperties": false,
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "SyncAckResult",
+        "type": "object"
+      },
+      "SyncCreateChainParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "SyncCreateChainParams",
+        "type": "object"
+      },
+      "SyncCreateChainResult": {
+        "additionalProperties": false,
+        "description": "The 24 words are shown exactly once (paper backup) and stored only in .env.",
+        "properties": {
+          "words": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 24,
+            "minItems": 24,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "SyncCreateChainResult",
+        "type": "object"
+      },
+      "SyncNowParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "SyncNowParams",
+        "type": "object"
+      },
+      "SyncNowResult": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "disabled",
+              "master",
+              "secondary"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "records": {
+            "title": "Records",
+            "type": "integer"
+          },
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "role",
+          "records",
+          "applied"
+        ],
+        "title": "SyncNowResult",
+        "type": "object"
+      },
+      "SyncPairParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Endpoint"
+          },
+          "words": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 24,
+            "minItems": 24,
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "words"
+        ],
+        "title": "SyncPairParams",
+        "type": "object"
+      },
+      "SyncPairResult": {
+        "additionalProperties": false,
+        "properties": {
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          },
+          "pinned_fingerprint": {
+            "title": "Pinned Fingerprint",
+            "type": "string"
+          },
+          "master_endpoint": {
+            "default": "",
+            "title": "Master Endpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "pinned_fingerprint"
+        ],
+        "title": "SyncPairResult",
+        "type": "object"
+      },
+      "SyncServeParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "start": {
+            "title": "Start",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "start"
+        ],
+        "title": "SyncServeParams",
+        "type": "object"
+      },
+      "SyncServeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "serving": {
+            "title": "Serving",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Port"
+          }
+        },
+        "required": [
+          "serving"
+        ],
+        "title": "SyncServeResult",
+        "type": "object"
+      },
+      "SyncStatusParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "SyncStatusParams",
+        "type": "object"
+      },
+      "SyncStatusResult": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "disabled",
+              "master",
+              "secondary"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "paired": {
+            "title": "Paired",
+            "type": "boolean"
+          },
+          "device_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Device Id"
+          },
+          "master_endpoint": {
+            "default": "",
+            "title": "Master Endpoint",
+            "type": "string"
+          },
+          "listen_port": {
+            "default": 27890,
+            "title": "Listen Port",
+            "type": "integer"
+          },
+          "auto_sync_minutes": {
+            "default": 0,
+            "title": "Auto Sync Minutes",
+            "type": "integer"
+          },
+          "pinned_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pinned Fingerprint"
+          },
+          "last_sync_at_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Sync At Ms"
+          },
+          "last_sync_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Sync Error"
+          },
+          "applied_count": {
+            "default": 0,
+            "title": "Applied Count",
+            "type": "integer"
+          },
+          "archived_count": {
+            "default": 0,
+            "title": "Archived Count",
+            "type": "integer"
+          },
+          "tracked_files": {
+            "default": 0,
+            "title": "Tracked Files",
+            "type": "integer"
+          },
+          "syncable_files": {
+            "default": 0,
+            "title": "Syncable Files",
+            "type": "integer"
+          },
+          "serving": {
+            "default": false,
+            "title": "Serving",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "role",
+          "paired"
+        ],
+        "title": "SyncStatusResult",
         "type": "object"
       },
       "SystemBatteryParams": {

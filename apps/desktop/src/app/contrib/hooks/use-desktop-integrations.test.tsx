@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { registerTerminalContextMenu } from '@/app/right-sidebar/terminal/terminal-context-menu'
 import { setApiRequestConnection, setApiRequestProfile } from '@/hermes'
 import { createClientSessionState } from '@/lib/chat-runtime'
+import type * as QueryClientModule from '@/lib/query-client'
 import { adoptNewSessionDraft, stashSessionDraft, takeSessionDraft } from '@/store/composer'
 import { $confirmRequest, runConfirm, settleConfirm } from '@/store/confirm'
 import { keepRoute, keptRouteOpened } from '@/store/gateway-kept-routes'
@@ -29,12 +30,38 @@ import { useDesktopIntegrations } from './use-desktop-integrations'
 // Mutable HUD-window flag so the restore tests can flip the window kind the
 // hook believes it runs in. Default false keeps the pre-existing restore
 // coverage exercising the real main-window path.
-const { hudWindowMock, peerWindowMock } = vi.hoisted(() => ({
+const { hudWindowMock, peerWindowMock, secondaryWindowMock, browserWindowMock } = vi.hoisted(() => ({
   hudWindowMock: vi.fn(() => false),
-  peerWindowMock: vi.fn(() => false)
+  peerWindowMock: vi.fn(() => false),
+  secondaryWindowMock: vi.fn(() => false),
+  browserWindowMock: vi.fn(() => false)
 }))
 
 const closeActiveTab = vi.hoisted(() => vi.fn(() => true))
+
+// Cross-window bus: the hook's only business with it is subscribing; the test
+// fires the captured handlers as if another window had posted.
+const { syncHandlers, invalidateSessionListQueries } = vi.hoisted(() => ({
+  syncHandlers: [] as Array<() => void>,
+  invalidateSessionListQueries: vi.fn()
+}))
+
+vi.mock('@/store/session-sync', () => ({
+  broadcastSessionsChanged: vi.fn(),
+  onSessionsChanged: (handler: () => void) => {
+    syncHandlers.push(handler)
+
+    return () => {
+      syncHandlers.splice(syncHandlers.indexOf(handler), 1)
+    }
+  }
+}))
+
+vi.mock('@/lib/query-client', async importOriginal => {
+  const actual = await importOriginal<typeof QueryClientModule>()
+
+  return { ...actual, invalidateSessionListQueries }
+})
 
 vi.mock('@/app/chat/close-tab', () => ({ closeActiveTab }))
 
@@ -55,8 +82,10 @@ vi.mock('@/store/windows', async importOriginal => {
 
   return {
     ...actual,
+    isBrowserWindow: () => browserWindowMock(),
     isHudWindow: () => hudWindowMock(),
-    isPeerInstanceWindow: () => peerWindowMock()
+    isPeerInstanceWindow: () => peerWindowMock(),
+    isSecondaryWindow: () => secondaryWindowMock()
   }
 })
 
@@ -85,6 +114,10 @@ describe('useDesktopIntegrations', () => {
     // Every test starts as a main window; only the HUD describe flips this.
     hudWindowMock.mockReturnValue(false)
     peerWindowMock.mockReturnValue(false)
+    secondaryWindowMock.mockReturnValue(false)
+    browserWindowMock.mockReturnValue(false)
+    syncHandlers.length = 0
+    invalidateSessionListQueries.mockClear()
     // Isolated owner-hint state per test: persisted hints are global
     // module state that would otherwise leak between restore cases.
     _resetSessionOwnerHintsForTests({ storage: true })
@@ -127,7 +160,8 @@ describe('useDesktopIntegrations', () => {
     // null = config record still loading (the hook takes undefined; null dodges the destructuring default).
     resumeLastSession = true as boolean | null,
     routedSessionId = null as string | null,
-    sessions = [] as readonly SessionInfo[]
+    sessions = [] as readonly SessionInfo[],
+    refreshSessions = vi.fn()
   } = {}) {
     return renderHook(
       ({
@@ -137,11 +171,13 @@ describe('useDesktopIntegrations', () => {
         resumeExhaustedSessionId,
         resumeLastSession,
         routedSessionId,
-        sessions
+        sessions,
+        refreshSessions
       }: {
         activeProfile: string
         locationPathname: string
         profileReady: boolean
+        refreshSessions?: () => Promise<unknown> | unknown
         resumeExhaustedSessionId: string | null
         resumeLastSession: boolean | null
         routedSessionId: string | null
@@ -154,7 +190,7 @@ describe('useDesktopIntegrations', () => {
           locationPathname,
           navigate,
           profileReady,
-          refreshSessions: vi.fn(),
+          refreshSessions: refreshSessions ?? (() => undefined),
           resumeExhaustedSessionId,
           resumeLastSession: resumeLastSession ?? undefined,
           routedSessionId,
@@ -166,10 +202,20 @@ describe('useDesktopIntegrations', () => {
           activeProfile,
           locationPathname,
           profileReady,
+          refreshSessions,
           resumeExhaustedSessionId,
           resumeLastSession,
           routedSessionId,
           sessions
+        } as {
+          activeProfile: string
+          locationPathname: string
+          profileReady: boolean
+          refreshSessions?: () => Promise<unknown> | unknown
+          resumeExhaustedSessionId: string | null
+          resumeLastSession: boolean | null
+          routedSessionId: string | null
+          sessions: readonly SessionInfo[]
         }
       }
     )
@@ -1052,6 +1098,40 @@ describe('useDesktopIntegrations', () => {
 
       unmount()
       dropSessionState('runtime-999')
+    })
+  })
+
+  describe('cross-window session sync', () => {
+    const fire = () => act(() => syncHandlers.slice().forEach(handler => handler()))
+
+    it('re-pulls the sidebar and drops cached session pages when another window mutates the list', () => {
+      const refreshSessions = vi.fn()
+      render({ refreshSessions })
+
+      expect(syncHandlers).toHaveLength(1)
+      fire()
+
+      expect(invalidateSessionListQueries).toHaveBeenCalledTimes(1)
+      expect(refreshSessions).toHaveBeenCalledTimes(1)
+    })
+
+    it('still drops cached session pages in a session pop-out, which renders no sidebar', () => {
+      secondaryWindowMock.mockReturnValue(true)
+      const refreshSessions = vi.fn()
+      render({ refreshSessions })
+
+      fire()
+
+      expect(invalidateSessionListQueries).toHaveBeenCalledTimes(1)
+      expect(refreshSessions).not.toHaveBeenCalled()
+    })
+
+    it('unsubscribes on unmount', () => {
+      const { unmount } = render()
+
+      unmount()
+
+      expect(syncHandlers).toHaveLength(0)
     })
   })
 

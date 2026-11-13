@@ -817,6 +817,38 @@ def _hydrate_from_history(agent: Any, conversation_history: Optional[list[Any]])
                 agent._turns_since_memory = prior_user_turns % agent._memory_nudge_interval
 
 
+def _tick_notes_lifecycle(agent: Any) -> None:
+    """One notes pass per user turn: publish the turn number and clear explicitly expired notes.
+
+    The turn number is what ``notes/docs`` reads stamp as ``lastUsed`` and what the stale-document
+    prompt counts against (Android 设 13). Cleanup only fires above the soft limit and never
+    deletes a note it could not archive first.
+    """
+    from hermes_notes.lifecycle import remove_expired_notes, set_current_turn
+    from hermes_notes.settings import load_notes_settings
+
+    set_current_turn(int(getattr(agent, "_user_turn_count", 0) or 0))
+    with suppress(Exception):
+        from hermes_constants import get_hermes_home
+
+        # ponytail: one O(n) scan per user turn; move to a background tick if a large
+        # notes/ tree starts showing up in turn latency.
+        settings = load_notes_settings()
+        remove_expired_notes(
+            get_hermes_home(),
+            soft_limit=settings.soft_limit,
+            enabled=settings.remove_expired_notes,
+        )
+
+
+def _tick_notes_organizer(agent: Any) -> None:
+    """Optional periodic notes housekeeping (memory.organize_turns, default off)."""
+    with suppress(Exception):
+        from agent.notes_organizer import maybe_spawn
+
+        maybe_spawn(agent)
+
+
 def _tick_memory_nudge(agent: Any) -> bool:
     """Advance the turn-based memory nudge counter; ``True`` when the review should fire."""
     if (agent._memory_nudge_interval > 0
@@ -1286,6 +1318,8 @@ def build_turn_context(
     agent._persist_user_message_idx = current_turn_user_idx
 
     agent._user_turn_count += 1
+    _tick_notes_lifecycle(agent)
+    _tick_notes_organizer(agent)
     # Turn-initiator state for per-request provider headers: the first API call of this
     # user turn is user-initiated; tool-loop follow-ups are agent-initiated.
     agent._is_user_initiated_turn = True

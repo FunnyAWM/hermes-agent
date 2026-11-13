@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils import atomic_write_text
+from hermes_charcount import char_count
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -126,8 +127,12 @@ def _no_match_error(entries: list[str], old_text: str, verb: str, **extra) -> di
                   **({"closest_entries": closest} if closest else {}), **extra)
 
 
-def _over_limit(new_total: int, limit: int) -> str:
-    return f"would put memory at {new_total:,}/{limit:,} chars: free at least {new_total - limit:,} chars"
+def _over_limit(new_total: int, limit: int, current_total: int) -> str:
+    # 'free at least' keeps the actionable shortfall; the headroom is what the
+    # caller can still use today, which the batch hint needs to size a trim.
+    available = max(0, limit - current_total)
+    return (f"would put memory at {new_total:,}/{limit:,} chars: free at least {new_total - limit:,} chars "
+            f"({available:,} chars remain available)")
 
 
 # Patch content cannot be empty, and 'remove' would drop the sibling facts in the entry.
@@ -185,7 +190,7 @@ class MemoryStore:
     # See #42405.
     _MAX_CONSOLIDATION_FAILURES_PER_TURN = 3
 
-    def __init__(self, memory_char_limit: int = 2200, user_char_limit: int = 1375, *,
+    def __init__(self, memory_char_limit: int = 3000, user_char_limit: int = 0, *,
                  memory_enabled: bool = True, user_profile_enabled: bool = True):
         self.memory_entries: list[str] = []
         self.user_entries: list[str] = []
@@ -251,7 +256,7 @@ class MemoryStore:
             # External writers (MCP bridges, hand edits) can exceed the cap; the limit only fires on
             # add/replace, so the oversized block would silently ride in the prompt while every later
             # add is refused with no visible cause (#10877). Warn; never truncate a user's memories.
-            if (count := self._char_count(target)) > (limit := self._char_limit(target)):
+            if self._exceeds(count := self._char_count(target), limit := self._char_limit(target)):
                 logger.warning("%s exceeds its char limit on load: %d/%d chars. Entries stay loaded; "
                                "further additions are blocked until it is back under the limit.",
                                path.name, count, limit)
@@ -305,6 +310,17 @@ class MemoryStore:
         from tools import memory_tool  # get_memory_dir is monkeypatched there
         return memory_tool.get_memory_dir() / ("USER.md" if target == "user" else "MEMORY.md")
 
+    @staticmethod
+    def _archive_before_write(path: Path) -> None:
+        """Copy the current memory file into ``.versions/`` before an accepted rewrite (T-28)."""
+        try:
+            from hermes_constants import get_hermes_home
+            from hermes_notes.lifecycle import archive_before_overwrite
+
+            archive_before_overwrite(Path(str(get_hermes_home())), path)
+        except (ImportError, OSError, ValueError) as error:
+            logger.debug("memory archive skipped for %s: %s", path, error)
+
     def _entries_for(self, target: str) -> list[str]:
         return self.user_entries if target == "user" else self.memory_entries
 
@@ -312,17 +328,27 @@ class MemoryStore:
         setattr(self, "user_entries" if target == "user" else "memory_entries", entries)
 
     def _char_count(self, target: str) -> int:
-        return len(ENTRY_DELIMITER.join(self._entries_for(target)))
+        return char_count(ENTRY_DELIMITER.join(self._entries_for(target)))
 
     def _char_limit(self, target: str) -> int:
         return self.user_char_limit if target == "user" else self.memory_char_limit
 
+    @staticmethod
+    def _exceeds(count: int, limit: int) -> bool:
+        """True only when a positive limit is set; 0 means unlimited."""
+        return limit > 0 and count > limit
+
     def _usage(self, target: str) -> str:
-        return f"{self._char_count(target):,}/{self._char_limit(target):,}"
+        limit = self._char_limit(target)
+        if limit <= 0:
+            return f"{self._char_count(target):,}/unlimited"
+        return f"{self._char_count(target):,}/{limit:,}"
 
     def _usage_pct(self, target: str, current: int) -> str:
         limit = self._char_limit(target)
-        return f"{min(100, int((current / limit) * 100)) if limit > 0 else 0}% — {current:,}/{limit:,} chars"
+        if limit <= 0:
+            return f"unlimited — {current:,} chars"
+        return f"{min(100, int((current / limit) * 100))}% — {current:,}/{limit:,} chars"
 
     def _failure_with_entries(self, target: str, message: str) -> dict[str, Any]:
         """Over-budget consolidation failure carrying the live entries so the model can consolidate."""
@@ -332,10 +358,13 @@ class MemoryStore:
     def _add_overflow(self, target: str, content: str, limit: int) -> dict[str, Any]:
         """A lone add over budget, legacy or one-item batch: the model has not consolidated yet,
         so the live entries come back (its prompt snapshot may predate other sessions' writes)."""
-        over = len(ENTRY_DELIMITER.join(self._entries_for(target) + [content])) - limit
+        content_chars = char_count(content)
+        over = char_count(ENTRY_DELIMITER.join(self._entries_for(target) + [content])) - limit
+        available = max(0, limit - self._char_count(target))
         return self._failure_with_entries(target, (
-            f"Memory at {self._char_count(target):,}/{limit:,} chars; adding this entry ({len(content)} chars) "
-            f"would exceed the limit by {over:,} chars. Retry as ONE 'operations' batch that "
+            f"Memory at {self._char_count(target):,}/{limit:,} chars; adding this entry ({content_chars:,} chars) "
+            f"would exceed the limit by {over:,} chars; {available:,} chars remain available. "
+            f"Retry as ONE 'operations' batch that "
             f"removes or shortens (patch) stale entries from current_entries below to free at least "
             f"{over:,} chars AND adds this entry — the limit is checked only on the batch result."))
 
@@ -388,7 +417,7 @@ class MemoryStore:
                 if not set(result[0]) <= set(before):
                     return _drift_error(path, self._drift_backup(target, raw))
                 limit = self._char_limit(target)
-                if any(len(e) > limit for e in before if e not in result[0]):
+                if any(self._exceeds(char_count(e), limit) for e in before if e not in result[0]):
                     bak = self._drift_backup(target, raw)
                     if bak.endswith(_BACKUP_FAILED):  # no copy, no delete of possibly glued text
                         return _drift_error(path, bak)
@@ -397,6 +426,7 @@ class MemoryStore:
             from hermes_constants import mkdir_under_hermes_home
 
             mkdir_under_hermes_home(path.parent)
+            self._archive_before_write(path)
             self._write_file(path, result[0])
             return self._success_response(target, result[1], **extra_fields)
 
@@ -411,7 +441,7 @@ class MemoryStore:
         def _add(entries, limit):
             if content in entries:
                 return self._success_response(target, "Entry already exists (no duplicate added).")
-            if len(ENTRY_DELIMITER.join(entries + [content])) > limit:
+            if self._exceeds(char_count(ENTRY_DELIMITER.join(entries + [content])), limit):
                 return self._add_overflow(target, content, limit)
             return entries + [content], "Entry added."
         # Append-only: skip the drift guard (appending never clobbers foreign
@@ -457,10 +487,10 @@ class MemoryStore:
             if after is None:
                 return _error(message, failure_class)
             patched = entries[:idx] + [after] + entries[idx + 1:]
-            new_total = len(ENTRY_DELIMITER.join(patched))
-            if new_total > limit:
+            new_total = char_count(ENTRY_DELIMITER.join(patched))
+            if self._exceeds(new_total, limit):
                 return self._failure_with_entries(target, (
-                    f"Patch would put memory at {new_total:,}/{limit:,} chars. Shorten the new "
+                    f"Patch {_over_limit(new_total, limit, char_count(ENTRY_DELIMITER.join(entries)))}. Shorten the new "
                     f"text, or 'remove' other stale or less important entries to make room "
                     f"(see current_entries below), then retry — all in this turn."))
             return patched, "Entry patched.", {
@@ -508,10 +538,10 @@ class MemoryStore:
             replaced = entries[:idx] + ([] if new_content is None else [new_content]) + entries[idx + 1:]
             if new_content is None:
                 return replaced, "Entry removed.", {"removed_entry": entries[idx]}
-            new_total = len(ENTRY_DELIMITER.join(replaced))
-            if new_total > limit:
+            new_total = char_count(ENTRY_DELIMITER.join(replaced))
+            if self._exceeds(new_total, limit):
                 return self._failure_with_entries(target, (
-                    f"Replacement {_over_limit(new_total, limit)}. Shorten the new content, or retry as ONE "
+                    f"Replacement {_over_limit(new_total, limit, char_count(ENTRY_DELIMITER.join(entries)))}. Shorten the new content, or retry as ONE "
                     f"'operations' batch with this replace plus removes/shortenings of other stale entries "
                     f"(see current_entries below) — the limit is checked only on the batch result."))
             return replaced, "Entry replaced.", {"replaced_entry": entries[idx]}
@@ -621,16 +651,16 @@ class MemoryStore:
                     f"previously non-empty store. Keep at least one entry — merge overlapping "
                     f"entries into a shorter one instead of removing the last one. To delete the "
                     f"final entry deliberately, remove it alone in a one-item batch."), "would_empty")
-            new_total = len(ENTRY_DELIMITER.join(working))  # budget check against the FINAL state only
+            new_total = char_count(ENTRY_DELIMITER.join(working))  # budget check against the FINAL state only
             # A remove-only batch or a lone duplicate add never grows the store, so like the
             # legacy remove/add it is not refused for excess left by a lowered cap.
             grows = not (all(op.get("action") == "remove" for op in ops)
                          or (len(ops) == 1 and working == entries))
-            if grows and new_total > limit:
+            if grows and self._exceeds(new_total, limit):
                 if len(ops) == 1 and ops[0].get("action") == "add":  # the advertised single add
                     return self._add_overflow(target, (ops[0].get("content") or ops[0].get("new_text") or "").strip(), limit)
                 return self._batch_failure(target, (
-                    f"Applying all {len(operations)} operations {_over_limit(new_total, limit)} more. Add "
+                    f"Applying all {len(operations)} operations {_over_limit(new_total, limit, char_count(ENTRY_DELIMITER.join(entries)))}. Add "
                     f"removes or shortening patches of other stale entries to the same batch, then retry."),
                     "over_budget")
             if not commit:
@@ -678,7 +708,7 @@ class MemoryStore:
             return ""
         content, sep = ENTRY_DELIMITER.join(entries), "═" * 46
         title = MEMORY_BLOCK_HEADERS["user" if target == "user" else "memory"]
-        return f"{sep}\n{title} [{self._usage_pct(target, len(content))}]\n{sep}\n{content}"
+        return f"{sep}\n{title} [{self._usage_pct(target, char_count(content))}]\n{sep}\n{content}"
 
     @staticmethod
     def _read_raw_checked(path: Path) -> tuple[str, bool]:
@@ -726,7 +756,7 @@ class MemoryStore:
         empty entries, padding) are NOT drift: parsing only strips whitespace, so the flush
         loses nothing but whitespace, and refusing there blocked every replace/remove on a
         hand-formatted file for good (#107270)."""
-        return max(map(len, self._parse_entries(raw)), default=0) > self._char_limit(target)
+        return self._exceeds(max(map(char_count, self._parse_entries(raw)), default=0), self._char_limit(target))
 
     def _drift_backup(self, target: str, raw: str) -> str:
         """``.bak.<ts>[.<n>]`` snapshot of *raw* before a drift refusal or a delete that drops an

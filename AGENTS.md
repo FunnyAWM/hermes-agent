@@ -83,9 +83,11 @@ hermes-agent/
 ├── cli.py                # HermesCLI (REPL, slash dispatch) + hermes_cli/cli_*_mixin.py
 ├── hermes_state.py       # SessionDB facade; hermes_state_*.py siblings
 ├── hermes_constants.py   # get_hermes_home(), display_hermes_home() — profile-aware paths
-├── scripts/              # check, run_tests.sh, code_health/, ci/
-├── evals/                # live-model A/B and probe harnesses
-└── website/              # Docusaurus docs (developer-guide/ holds the long-form area docs)
+├── agent/ hermes_cli/ tools/ gateway/ plugins/ skills/ cron/
+├── ui-tui/, tui_gateway/  # Ink TUI + its JSON-RPC backend
+├── apps/desktop/  web/    # Electron app; dashboard SPA
+├── pm/, hermes_platform/  # dependency/env manager; host facts
+├── scripts/  website/  tests/  # gates, docs, pytest suite
 ```
 
 **User state:** `~/.hermes/config.yaml` (settings), `.env` (secrets only), `logs/` (`hermes logs`);
@@ -161,5 +163,11 @@ Every former god file is a **facade** (public entry points + the names other pac
 | `hermes_platform/` | `hermes_platform/AGENTS.md` | host facts, resolvers |
 | `acp_adapter/` | `website/docs/developer-guide/acp-internals.md` | ACP server for editors |
 | `providers/` | `providers/README.md` | `ProviderProfile` registry and ABC |
+| `sync/` | `sync/AGENTS.md` | KouriChat Link device-chain sync |
 
 PR workflow: `CONTRIBUTING.md` (maintainers: the `hermes-agent-dev` skill, not shipped here).
+
+## Working constraints
+
+Fork policy: @AGENTS_PROJECT.md outranks the upstream rubric here. Baselines:
+@AGENTS_PYTHON.md (Python), @AGENTS_FRONTEND.md (`apps/`, `ui-tui/`, `web/`).

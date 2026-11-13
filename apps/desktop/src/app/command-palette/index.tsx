@@ -19,7 +19,7 @@ import { codiconIcon } from '@/components/ui/codicon'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { HighlightMatches } from '@/components/ui/highlight-matches'
 import { KbdCombo } from '@/components/ui/kbd'
-import { getHermesConfigRecord, listAllProfileSessions } from '@/hermes'
+import { getApiRequestConnection, getHermesConfigRecord, listAllProfileSessions } from '@/hermes'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
@@ -60,6 +60,7 @@ import {
   Zap
 } from '@/lib/icons'
 import { getServers } from '@/lib/mcp-servers'
+import { SESSION_LIST_QUERY_ROOT } from '@/lib/query-client'
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
 import { $repoWorktrees } from '@/store/coding-status'
@@ -78,7 +79,7 @@ import { toggleBrowserTab } from '@/store/preview'
 import { $projectTree, goToProject, openFolderAsProject, requestStartWorkSession } from '@/store/projects'
 import { $cronSessions, $messagingSessions, $sessions } from '@/store/session'
 import { $unconfirmedPinWrites } from '@/store/session-pin-sync'
-import { $removedSessionIds } from '@/store/session-removal'
+import { $removedSessionIds, dropTombstonedSessions } from '@/store/session-removal'
 import { runGatewayRestart } from '@/store/system-actions'
 import {
   requestActiveUpdate
@@ -635,13 +636,13 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
   // invalidate these keys — every open must revalidate. The cached page
   // still paints instantly; the live-store overlay below covers the gap.
   const sessionsQuery = useQuery({
-    queryKey: ['command-palette', 'sessions'],
+    queryKey: [...SESSION_LIST_QUERY_ROOT, 'palette', getApiRequestConnection() ?? 'local'],
     queryFn: () => listAllProfileSessions(200, 1, 'exclude'),
     staleTime: 0
   })
 
   const archivedQuery = useQuery({
-    queryKey: ['command-palette', 'archived'],
+    queryKey: [...SESSION_LIST_QUERY_ROOT, 'palette-archived', getApiRequestConnection() ?? 'local'],
     queryFn: () => listAllProfileSessions(200, 0, 'only'),
     staleTime: 0
   })
@@ -666,13 +667,11 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
       [...liveCronSessions, ...liveMessagingSessions, ...liveSessions].map(row => [row.id, row] as const)
     )
 
-    return (sessionsQuery.data?.sessions ?? [])
-      .filter(session => !removedSessionIds.has(session.id))
-      .map(session => {
-        const live = byId.get(session.id)
+    return dropTombstonedSessions(sessionsQuery.data?.sessions ?? [], removedSessionIds).map(session => {
+      const live = byId.get(session.id)
 
-        return live ? { ...session, pinned: live.pinned, title: live.title } : session
-      })
+      return live ? { ...session, pinned: live.pinned, title: live.title } : session
+    })
   }, [liveCronSessions, liveMessagingSessions, liveSessions, removedSessionIds, sessionsQuery.data])
 
   // Same resolution as the sidebar's Pinned section: local pin order first,
@@ -689,7 +688,10 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
     return liveRows.filter(session => !pinned.has(session.id)).map(toSessionEntry)
   }, [liveRows, pinnedSessions])
 
-  const archivedSessions = useMemo(() => (archivedQuery.data?.sessions ?? []).map(toSessionEntry), [archivedQuery.data])
+  const archivedSessions = useMemo(
+    () => dropTombstonedSessions(archivedQuery.data?.sessions ?? [], removedSessionIds).map(toSessionEntry),
+    [archivedQuery.data, removedSessionIds]
+  )
 
   // Search/sub-page are local to a mount, and this component remounts per open
   // (keyed by open count), so each open starts clean without a reset effect.

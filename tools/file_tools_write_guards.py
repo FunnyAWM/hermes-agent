@@ -12,7 +12,10 @@ whole-file overwrite of content this task never saw or that changed since.
 
 import fnmatch
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
+from typing import Iterator
 
 from agent.file_safety import get_nt_namespace_error
 from tools import file_state
@@ -142,6 +145,60 @@ def _resolved_or_raw(filepath: str, task_id: str) -> str:
         return str(_resolve_path_for_task(filepath, task_id))
     except (OSError, ValueError):
         return filepath
+
+
+#: Set only by the notes organizer fork: writes may then touch ``notes/<category>/*.md`` and
+#: nothing else (never ``memories/``, ``SOUL.md`` or ``notes/docs/``), so an auxiliary model can
+#: maintain notes without any path to the memory files.
+_NOTES_WRITE_SCOPE: ContextVar[bool] = ContextVar("hermes_notes_write_scope", default=False)
+
+
+@contextmanager
+def bind_notes_write_scope() -> Iterator[None]:
+    token = _NOTES_WRITE_SCOPE.set(True)
+    try:
+        yield
+    finally:
+        _NOTES_WRITE_SCOPE.reset(token)
+
+
+def _check_notes_write_scope(filepath: str, task_id: str = "default") -> str | None:
+    """Inside the organizer fork, only writable-category note files are addressable."""
+    if not _NOTES_WRITE_SCOPE.get():
+        return None
+    home = _get_real_hermes_home()
+    if not home:
+        return f"Refusing to write {filepath}: the profile home is unresolved in note-organizer mode."
+    notes = os.path.normcase(os.path.realpath(os.path.join(home, "notes")))
+    docs = os.path.join(notes, "docs") + os.sep
+    for candidate in (_resolved_or_raw(filepath, task_id), os.path.normpath(_expand_tilde(filepath))):
+        try:
+            real = os.path.normcase(os.path.realpath(candidate))
+        except (OSError, ValueError):
+            continue
+        if real.startswith(notes + os.sep) and not real.startswith(docs) and real.lower().endswith(".md"):
+            return None
+    return (f"Refusing to write {filepath}: the note organizer may only change Markdown notes "
+            "under notes/<category>/ (not notes/docs, memories/ or SOUL.md).")
+
+
+def _check_notes_docs_readonly(filepath: str, task_id: str = "default") -> str | None:
+    """Imported source text under ``<home>/notes/docs`` is read-only for the model."""
+    home = _get_real_hermes_home()
+    if not home:
+        return None
+    docs = os.path.normcase(os.path.realpath(os.path.join(home, "notes", "docs")))
+    for candidate in (_resolved_or_raw(filepath, task_id), os.path.normpath(_expand_tilde(filepath))):
+        try:
+            real = os.path.normcase(os.path.realpath(candidate))
+        except (OSError, ValueError):
+            continue
+        if real == docs or real.startswith(docs + os.sep):
+            return (
+                f"Refusing to write to {filepath}: notes/docs holds imported source text and is "
+                "read-only. Write new notes under notes/<category>/ instead."
+            )
+    return None
 
 
 def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None:

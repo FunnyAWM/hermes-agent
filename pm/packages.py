@@ -735,29 +735,19 @@ class Npm(BinaryPackage):
                 )
                 wrapper.chmod(0o755)
             return
-        from pm.install import _installed_location, _lockfile
+        from pm.install import _resolved_package, _lockfile
         from pm.registry import get_package
 
         node = get_package("node")
-        location = _installed_location(node, _lockfile(), target)
-        if location is None:
+        selected = _resolved_package(node, _lockfile(), target)
+        if selected is None:
             raise InstallError(self.name, "npm extends node, which is not installed")
-        facts, store = location
-        node_fact = facts.get("node")
-        if node_fact is None:
-            raise InstallError(self.name, "npm extends node, which is not installed")
-        node_bin = node.binary(store.entry(node_fact["entry"]), target)
+        node_bin = selected.binary
         if node_bin is None or not node_bin.is_file():
             raise InstallError(self.name, "node's entry is missing its binary")
-        win = target.startswith("win32")
-        bundled_cli = (
-            node_bin.parent / "node_modules" / "npm" / "bin" / "npm-cli.js"
-            if win
-            else node_bin.parent.parent / "lib" / "node_modules" / "npm" / "bin" / "npm-cli.js"
-        )
-        if not bundled_cli.is_file():
-            raise InstallError(self.name, "node's entry is missing its bundled npm-cli.js")
+        from pm.store import extract
 
+        # 系统 Node 可能未附带 npm；用已校验 tarball 自身的 CLI 引导安装。
         staged.mkdir(parents=True, exist_ok=True)
         # npm caches the tarball it installs. The archive's directory is the
         # store's download entry, which must hold only the archive: a cache
@@ -765,6 +755,11 @@ class Npm(BinaryPackage):
         # while Defender still holds the fresh copy (WinError 145). Cleanup
         # of this throwaway cache must never fail the install.
         with tempfile.TemporaryDirectory(prefix="hermes-npm-cache-", ignore_cleanup_errors=True) as cache:
+            bootstrap = Path(cache) / "bootstrap"
+            extract(archive, bootstrap)
+            bundled_cli = bootstrap / "package" / "bin" / "npm-cli.js"
+            if not bundled_cli.is_file():
+                raise InstallError(self.name, "npm archive is missing npm-cli.js")
             proc = subprocess.run(
                 [
                     native(node_bin), native(bundled_cli), "install", "--global",
@@ -1027,15 +1022,14 @@ class Ripgrep(BinaryPackage):
         super().stage(store, staged, version, target)
         if target != "win32-arm64":
             return
-        from pm.install import _installed_location, _lockfile
+        from pm.install import _resolved_package, _lockfile
         from pm.registry import get_package
 
         python = get_package("python")
-        location = _installed_location(python, _lockfile(), target)
-        fact = location[0].get("python") if location is not None else None
-        if fact is None:
+        selected = _resolved_package(python, _lockfile(), target)
+        if selected is None or selected.binary is None:
             raise InstallError(self.name, "ARM64 rg.exe needs vcruntime140.dll from python, which is not installed")
-        runtime = location[1].entry(fact["entry"]) / "vcruntime140.dll"
+        runtime = selected.binary.parent / "vcruntime140.dll"
         if not runtime.is_file():
             raise InstallError(self.name, f"python's entry has no {runtime.name}")
         # App-local copy: the loader searches the exe's own folder first, and

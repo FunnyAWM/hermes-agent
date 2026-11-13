@@ -35,7 +35,7 @@ export interface RosterGroupRow {
 /** Gateway Group Chats as roster rows. They live on the active source, so a
  *  gateway filter naming another source hides them. */
 function gatewayGroupRows(
-  { gatewayRooms: rooms, gatewayRoomLive, query, gatewayFilter, rowKindFilter, activityFilter }: RosterRowsInput
+  { gatewayRooms: rooms = [], gatewayRoomLive = {}, query, gatewayFilter, rowKindFilter, activityFilter }: RosterRowsInput
 ): RosterGroupRow[] {
   if (rowKindFilter === 'bots' || (gatewayFilter !== 'all' && rooms[0]?.binding.connectionId !== gatewayFilter)) {
     return []
@@ -70,12 +70,15 @@ interface RosterRowsInput {
   activityFilter: RosterActivityFilter
   rowKindFilter: RosterKindFilter
   groupRooms: ReturnType<typeof $groupChats.get>
-  gatewayRooms: GatewayGroupRoom[]
-  gatewayRoomLive: Record<string, CanonicalRoomLive>
+  /** Fork rule: the single-bot pane shows no groups, so room feeds are optional. */
+  gatewayRooms?: GatewayGroupRoom[]
+  gatewayRoomLive?: Record<string, CanonicalRoomLive>
   activeRosterKeys: Set<string>
   gatewayOptions: ReturnType<typeof rosterGatewayOptions>
   activityOf: (bot: RosterRow) => number
   isPinned: (bot: RosterRow) => boolean
+  /** Fork rule: the pane drives one assistant, so no groups and no hiding. */
+  singleBot?: boolean
 }
 
 export function deriveRosterRows(input: RosterRowsInput) {
@@ -87,18 +90,20 @@ export function deriveRosterRows(input: RosterRowsInput) {
   activityFilter,
   rowKindFilter,
   groupRooms,
-  gatewayRooms,
+  gatewayRooms = [],
+  gatewayRoomLive = {},
   activeRosterKeys,
   gatewayOptions,
   activityOf,
-  isPinned
+  isPinned,
+  singleBot = false
   } = input
 
   const activeSourceRoster = roster.filter(bot => !bot.remoteSource)
   // Hidden rows remain fully alive and recoverable at the bottom. Every
   // non-display consumer continues to receive the complete roster.
-  const hiddenBots = roster.filter(bot => isBotHidden(bot, allMeta))
-  const visibleRoster = roster.filter(bot => !isBotHidden(bot, allMeta))
+  const hiddenBots = singleBot ? [] : roster.filter(bot => isBotHidden(bot, allMeta))
+  const visibleRoster = singleBot ? roster : roster.filter(bot => !isBotHidden(bot, allMeta))
   const gatewayRoster = filterBotsByGateway(visibleRoster, gatewayFilter)
 
   const filteredRoster = filterBots(gatewayRoster, allMeta, query).filter((bot: RosterRow) =>
@@ -122,7 +127,7 @@ export function deriveRosterRows(input: RosterRowsInput) {
       )
   )
 
-  const groupNames = groupChatNames(allMeta, groupRooms)
+  const groupNames = singleBot ? [] : groupChatNames(allMeta, groupRooms)
 
   const groupRows = groupNames
     .map(name => ({

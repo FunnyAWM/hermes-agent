@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- pure-data config table: comments are the user-facing docs of config.yaml; the growth is the terminal.sandbox block and its per-key comments
 """Default configuration data for Hermes Agent: DEFAULT_CONFIG and OPTIONAL_ENV_VARS.
 
 Pure-data leaf module — must not import from hermes_cli.config. Comments are the user-facing
@@ -374,6 +375,36 @@ DEFAULT_CONFIG = {
         # SSH: carry exported env vars between commands (cwd always carries). false = every command
         # starts from the login env, profile functions included. Local: TERMINAL_LOCAL_PERSISTENT.
         "persistent_shell": True,
+        # sandctl boundary around local command execution (tools/environments/local_command_sandbox.py).
+        # On by default once a launcher is installed (the app ships one; PATH also counts); Full
+        # Access sessions (approvals.mode: off / /yolo) are never confined.
+        "sandbox": {
+            "enabled": True,         # true = force every non-Full-Access local command through the launcher
+            "binary": "sandctl",     # Launcher path or name on PATH, resolved per spawn
+            "backend": "l1",         # Passed to `sandctl run --backend`; names the execution boundary
+            "allow_degraded": True,  # true = accept a wider-than-requested boundary instead of refusing to run
+            # Active profile name from "profiles" below. Exec is the default so builds and
+            # package managers can write their caches; network stays denied.
+            "profile": "workspace-exec",
+            # May the model ask, for ONE command, to run at a wider level? It must name the
+            # level on that call and the user is asked to approve it; the configured profile
+            # applies again to the next command.
+            "escalation": True,
+            # Named boundaries (Settings → Workspace → Shell edits these):
+            #   read-only        reads the workspace and scratch; no file writes anywhere
+            #   workspace-write  + writes the working directory and the scratch directory
+            #   workspace-exec   + writes build/package-manager caches (still no network)
+            #   full-access      no sandbox at all (the Desktop asks for consent before selecting it)
+            #   custom           a preset plus extra "read" / "write" directories (~ allowed)
+            # Network is denied by every preset except full-access, which is no sandbox.
+            # An unknown preset falls back to read-only.
+            "profiles": {
+                "read-only": {"preset": "read-only"},
+                "workspace-write": {"preset": "workspace-write"},
+                "workspace-exec": {"preset": "workspace-exec"},
+                "full-access": {"preset": "full-access"},
+            },
+        },
     },
 
     "web": {
@@ -749,6 +780,7 @@ DEFAULT_CONFIG = {
         # 60s default. Independent of "timeout" (the overall request budget). See #108104.
         "compression": _aux(120, no_progress_timeout=None),
         "approval": _aux(30),   # classifier — a fast/cheap model is recommended
+        "auto_review": _aux(30),   # per-tool-call risk verdict (approvals.mode: auto)
         # /review reviewer: a full subagent on the async delegation rail, credentials resolved like
         # delegation.provider pins. "auto" + "" = main agent's model. api_mode forces transport:
         # chat_completions | anthropic_messages | codex_responses.
@@ -1299,8 +1331,8 @@ DEFAULT_CONFIG = {
         # true = foreground writes prompt inline; background writes are staged (/memory
         # pending|approve <id>|reject <id>). To disable memory: memory_enabled.
         "write_approval": False,
-        "memory_char_limit": 2200,   # ~800 tokens at 2.75 chars/token
-        "user_char_limit": 1375,     # ~500 tokens at 2.75 chars/token
+        "memory_char_limit": 3000,   # model writes only; 0 disables the cap
+        "user_char_limit": 0,        # unlimited (shared contract with Android)
         # Periodic built-in memory review; 0 when an external provider auto-extracts.
         "nudge_interval": 10,
         # One external provider: bundled (retaindb, byterover) or catalog-installed (honcho,
@@ -1634,7 +1666,8 @@ DEFAULT_CONFIG = {
         "allowed_rooms": "",  # if set, ONLY respond in these room IDs (whitelist)
     },
     # Approvals for dangerous commands.
-    # mode: manual (always prompt) | smart (aux LLM auto-approves low-risk) | off (= --yolo)
+    # mode: manual (always prompt) | smart (aux LLM auto-approves low-risk)
+    #       | auto (aux LLM reviews every tool call; deny asks, high risk blocks) | off (= --yolo)
     # cron_mode / single_query_mode / unattended_mode: deny | approve — what to do when a
     #   cron job, a -q session (HERMES_INTERACTIVE=1 but nobody to answer), or an unattended
     #   platform (webhook, msgraph_webhook, api_server; no /approve channel) hits one.
@@ -1662,6 +1695,16 @@ DEFAULT_CONFIG = {
         # Extra rules appended to the smart-approval guardian's SYSTEM prompt, e.g. "Always ESCALATE
         # commands touching /etc".
         "smart_policy": "",
+        # approvals.mode: auto — the per-tool-call reviewer (tools/auto_review.py). policy: extra
+        # TRUSTED rules appended to that reviewer's system prompt. history_messages: recent user
+        # turns + tool results shown to the reviewer (0 = none). max_arg_chars: pending-call cap.
+        # skip_tools: extra tool names never reviewed (local read-only tools are always skipped).
+        "auto_review": {
+            "policy": "",
+            "history_messages": 6,
+            "max_arg_chars": 4000,
+            "skip_tools": [],
+        },
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
@@ -1699,12 +1742,12 @@ DEFAULT_CONFIG = {
         # skipped with the reason "load timed out" and the rest keep loading; the stuck worker thread is
         # abandoned. 0 = no deadline (load inline). Max 600.
         "load_timeout_seconds": 10,
-        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables). Applying stays
-        # explicit: `hermes plugins update <name>`, or auto_apply below (catalog and tracked git
-        # plugins, scan-gated by that same pipeline).
-        "auto_update_check_hours": 24,
-        # Opt-in unattended apply (`hermes plugins auto-update on`, Desktop's Plugins tab): catalog +
-        # tracked git plugins, same scan/consent pipeline as the manual update (never a widened pin).
+        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables).
+        # Fork policy (PRD §8.1 隐 02): 0 unless the user opts in; applying stays
+        # explicit (`hermes plugins update <name>`), or via auto_apply below.
+        "auto_update_check_hours": 0,
+        # Opt-in unattended apply; every apply runs the manual update's scan / consent pipeline.
+        "auto_apply": False,
         "auto_apply": False,
         # Where third-party Python plugins run. in_process: imported into Hermes (default).
         # host: one plugin-host process per profile runs them and they reach Hermes only through
@@ -2325,8 +2368,8 @@ DEFAULT_CONFIG = {
     },
 
     "updates": {
-        # Passive version/banner checks only; explicit `hermes update --check` remains enabled.
-        "check": True,
+        # Fork privacy (PRD §8.1): passive checks opt in; explicit `hermes update --check` stays enabled.
+        "check": False,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
         # config.yaml, .env, auth.json, profile DBs) into <HERMES_HOME>/state-snapshots/, skipping
         # files >1 GiB; restore via ``/snapshot``. full = quick PLUS a ``hermes backup`` zip in

@@ -921,6 +921,74 @@ export interface Translations extends NoticeTranslations {
     }
     fieldLabels: Record<string, string>
     fieldDescriptions: Record<string, string>
+    sandboxProfiles: {
+      title: string
+      activeTitle: string
+      activeDesc: string
+      profileName: string
+      addProfile: string
+      deleteProfile: string
+      readDirectories: string
+      readDirectoriesDesc: string
+      writeDirectories: string
+      writeDirectoriesDesc: string
+      pathsPlaceholder: string
+      presets: Record<
+        'readOnly' | 'workspaceWrite' | 'workspaceExec' | 'fullAccess' | 'custom',
+        { title: string; description: string }
+      >
+      fullAccess: { title: string; description: string; confirmLabel: string; cancelLabel: string }
+      widen: { title: string; description: string; confirmLabel: string; cancelLabel: string }
+      policy: {
+        title: string
+        subtitle: string
+        isolation: string
+        inheritGlobal: string
+        l1: string
+        l2: string
+        l3: string
+        syscall: string
+        inherit: string
+        none: string
+        platformDefault: string
+        restricted: string
+        strict: string
+        networkMode: string
+        networkModeDefault: string
+        networkModeAllowlist: string
+        networkModeDenylist: string
+        networkDefault: string
+        networkDefaultDefault: string
+        deny: string
+        allow: string
+        allowedHosts: string
+        allowedHostsDesc: string
+        allowedHostsPlaceholder: string
+        allowedCidrs: string
+        allowedCidrsDesc: string
+        allowedCidrsPlaceholder: string
+        blockedTargets: string
+        blockedTargetsDesc: string
+        blockedTargetsPlaceholder: string
+        fsMode: string
+        fsModeDefault: string
+        allowlist: string
+        denylist: string
+        cpu: string
+        memory: string
+        pids: string
+        wallTime: string
+        noNewPrivs: string
+        noNewPrivsDesc: string
+        injectSecrets: string
+        injectSecretsDesc: string
+        proxySecrets: string
+        proxySecretsDesc: string
+        allowedSecrets: string
+        allowedSecretsDesc: string
+        allowedSecretsPlaceholder: string
+      }
+    }
     uninstallSection: UninstallSectionTranslations
     memoryLayers: MemoryLayersTranslations
     customEndpoints: {
@@ -1855,9 +1923,84 @@ export interface Translations extends NoticeTranslations {
   }
 
   skillDeepLink: SkillDeepLinkCopy
+  linkSync: {
+    loading: string
+    notPairedTitle: string
+    notPairedDesc: string
+    pairWithMaster: string
+    createChain: string
+    pairedTitle: string
+    roleMaster: string
+    roleSecondary: string
+    servingOn: string
+    syncNow: string
+    syncedNow: (records: number, applied: number) => string
+    masterEndpoint: string
+    listenPort: string
+    fingerprint: string
+    tracked: string
+    appliedArchived: string
+    lastSync: string
+    never: string
+    serveStart: string
+    serveStop: string
+    serveStarted: string
+    serveStopped: string
+    disconnect: string
+    leftChain: string
+    resetChain: string
+    chainReset: string
+    pairOk: string
+    chainCreated: string
+    wordsWarning: string
+    wordsCopied: string
+    copyWords: string
+    done: string
+    pairDiscoverHint: string
+    wordsLabel: string
+    wordsPlaceholder: string
+    wordCount: (count: number) => string
+    cancel: string
+    pair: string
+    settingsTitle: string
+    autoSyncLabel: string
+    autoSyncOff: string
+    autoSyncEvery: (minutes: number) => string
+    listenPortLabel: string
+    portHint: string
+    saveSettings: string
+    settingsSaved: string
+  }
+  memoryPanel: {
+    title: string
+    subtitle: string
+    refresh: string
+    loading: string
+    loadFailed: string
+    retry: string
+    documents: string
+    notes: string
+    emptyNote: string
+    missing: string
+    missingHint: string
+    tooLarge: string
+    noNotes: string
+    noteMissing: string
+    save: string
+    saving: string
+    saved: string
+    revert: string
+    unsaved: string
+    saveFailed: string
+    readOnly: string
+    bytes: (count: number) => string
+    updated: (ms: number) => string
+    selectPrompt: string
+  }
   skills: {
     tabSkills: string
     tabToolsets: string
+    tabLink: string
     configuringProfile: string
     all: string
     searchSkills: string
@@ -2941,6 +3084,16 @@ export interface Translations extends NoticeTranslations {
     speaking: string
     transcribing: string
     thinking: string
+    sandboxProfile: string
+    autoReview: string
+    autoReviewDescription: string
+    autoReviewSaveFailed: string
+    sandboxProfileHint: string
+    sandboxProfileSaveFailed: string
+    sandboxProfileFullAccessTitle: string
+    sandboxProfileFullAccessDesc: string
+    sandboxProfileFullAccessConfirm: string
+    sandboxProfileCancel: string
     muted: string
     listening: string
     muteMic: string
@@ -3590,6 +3743,8 @@ export interface Translations extends NoticeTranslations {
       manualDescription: string
       smart: string
       smartDescription: string
+      auto: string
+      autoDescription: string
       off: string
       offDescription: string
     }
@@ -4065,6 +4220,7 @@ export interface Translations extends NoticeTranslations {
       run: string
       command: string
       commandDetails: string
+      justification: string
       moreOptions: string
       allowSession: string
       alwaysAllowMenu: string

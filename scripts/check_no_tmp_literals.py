@@ -171,11 +171,11 @@ def _git_ignored(root: Path) -> set[Path]:
     try:
         out = subprocess.run(
             ["git", "-C", str(root), "ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
-            capture_output=True, text=True, check=True, stdin=subprocess.DEVNULL,
+            capture_output=True, check=True, stdin=subprocess.DEVNULL,
         ).stdout
     except (OSError, subprocess.CalledProcessError):
         return set()
-    return {root / rel for rel in out.split("\0") if rel}
+    return {root / os.fsdecode(rel) for rel in out.split(b"\0") if rel}
 
 
 def iter_files(root: Path | None = None):

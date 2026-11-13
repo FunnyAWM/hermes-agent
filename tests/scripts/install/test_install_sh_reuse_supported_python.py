@@ -67,7 +67,7 @@ def _environment(tmp_path: Path) -> tuple[Path, Path, dict[str, str]]:
         {"packages": {"python": {"version": version}}}, indent=2), encoding="utf-8")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    for tool in ("awk", "cut", "uname"):
+    for tool in ("awk", "cut", "uname", "dirname"):
         real = shutil.which(tool)
         assert real, f"the shell bootstrap requires {tool}"
         (bin_dir / tool).symlink_to(real)

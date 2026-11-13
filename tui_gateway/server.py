@@ -659,7 +659,9 @@ def _approval_request_payload(data: dict | None) -> dict:
                 choices.append("always")
         payload["choices"] = choices + ["deny"]
     from gateway.run import _redact_approval_command  # description too: consent prompts carry MCP/vault text
-    payload.update({k: _redact_approval_command(payload[k]) for k in ("command", "description") if k in payload})
+    payload.update(
+        {k: _redact_approval_command(payload[k]) for k in ("command", "description", "justification") if k in payload}
+    )
     return payload
 
 
@@ -1251,7 +1253,7 @@ def _write_config_keys(updates: dict) -> None:
 
 
 _STATUSBAR_MODES = frozenset({"off", "top", "bottom"})
-_APPROVAL_MODES = frozenset({"manual", "smart", "off"})
+_APPROVAL_MODES = frozenset({"manual", "smart", "auto", "off"})
 
 # Appearance switches the renderer owns but the AGENT must see (each gates a tool's `check_fn`). `config.set`
 # answers 4002 for unlisted keys — a mirrored switch missing here writes nothing and its tool stays dark.
@@ -2019,7 +2021,8 @@ from . import (
     methods_connectors as _methods_connectors, methods_connectors_account as _methods_connectors_account,
     methods_display as _methods_display, methods_display_watch as _methods_display_watch,
     methods_onboarding as _methods_onboarding, methods_i18n as _methods_i18n, methods_machine as _methods_machine,
-    methods_shared_metrics as _methods_shared_metrics, methods_plugin_catalog as _methods_plugin_catalog)
+    methods_shared_metrics as _methods_shared_metrics, methods_plugin_catalog as _methods_plugin_catalog,
+    methods_sync as _methods_sync)
 
 for _m in (
     _session_registry, _agent_factory, _slash_worker_client,
@@ -2032,6 +2035,6 @@ for _m in (
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
     _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
     _methods_connectors_account, _methods_display, _methods_display_watch, _methods_onboarding,
-    _methods_i18n, _methods_machine, _methods_shared_metrics, _methods_plugin_catalog):
+    _methods_i18n, _methods_machine, _methods_shared_metrics, _methods_plugin_catalog, _methods_sync):
     _m.register(sys.modules[__name__])
 del _m

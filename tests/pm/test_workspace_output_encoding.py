@@ -101,7 +101,10 @@ def test_node_sidecar_retains_output_and_exit_status(
         return context
 
     def run_npm(cmd, **kwargs):
-        assert cmd == [str(npm), install_cmd, "--no-audit", "--no-fund"]
+        # npm resolves as npm.CMD from PATHEXT; compare case-insensitively
+        # instead of pinning the extension's case.
+        assert os.path.normcase(cmd[0]) == os.path.normcase(str(npm))
+        assert cmd[1:] == [install_cmd, "--no-audit", "--no-fund"]
         assert kwargs["env"] == context.env
         assert kwargs["cwd"] == str(tmp_path)
         # Keep the real Runner and decoding path; only replace npm's process

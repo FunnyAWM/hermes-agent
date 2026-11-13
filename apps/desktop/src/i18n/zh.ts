@@ -11,6 +11,7 @@ import { zhErrorCodes } from './zh_error_codes'
 import { zhErrorLayers } from './zh_error_layers'
 import { zhFirstRun } from './zh_first_run'
 import { zhGatewayHost } from './zh_gateway_host'
+import { zhLinkSync } from './zh_link_sync'
 import { zhLocalModels } from './zh_local_models'
 import { zhMemoryLayers } from './zh_memory_layers'
 import { zhModelMenu } from './zh_model_menu'
@@ -34,6 +35,33 @@ export const zhOverrides = {
     missing: "此群聊已不存在。"
   },
   catalog: zhCatalog,
+  linkSync: zhLinkSync,
+  memoryPanel: {
+    title: '记忆',
+    subtitle: 'Bot 每一轮都会加载的内容,以及它能读到的全部笔记。可以直接在这里编辑。',
+    refresh: '刷新',
+    loading: '正在读取记忆文件…',
+    loadFailed: '无法读取记忆文件。',
+    retry: '重试',
+    documents: '上下文文件',
+    notes: '笔记',
+    emptyNote: '这个文件是空的。',
+    missing: '还没有创建。',
+    missingHint: '还没有创建,保存后会新建。',
+    tooLarge: '文件过大,无法在此预览。',
+    noNotes: '还没有笔记。',
+    noteMissing: '这条笔记已不存在。',
+    save: '保存',
+    saving: '正在保存…',
+    saved: '已保存',
+    revert: '撤销修改',
+    unsaved: '未保存',
+    saveFailed: '无法保存该文件。',
+    readOnly: '导入文档,只读',
+    bytes: count => `${count} 字节`,
+    updated: ms => new Date(ms).toLocaleString(),
+    selectPrompt: '选择左侧的文件或笔记,即可查看并编辑。'
+  },
   externalOpenFailed: {
     title: '无法打开此链接',
     message: '没有注册用于打开此地址的浏览器。请复制链接并手动打开。',
@@ -357,6 +385,7 @@ export const zhOverrides = {
       'nav.commandCenter': '打开命令中心',
       'nav.settings': '打开设置',
       'nav.profiles': '打开配置',
+      'nav.memory': '打开记忆',
       'nav.capabilities': '打开技能',
       'nav.messaging': '打开消息',
       'nav.artifacts': '打开制品',
@@ -869,6 +898,105 @@ export const zhOverrides = {
         turnOffFailed: '无法关闭宠物。'
       }
     },
+    sandboxProfiles: {
+      title: '命令沙箱配置',
+      activeTitle: '当前配置',
+      activeDesc:
+        '除完全访问外，每条命令都在当前配置内运行。配置按命令读取，切换后下一条命令即生效，无需重开会话。',
+      profileName: '配置名称',
+      addProfile: '添加配置',
+      deleteProfile: '删除配置',
+      readDirectories: '可读目录',
+      readDirectoriesDesc: '该配置额外可读的路径，每行一个。',
+      writeDirectories: '可写目录',
+      writeDirectoriesDesc: '该配置额外可写的路径，每行一个。',
+      pathsPlaceholder: '每行一个路径',
+      presets: {
+        readOnly: {
+          title: '只读',
+          description: '可读工作区。所有写入保持关闭，网络同样关闭。'
+        },
+        workspaceWrite: {
+          title: '工作区可写',
+          description: '可读写工作区。网络保持关闭。'
+        },
+        workspaceExec: {
+          title: '工作区可执行',
+          description: '可读写并运行工作区命令。网络保持关闭。'
+        },
+        fullAccess: {
+          title: '完全访问',
+          description: '在 sandctl 之外运行命令，不受任何限制。'
+        },
+        custom: {
+          title: '自定义',
+          description: '只能读写下列路径，并叠加下方的 sandctl 覆盖项。'
+        }
+      },
+      fullAccess: {
+        title: '启用完全访问？',
+        description:
+          '完全访问会在本机直接运行命令，不受 sandctl 限制。只有在你信任智能体执行的所有内容时才继续。',
+        confirmLabel: '启用完全访问',
+        cancelLabel: '保留沙箱'
+      },
+      widen: {
+        title: '放宽沙箱限制？',
+        description:
+          '此改动会让命令权限超出预设范围：网络、Syscall 过滤或密钥注入会变得更宽松。',
+        confirmLabel: '放宽限制',
+        cancelLabel: '取消'
+      },
+      policy: {
+        title: 'sandctl 策略覆盖',
+        subtitle: '叠加在预设之上。留空的项保持预设值。',
+        isolation: '隔离等级',
+        inheritGlobal: '跟随全局',
+        l1: 'L1 — 进程边界',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — Kata 虚拟机',
+        syscall: 'Syscall 过滤',
+        inherit: '跟随预设',
+        none: '不过滤',
+        platformDefault: '平台默认',
+        restricted: '受限',
+        strict: '严格',
+        networkMode: '网络模式',
+        networkModeDefault: '跟随预设',
+        networkModeAllowlist: '白名单',
+        networkModeDenylist: '黑名单',
+        networkDefault: '网络默认动作',
+        networkDefaultDefault: '跟随预设',
+        deny: '拒绝',
+        allow: '允许',
+        allowedHosts: '允许的主机',
+        allowedHostsDesc: '该配置可访问的主机名，每行一个。只会叠加到预设之上。',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: '允许的 CIDR',
+        allowedCidrsDesc: '该配置可访问的 CIDR 段，每行一个。只会叠加到预设之上。',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: '拒绝的目标',
+        blockedTargetsDesc: '要拒绝的主机名或 CIDR，每行一个。',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: '文件系统模式',
+        fsModeDefault: '跟随预设',
+        allowlist: '白名单',
+        denylist: '黑名单',
+        cpu: 'CPU 上限',
+        memory: '内存上限',
+        pids: '进程数上限',
+        wallTime: '实际耗时上限',
+        noNewPrivs: '禁止提权',
+        noNewPrivsDesc: '设置 no_new_privs，令命令无法借 setuid 二进制取得新权限。',
+        injectSecrets: '注入密钥',
+        injectSecretsDesc: '把密钥值直接注入沙箱环境。比预设更宽松。',
+        proxySecrets: '代理密钥',
+        proxySecretsDesc: '密钥不进入沙箱，改由出口代理注入。',
+        allowedSecrets: '允许的密钥',
+        allowedSecretsDesc: '该配置可使用的密钥名称，每行一个。',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: defineFieldCopy({
       model: '默认模型',
       modelContextLength:
@@ -898,6 +1026,11 @@ export const zhOverrides = {
         timeout: '命令超时',
         persistentShell: '持久化 Shell',
         envPassthrough: '环境变量透传',
+        sandbox: {
+          enabled: '命令沙箱',
+          escalation: '单次命令提权',
+          backend: '沙箱隔离等级'
+        },
         dockerImage: 'Docker 镜像',
         singularityImage: 'Singularity 镜像',
         modalImage: 'Modal 镜像',
@@ -915,7 +1048,13 @@ export const zhOverrides = {
       approvals: {
         mode: '审批模式',
         timeout: '审批超时',
-        mcpReloadConfirm: '确认 MCP 重载'
+        mcpReloadConfirm: '确认 MCP 重载',
+        autoReview: {
+          policy: '自动审查策略',
+          historyMessages: '审查历史窗口',
+          maxArgChars: '审查参数上限',
+          skipTools: '跳过审查的工具'
+        }
       },
       commandAllowlist: '命令白名单',
       security: {
@@ -1070,6 +1209,14 @@ export const zhOverrides = {
         cwd: '工具与终端操作的默认项目目录。',
         persistentShell: '当后端支持时，在命令之间保留 Shell 状态。',
         envPassthrough: '传入工具执行的环境变量。',
+        sandbox: {
+          enabled:
+            '让每条智能体命令都在 sandctl 内运行；完全访问会绕过它。Windows 沙箱会话使用 PowerShell。下方启用的配置决定工作区允许做什么，所有配置都禁止网络。',
+          escalation:
+            '智能体可以针对单条命令请求更高的沙箱等级（最高到完全访问）。你逐次审批，之后配置的档位继续对下一条命令生效。',
+          backend:
+            '所有命令的隔离等级：l1（进程边界）、l2（gVisor）或 l3（Kata 虚拟机），也可以填具体后端名。沙箱配置可单独覆盖。'
+        },
         dockerImage: '当执行后端为 Docker 时使用的容器镜像。',
         singularityImage: '当执行后端为 Singularity 时使用的镜像。',
         modalImage: '当执行后端为 Modal 时使用的镜像。',
@@ -1081,7 +1228,13 @@ export const zhOverrides = {
       fileReadMaxChars: 'Hermes 单次文件读取可读取的最大字符数。',
       approvals: {
         mode: 'Hermes 如何处理需要显式审批的命令。',
-        timeout: '审批提示在超时前等待的时长。'
+        timeout: '审批提示在超时前等待的时长。',
+        autoReview: {
+          policy: '审查器的附加规则。这段文字来自你，视为可信；工具调用本身始终不可信。',
+          historyMessages: '审查器可见的最近对话消息数（0-50）。',
+          maxArgChars: '审查器可见的每条工具参数长度（500-20000 字符）。',
+          skipTools: '永不审查的工具名。本地只读工具始终跳过。'
+        }
       },
       security: {
         redactSecrets: '尽可能从模型可见内容中隐藏检测到的密钥。'
@@ -2024,6 +2177,7 @@ export const zhOverrides = {
   skills: {
     tabSkills: '技能',
     tabToolsets: '工具集',
+    tabLink: '同步',
     configuringProfile: '正在配置：',
     all: '全部',
     searchSkills: '搜索技能…',
@@ -3119,6 +3273,7 @@ export const zhOverrides = {
     },
     nav: {
       'new-session': '新建会话',
+      memory: '记忆',
       capabilities: '技能与工具',
       messaging: '消息平台',
       artifacts: '产物',
@@ -3251,6 +3406,17 @@ export const zhOverrides = {
     transcribing: '转写中',
     thinking: '思考中',
     muted: '已静音',
+    sandboxProfile: '沙箱配置',
+    autoReview: 'Auto Review',
+    autoReviewDescription: '每次工具调用执行前先由辅助模型审查；被拒绝的调用会询问你。',
+    autoReviewSaveFailed: '无法修改 Auto Review。',
+    sandboxProfileHint: '每条命令都在所选配置内运行；切换从下一条命令开始生效。',
+    sandboxProfileSaveFailed: '无法修改沙箱配置。',
+    sandboxProfileFullAccessTitle: '启用完全访问？',
+    sandboxProfileFullAccessDesc:
+      '完全访问会为该配置关闭命令沙箱：命令以你的账户和网络访问运行，文件工具可以写入机器上的任意位置。仅在信任智能体将要执行的工作时启用。',
+    sandboxProfileFullAccessConfirm: '启用完全访问',
+    sandboxProfileCancel: '保留沙箱',
     listening: '聆听中',
     muteMic: '麦克风静音',
     unmuteMic: '取消麦克风静音',
@@ -3696,7 +3862,7 @@ export const zhOverrides = {
       noReturn: '后端未恢复在线。更新可能未完成——请检查后端主机。'
     },
     // Update-status overlay + version-details (mechanism-aware update UI).
-    appName: 'Hermes',
+    appName: 'KouriChat Next',
     version: value => `版本 ${value}`,
     versionUnavailable: '版本不可用',
     checkNow: '立即检查',
@@ -3976,6 +4142,8 @@ export const zhOverrides = {
       manualDescription: '执行需要审批的操作前询问',
       smart: '智能',
       smartDescription: '自动评估操作，并在需要时询问',
+      auto: '自动',
+      autoDescription: '逐次审查工具调用，被拒绝时询问',
       off: '关闭',
       offDescription: '不显示审批提示，直接运行'
     },
@@ -4450,6 +4618,7 @@ export const zhOverrides = {
       moreOptions: '更多审批选项',
       allowSession: '允许本会话',
       alwaysAllowMenu: '始终允许…',
+      justification: '理由',
       jumpToApproval: '需要审批',
       reject: '拒绝',
       alwaysTitle: '始终允许此命令？',

@@ -1,0 +1,5 @@
+name: device-pairing
+version: 1.0.0
+description: "Dashboard auth provider — one-time pairing code -> long-lived, individually revocable device token (PRD 远 04 / TODO T-09a). The operator prints a code with `hermes device-pair generate --label <device>`; the client redeems it via POST /auth/password-login {provider: device-pairing, username: <label>, password: <code>} and keeps the minted 256-bit bearer token, which authenticates the gate's REST bearer leg and the /api/ws?token= upgrade leg through the shared verify_session seam. Code semantics mirror gateway/pairing.py (8-char unambiguous alphabet, 1-hour expiry, per-label 10-min request throttle, global lockout after 5 failed redemptions, 0600 data files, codes and tokens never logged, only salted SHA-256 hashes at rest). Off by default: set dashboard.device_pairing.enabled: true in config.yaml to opt in."
+author: FunnyAWM
+kind: backend

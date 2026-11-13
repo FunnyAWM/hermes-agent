@@ -92,6 +92,15 @@ import {
 
 // ── bot row ──────────────────────────────────────────────────────────────────
 
+/** The one-line preview under a row: a bot-to-bot delivery drops its prefix. */
+function rowPreview(preview: string | undefined | null, fromBot: string | null): string {
+  if (fromBot) {
+    return (preview || '').replace(A2A_PREFIX_RE, '').trim() || '…'
+  }
+
+  return preview || ''
+}
+
 interface BotRowProps {
   bot: RosterRow
   onDelete: (bot: RosterRow) => void
@@ -100,9 +109,11 @@ interface BotRowProps {
   /** Opens the New section dialog; the bot is filed into it on create. */
   onNewSection: (bot: RosterRow) => void
   showHandle?: boolean
+  /** Fork rule: one assistant offers only open-chat and rename. */
+  singleBot?: boolean
 }
 
-export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle }: BotRowProps) {
+export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandle, singleBot = false }: BotRowProps) {
   const { t } = useI18n()
   const b = useBots()
   const focusedOwner = focusedRosterOwner(useValue($focusedBotOwner))
@@ -179,9 +190,7 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
   const { fromBot } = previewKind(previewSession?.preview, $lastRoster.get(), bot.connectionId)
 
   // DM previews read like DMs: strip the delivery prefix, keep the message.
-  const displayPreview = stripPreviewMarkdown(
-    fromBot ? (previewSession?.preview || '').replace(A2A_PREFIX_RE, '').trim() || '…' : previewSession?.preview || ''
-  )
+  const displayPreview = stripPreviewMarkdown(rowPreview(previewSession?.preview, fromBot))
 
   const handle = botHandle(bot.name, bot)
   const gatewayLabel = bot.connectionLabel || (bot.connectionId === 'local' ? b.bot.thisDevice : '')
@@ -317,6 +326,27 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
       </div>
     </RowButton>
   )
+
+  if (singleBot) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => void openRosterBot(bot)}>{b.bot.openBotChat}</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onSelect={() =>
+              void ensureBotMetadata(bot)
+                .then(() => onEdit(bot))
+                .catch(error => host.notifyError?.(error, b.bot.loadFailed))
+            }
+          >
+            {b.bot.editMenu}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }
 
   return (
     <ContextMenu>

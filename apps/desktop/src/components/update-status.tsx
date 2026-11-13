@@ -115,11 +115,12 @@ function ordinaryUpdateStatus({
   target,
   u
 }: UpdateStatusInput): UpdateStatusView {
+  const disabled = status?.reason === 'disabled'
   const behind = status?.behind ?? 0
   // behind is null when the exact count is unknowable (shallow clone): the
   // backend flags that case via updateAvailable instead of a number.
-  const updateAvailable = behind > 0 || Boolean(status?.updateAvailable)
-  const supported = status?.supported !== false
+  const updateAvailable = !disabled && (behind > 0 || Boolean(status?.updateAvailable))
+  const supported = disabled || status?.supported !== false
   const applying = apply.applying || apply.stage === 'restart'
 
   if (!supported) {
@@ -151,7 +152,7 @@ function ordinaryUpdateStatus({
     }
   }
 
-  if (status) {
+  if (status && !disabled) {
     return {
       applying,
       line: currentLine(status, target, u, latestRelease, held),

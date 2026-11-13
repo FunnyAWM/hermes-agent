@@ -233,7 +233,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
 // backend schema only declares a string type.
 export const ENUM_OPTIONS: Record<string, string[]> = {
   'agent.image_input_mode': ['auto', 'native', 'text'],
-  'approvals.mode': ['manual', 'smart', 'off'],
+  'approvals.mode': ['manual', 'smart', 'auto', 'off'],
   'code_execution.mode': ['project', 'strict'],
   'context.engine': ['compressor', 'default', 'custom'],
   // '' = inherit the agent's own effort; the rest is the shared scale.
@@ -445,6 +445,11 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     timeout: 'Command Timeout',
     persistentShell: 'Persistent Shell',
     envPassthrough: 'Environment Passthrough',
+    sandbox: {
+      enabled: 'Command Sandbox',
+      escalation: 'One-Command Escalation',
+      backend: 'Sandbox Isolation Level'
+    },
     dockerImage: 'Docker Image',
     singularityImage: 'Singularity Image',
     modalImage: 'Modal Image',
@@ -462,7 +467,13 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   approvals: {
     mode: 'Approval Mode',
     timeout: 'Approval Timeout',
-    mcpReloadConfirm: 'Confirm MCP Reloads'
+    mcpReloadConfirm: 'Confirm MCP Reloads',
+    autoReview: {
+      policy: 'Auto Review Policy',
+      historyMessages: 'Review History Window',
+      maxArgChars: 'Review Argument Limit',
+      skipTools: 'Tools Skipped By Review'
+    }
   },
   commandAllowlist: 'Command Allowlist',
   security: {
@@ -632,6 +643,14 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     persistentShell:
       'SSH backend: keep exported variables between commands. Off starts each command from the login environment; the working directory always carries over.',
     envPassthrough: 'Environment variables to pass into tool execution.',
+    sandbox: {
+      enabled:
+        'Run every agent command inside sandctl; Full Access bypasses it. Sandboxed Windows sessions use PowerShell. The active profile below decides what the workspace allows, and every profile denies the network.',
+      escalation:
+        'The agent may ask, for one command, to run at a wider sandbox level (up to Full Access). You approve each request, and the configured profile applies again to the next command.',
+      backend:
+        'Isolation level for every command: l1 (process boundary), l2 (gVisor) or l3 (Kata VM), or a concrete backend name. A sandbox profile can override it.'
+    },
     dockerImage: 'Container image used when the execution backend is Docker.',
     singularityImage: 'Image used when the execution backend is Singularity.',
     modalImage: 'Image used when the execution backend is Modal.',
@@ -643,7 +662,13 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   fileReadMaxChars: 'Maximum characters Hermes can read from one file request.',
   approvals: {
     mode: 'How Hermes handles commands that need explicit approval.',
-    timeout: 'How long approval prompts wait before timing out.'
+    timeout: 'How long approval prompts wait before timing out.',
+    autoReview: {
+      policy: 'Extra rules for the reviewer. They are trusted operator text, while the tool call itself is always untrusted.',
+      historyMessages: 'How many recent conversation messages the reviewer sees (0-50).',
+      maxArgChars: 'How much of each tool argument the reviewer is shown (500-20000 characters).',
+      skipTools: 'Tool names that are never reviewed. Local read-only tools are always skipped.'
+    }
   },
   security: {
     redactSecrets: 'Hide detected secrets from model-visible content when possible.'
@@ -747,6 +772,9 @@ export const SECTIONS: DesktopConfigSection[] = [
       'code_execution.mode',
       'terminal.persistent_shell',
       'terminal.env_passthrough',
+      'terminal.sandbox.enabled',
+      'terminal.sandbox.escalation',
+      'terminal.sandbox.backend',
       'file_read_max_chars'
     ]
   },
@@ -758,6 +786,10 @@ export const SECTIONS: DesktopConfigSection[] = [
       'approvals.mode',
       'approvals.timeout',
       'approvals.mcp_reload_confirm',
+      'approvals.auto_review.policy',
+      'approvals.auto_review.history_messages',
+      'approvals.auto_review.max_arg_chars',
+      'approvals.auto_review.skip_tools',
       'command_allowlist',
       'security.redact_secrets',
       'security.allow_private_urls',

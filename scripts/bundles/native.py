@@ -193,8 +193,13 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     with _phase(f"staging repo snapshot ({ref})"):
         snapshot(source, revision, repo_dir, exclude=INERT_SNAPSHOT_DIRS)
     # PM's provider code reads its adjacent lock. Never combine that tool graph
-    # with a revision selecting different pins.
-    if (repo_dir / "pm/lock.json").read_bytes() != paths.lockfile_path().read_bytes():
+    # with a revision selecting different pins. Compare with LF normalization:
+    # core.autocrlf writes CRLF into the working copy while the git snapshot
+    # carries LF, which would otherwise reject every clean Windows checkout.
+    def lock_bytes(path: Path) -> bytes:
+        return path.read_bytes().replace(b"\r\n", b"\n")
+
+    if lock_bytes(repo_dir / "pm/lock.json") != lock_bytes(paths.lockfile_path()):
         raise ValueError("selected revision's PM lock differs from the builder; use a checkout at that revision")
     build_env = os.environ if env is None else env
 

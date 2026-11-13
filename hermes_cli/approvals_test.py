@@ -89,13 +89,13 @@ def evaluate_command(command: str, env_type: str = "local") -> dict:
                    "config.yaml (blocked even under --yolo / mode=off)",
         )
 
-    # 5. Yolo / approvals.mode=off bypass.
+    # 5. Yolo / approvals.mode=off (or auto, whose per-call review already ran) bypass.
     if (approval._YOLO_MODE_FROZEN
             or approval.is_current_session_yolo_enabled()
-            or approval_context._get_approval_mode() == "off"):
+            or approval_context._get_approval_mode() in ("off", "auto")):
         return result(
             "allow",
-            detail="approval bypass active (--yolo or approvals.mode: off); "
+            detail="approval bypass active (--yolo or approvals.mode: off/auto); "
                    "only hardline/deny rules would block",
         )
 

@@ -433,6 +433,7 @@ def cmd_env(args) -> int:
 
 def cmd_doctor(args) -> int:
     from pm.install import _identity, _installed_location
+    from pm.local_tools import find_local
     from pm.store import digest_matches
 
     lockfile = _lockfile()
@@ -445,6 +446,10 @@ def cmd_doctor(args) -> int:
         reason = package.missing_reason(target)
         if reason is not None:
             print(f"- {name}: n/a on {target} ({reason})")
+            continue
+        local = find_local(package, lockfile, target)
+        if local is not None:
+            print(f"✓ {name}: local {local.version} ({local.binary})")
             continue
         facts, store = _installed_location(package, lockfile, target) or (_facts(), _store())
         fact = facts.get(name)

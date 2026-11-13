@@ -9,7 +9,7 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvoca
 $installer = Join-Path $repoRoot 'scripts/install.ps1'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('hermes-utf8-' + [guid]::NewGuid())
 $savedEncoding = [Console]::OutputEncoding
-$envNames = @('HERMES_HOME', 'HERMES_RUNTIME_DIR', 'UTF8_PROBE_PYTHON', 'UTF8_PROBE_CALLS', 'UTF8_PROBE_PM', 'UTF8_PROBE_NEEDS_INSTALL', 'UTF8_PROBE_FIND_EXIT')
+$envNames = @('HERMES_HOME', 'HERMES_RUNTIME_DIR', 'UTF8_PROBE_PYTHON', 'UTF8_PROBE_CALLS', 'UTF8_PROBE_READY', 'UTF8_PROBE_PM', 'UTF8_PROBE_NEEDS_INSTALL', 'UTF8_PROBE_FIND_EXIT')
 $savedEnv = @{}
 foreach ($name in $envNames) { $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name) }
 
@@ -80,6 +80,7 @@ public static class HermesUtf8Host {
     [IO.File]::WriteAllText((Join-Path $packageDir 'lock.json'), '{"packages":{"python":{"version":"3.14.0+fixture"},"uv":{"version":"fixture","artifacts":{"any":{"url":"https://example.invalid/unused.zip"}}}}}')
     $env:UTF8_PROBE_PYTHON = Join-Path $profileDir 'python.exe'
     $env:UTF8_PROBE_CALLS = Join-Path $testRoot 'uv-calls.txt'
+    $env:UTF8_PROBE_READY = Join-Path $testRoot 'python-installed'
     $env:UTF8_PROBE_PM = Join-Path $testRoot 'pm-call.txt'
     $fixtureSource = Join-Path $testRoot 'fixture.cs'
     [IO.File]::WriteAllText($fixtureSource, @'
@@ -95,11 +96,11 @@ class Fixture {
             return 0;
         }
         if (args[0] == "python") {
-            string calls = Env("UTF8_PROBE_CALLS");
-            bool first = !File.Exists(calls);
-            File.AppendAllText(calls, args[1] + "\n");
-            if (args[1] == "install") return 0;
-            if (first && Env("UTF8_PROBE_NEEDS_INSTALL") == "1") {
+            File.AppendAllText(Env("UTF8_PROBE_CALLS"), args[1] + "\n");
+            // The installer probes for a compatible interpreter before it
+            // downloads one, so a miss fails every find until install lands.
+            if (args[1] == "install") { File.WriteAllText(Env("UTF8_PROBE_READY"), "1"); return 0; }
+            if (!File.Exists(Env("UTF8_PROBE_READY")) && Env("UTF8_PROBE_NEEDS_INSTALL") == "1") {
                 Console.Error.WriteLine("interpreter not installed");
                 return 1;
             }
@@ -142,12 +143,12 @@ class Fixture {
         # both a cache hit in uv and a miss followed by install + find.
         foreach ($needsInstall in @('0', '1')) {
             $env:UTF8_PROBE_NEEDS_INSTALL = $needsInstall
-            Remove-Item -LiteralPath $env:UTF8_PROBE_CALLS, $env:UTF8_PROBE_PM -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $env:UTF8_PROBE_CALLS, $env:UTF8_PROBE_READY, $env:UTF8_PROBE_PM -Force -ErrorAction SilentlyContinue
             $script:BootstrapPython = $null
             Stage-PythonDeps
             Assert-Equal 0 $LASTEXITCODE 'dependency stage succeeds'
             Assert-Equal '-m pm.cli install' ([IO.File]::ReadAllText($env:UTF8_PROBE_PM)) 'resolved executable was invoked'
-            $expectedCalls = if ($needsInstall -eq '1') { "find`ninstall`nfind`n" } else { "find`n" }
+            $expectedCalls = if ($needsInstall -eq '1') { "find`nfind`ninstall`nfind`n" } else { "find`n" }
             Assert-Equal $expectedCalls ([IO.File]::ReadAllText($env:UTF8_PROBE_CALLS)) 'lookup and retry call sequence'
             Assert-Equal $codePage ([Console]::OutputEncoding.CodePage) 'stage preserves caller encoding'
             Assert-Equal $env:UTF8_PROBE_PYTHON (Get-BootstrapPython) 'cached path remains intact'
@@ -159,11 +160,12 @@ class Fixture {
         foreach ($findExit in @('0', '9')) {
             $env:UTF8_PROBE_FIND_EXIT = $findExit
             $env:UTF8_PROBE_NEEDS_INSTALL = '0'
-            Remove-Item -LiteralPath $env:UTF8_PROBE_CALLS, $env:UTF8_PROBE_PM -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $env:UTF8_PROBE_CALLS, $env:UTF8_PROBE_READY, $env:UTF8_PROBE_PM -Force -ErrorAction SilentlyContinue
             $setupFailure = $null
             try { & $setupScript -RuntimeOnly } catch { $setupFailure = $_ }
             Assert-Equal $codePage ([Console]::OutputEncoding.CodePage) 'setup preserves caller encoding'
-            Assert-Equal "install`nfind`n" ([IO.File]::ReadAllText($env:UTF8_PROBE_CALLS)) 'setup native call sequence'
+            $setupExpectedCalls = if ($findExit -eq '0') { "find`n" } else { "find`nfind`ninstall`nfind`n" }
+            Assert-Equal $setupExpectedCalls ([IO.File]::ReadAllText($env:UTF8_PROBE_CALLS)) 'setup native call sequence'
             if ($findExit -eq '0') {
                 if ($setupFailure) { throw $setupFailure }
                 Assert-Equal 0 $LASTEXITCODE 'setup succeeds'

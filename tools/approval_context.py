@@ -273,13 +273,13 @@ def _should_fall_through_to_cli_approval(*, is_cli: bool, approval_callback, not
     return bool(is_cli and approval_callback is not None and notify_cb is None)
 
 
-_VALID_MODES = ("manual", "smart", "off")
+_VALID_MODES = ("manual", "smart", "auto", "off")
 
 
 def _normalize_approval_mode(mode) -> str:
     """Normalize approval mode values loaded from YAML/config. YAML 1.1 parses a
     bare ``off`` as False, so ``mode: off`` arrives as a bool; treat it as the
-    intended string mode. Unknown strings (e.g. 'auto') warn and fall back to
+    intended string mode. Unknown strings (e.g. 'yolo') warn and fall back to
     'manual' instead of silently failing every mode check."""
     if isinstance(mode, bool):
         return "off" if mode is False else "manual"
@@ -305,7 +305,7 @@ def _get_approval_config() -> dict:
 
 
 def _get_approval_mode() -> str:
-    """Return 'manual', 'smart', or 'off' (a hosted-room policy overrides config)."""
+    """Return 'manual', 'smart', 'auto', or 'off' (a hosted-room policy overrides config)."""
     try:
         from gateway.hosted_room_execution_policy import current_room_execution_policy
         if (room_policy := current_room_execution_policy()) is not None:

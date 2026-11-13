@@ -1,13 +1,16 @@
+import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { listAllProfileSessions } from '@/hermes'
+import { getApiRequestConnection, listAllProfileSessions } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { Check, MessageCircle } from '@/lib/icons'
+import { SESSION_LIST_QUERY_ROOT } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
+import { $removedSessionIds, dropTombstonedSessions } from '@/store/session-removal'
 
 interface SessionPickerDialogProps {
   /** Stored id of the session currently open, so it can be flagged in the list. */
@@ -27,11 +30,20 @@ interface SessionPickerDialogProps {
 export function SessionPickerDialog({ activeStoredSessionId, onOpenChange, onResume, open }: SessionPickerDialogProps) {
   const { t } = useI18n()
   const [search, setSearch] = useState('')
+  const removedSessionIds = useStore($removedSessionIds)
+  // The unified page is read from whichever connection is active; a switch
+  // serves a different backend's rows, so it must not reuse this cache entry.
+  const connectionKey = getApiRequestConnection() ?? 'local'
 
+  // staleTime 0: deletes, archives and renames happen in the sidebar while this
+  // dialog is closed, so every open must revalidate. The cached page still
+  // paints instantly and the tombstone filter below removes just-deleted rows
+  // before the refetch lands.
   const sessionsQuery = useQuery({
     enabled: open,
     queryFn: () => listAllProfileSessions(200, 1, 'exclude'),
-    queryKey: ['session-picker', 'sessions']
+    queryKey: [...SESSION_LIST_QUERY_ROOT, 'picker', connectionKey],
+    staleTime: 0
   })
 
   useEffect(() => {
@@ -40,7 +52,10 @@ export function SessionPickerDialog({ activeStoredSessionId, onOpenChange, onRes
     }
   }, [open])
 
-  const sessions = useMemo(() => sessionsQuery.data?.sessions ?? [], [sessionsQuery.data])
+  const sessions = useMemo(
+    () => dropTombstonedSessions(sessionsQuery.data?.sessions ?? [], removedSessionIds),
+    [removedSessionIds, sessionsQuery.data]
+  )
 
   return (
     <DialogPrimitive.Root onOpenChange={onOpenChange} open={open}>

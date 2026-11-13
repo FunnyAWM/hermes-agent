@@ -25,6 +25,7 @@ def test_release_channel_never_compares_main_or_reuses_main_cache(tmp_path, monk
     target = "b" * 40
     monkeypatch.setattr(source_check, "_git_stdout", lambda args, **kw: head if args == ["rev-parse", "HEAD"] else "https://github.com/example/fork.git")
     (get_hermes_home() / "config.yaml").write_text(json.dumps({
+        "updates": {"check": True},
         "update": {"installs": {install_id(root): {"path": str(root), "channel": channel}}}
     }))
     (get_hermes_home() / ".update_check").write_text(json.dumps({

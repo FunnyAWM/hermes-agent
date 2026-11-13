@@ -35,11 +35,15 @@ export function applyDesktopIdentity(
   },
   identity: Readonly<ProductIdentity> = PRODUCT_IDENTITY
 ): string | null {
-  if (!identity.token && identity.appNamePascal === identity.artifactNamePascal) {
+  // No pin when nothing separates this build's userData from the product-name default:
+  // stable and light keep their historical Electron-derived directory. userDataDirName
+  // (stable headless) pins explicitly — its display name now matches the regular app,
+  // and without the pin both installs would read the same state directory.
+  if (!identity.token && !identity.userDataDirName && identity.appNamePascal === identity.artifactNamePascal) {
     return null
   }
 
-  const userData: string = path.join(app.getPath('appData'), identity.appNamePascal)
+  const userData: string = path.join(app.getPath('appData'), identity.userDataDirName ?? identity.appNamePascal)
   mkdirSync(userData, { recursive: true })
   app.setPath('userData', userData)
   app.setName(identity.displayName)

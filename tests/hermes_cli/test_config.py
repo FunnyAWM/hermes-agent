@@ -1374,8 +1374,6 @@ class TestEnvWriteDenylist:
             # Non-exec git env names a user may legitimately persist.
             "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME", "GIT_TERMINAL_PROMPT",
             "GIT_EDITOR_WIDE",  # near-miss: not the real GIT_EDITOR
-            # POSIX case: lowercase exec names are different, inert variables.
-            "git_config_parameters", "ld_preload",
         ],
     )
     def test_non_exec_near_misses_still_writable(self, allowed_key):
