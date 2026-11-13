@@ -32,6 +32,7 @@ import {
 import { markReasoningEffortPending } from '@/lib/chat-runtime'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { purgeInFlightTurnJournals, recoverInFlightTurnJournal } from '@/lib/inflight-turn-journal'
+import { invalidateSessionListQueries } from '@/lib/query-client'
 import { latestSessionTodoSnapshot } from '@/lib/todos'
 import { setSessionYolo } from '@/lib/yolo-session'
 import { $clarifyRequests, clearClarifyRequest } from '@/store/clarify'
@@ -135,12 +136,7 @@ import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos, restoreSessionTodosFromSnapshot } from '@/store/todos'
 import { dropTranscriptTail, dropTranscriptTailEverywhere, saveTranscriptTail } from '@/store/transcript-tail-cache'
 import { isWatchWindow } from '@/store/windows'
-import type {
-  SessionCreateResponse,
-  SessionMessagesResponse,
-  SessionResumeResult,
-  UsageStats
-} from '@/types/hermes'
+import type { SessionCreateResponse, SessionMessagesResponse, SessionResumeResult, UsageStats } from '@/types/hermes'
 
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '../../../routes'
 import type { ClientSessionState, SidebarNavItem } from '../../../types'
@@ -190,7 +186,7 @@ import {
 } from './resume-reconcile'
 import { backgroundRuntimeOptions, runtimeOwner, runtimeOwnerProfile } from './runtime-owner'
 import { createGatewaySession, desktopSessionCreateParams } from './session-create-request'
-import { publishWarmSessionRuntime } from './session-usage'
+import { applyStoredUsage, publishWarmSessionRuntime } from './session-usage'
 import {
   createPersistedDisplayTranscriptProvenance,
   hasPersistedDisplayTranscriptProvenance,
@@ -267,15 +263,6 @@ export interface BranchLoadedSessionOptions {
 // How long we keep creatingSessionRef after create/fork navigate before giving up
 // if the router never lands on the pending stored id (stuck navigate / lost race).
 const CREATE_GUARD_RELEASE_MS = 3_000
-
-// Reflect a stored row's persisted token counts into the live usage atom
-// (total is derived, so callers can't drift it out of sync with input/output).
-function applyStoredUsage(stored: { input_tokens?: number | null; output_tokens?: number | null }) {
-  const input = stored.input_tokens || 0
-  const output = stored.output_tokens || 0
-
-  setCurrentUsage(current => ({ ...current, input, output, total: input + output }))
-}
 
 interface FreshSessionDraftOptions {
   preserveRoute?: boolean
@@ -3136,6 +3123,11 @@ export function useSessionActions({
 
         await deleteSession(storedSessionId, removedOwner)
 
+        // Cached pages and other windows still list the row; the bus carries the
+        // ids so their own tombstones keep a keep-set survivor from resurrecting it.
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ removed: removedIds })
+
         dropTranscriptTailEverywhere(storedSessionId)
         // Only after the RPC lands — the optimistic eviction above can roll
         // back, and a rolled-back row must keep its watermark/marker.
@@ -3275,6 +3267,10 @@ export function useSessionActions({
 
       try {
         await setSessionArchived(storedSessionId, true, profile)
+        // Archived rows leave only this window's stores; push the ids with the
+        // invalidate so a receiver's keep set cannot resurrect the row.
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ removed: archivedIds })
         // Archived rows never reach the sidebar, so their persisted unread can
         // only rot. Dropped after the RPC so a failed archive keeps it.
         forgetSessionUnread(archivedIds, profile)
@@ -3339,6 +3335,9 @@ export function useSessionActions({
           untombstoneSessions([storedSessionId, archived._lineage_root_id])
           restoreListedSession({ ...archived, archived: false })
         }
+
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ released: [storedSessionId, archived?._lineage_root_id] })
 
         notify({ durationMs: 2_000, kind: 'success', message: copy.restored })
       } catch (err) {

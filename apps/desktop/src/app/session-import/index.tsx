@@ -10,6 +10,7 @@ import { Loader } from '@/components/ui/loader'
 import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useI18n } from '@/i18n'
+import { invalidateSessionListQueries } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { setSessionOwnerHint } from '@/store/session'
 import type { SessionOwnerRoute } from '@/store/session-request-router'
@@ -94,7 +95,7 @@ export function SessionImportView({ owner, onClose, onOpenSession }: SessionImpo
       const result = await foreignRequest<ForeignImportResult>(owner, 'import', { id: current.id }, signal)
       setSessionOwnerHint(result.session_id, owner)
       void queryClient.invalidateQueries({ queryKey: ['foreign-preview', ...scope] })
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      invalidateSessionListQueries()
 
       if (!signal?.aborted) {
         onOpenSession(result.session_id)

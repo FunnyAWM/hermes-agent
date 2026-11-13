@@ -1,7 +1,7 @@
 import type { ModelOptionsResult } from '@hermes/shared'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { invalidateProfileScopedQueries, keepWarmNousRow, queryClient } from './query-client'
+import { invalidateProfileScopedQueries, invalidateSessionListQueries, keepWarmNousRow, queryClient } from './query-client'
 
 function invalidated(key: unknown[]): boolean {
   return queryClient.getQueryState(key)?.isInvalidated ?? false
@@ -19,8 +19,9 @@ describe('invalidateProfileScopedQueries', () => {
       ['skills-list'],
       ['toolsets-list'],
       ['model-options', 'global'],
-      ['command-palette', 'sessions'],
-      ['session-picker', 'sessions']
+      ['command-palette', 'config'],
+      ['sessions', 'picker', 'local'],
+      ['sessions', 'palette', 'local']
     ]
 
     const global = [
@@ -55,6 +56,32 @@ describe('invalidateProfileScopedQueries', () => {
 
     expect(invalidated(['some-future-profile-query'])).toBe(true)
     expect(invalidated([{ scope: 'weird' }])).toBe(true)
+  })
+})
+
+describe('invalidateSessionListQueries', () => {
+  beforeEach(() => {
+    queryClient.clear()
+  })
+
+  it('invalidates every cached session page and leaves unrelated caches alone', () => {
+    const pages = [
+      ['sessions', 'picker', 'local'],
+      ['sessions', 'palette', 'local'],
+      ['sessions', 'palette-archived', 'remote-a']
+    ]
+
+    for (const key of [...pages, ['command-palette', 'config']]) {
+      queryClient.setQueryData(key, { seeded: true })
+    }
+
+    invalidateSessionListQueries()
+
+    for (const key of pages) {
+      expect(invalidated(key), `${JSON.stringify(key)} should be invalidated`).toBe(true)
+    }
+
+    expect(invalidated(['command-palette', 'config'])).toBe(false)
   })
 })
 

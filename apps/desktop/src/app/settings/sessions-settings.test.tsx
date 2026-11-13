@@ -2,17 +2,22 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { setSessionArchived } from '@/hermes'
+import { deleteSession, setSessionArchived } from '@/hermes'
 import { en } from '@/i18n/en'
 import { $messagingSessions, $sessions, setMessagingSessions, setSessions } from '@/store/session'
+import { $removedSessionIds } from '@/store/session-removal'
+import { $archivedSessions } from '@/store/sidebar-archive'
 import type { SessionInfo } from '@/types/hermes'
 
 import { SessionsSettings } from './sessions-settings'
 
 vi.mock('@/i18n', () => ({ useI18n: () => ({ t: en }) }))
 
+vi.mock('@/store/confirm', () => ({ confirm: vi.fn().mockResolvedValue(true) }))
+
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  deleteSession: vi.fn().mockResolvedValue({ ok: true }),
   getHermesConfigRecord: vi.fn().mockResolvedValue({ config: {} }),
   setSessionArchived: vi.fn().mockResolvedValue(undefined)
 }))
@@ -53,11 +58,31 @@ const archivedMatrixSession = {
 beforeEach(() => {
   setSessions([])
   setMessagingSessions([])
+  $archivedSessions.set([])
+  $removedSessionIds.set(new Set())
   listEveryArchivedSession.mockReset().mockResolvedValue([archivedMatrixSession])
 })
 
 afterEach(() => {
   cleanup()
+  $removedSessionIds.set(new Set())
+})
+
+describe('SessionsSettings permanent delete', () => {
+  it('evicts the row from every shared list and tombstones it', async () => {
+    setSessions([{ ...archivedMatrixSession, archived: false }])
+    $archivedSessions.set([archivedMatrixSession])
+
+    render(<SessionsSettings />)
+    const button = await screen.findByRole('button', { name: en.settings.sessions.deletePermanently })
+
+    await act(async () => fireEvent.click(button))
+
+    await waitFor(() => expect(deleteSession).toHaveBeenCalledWith('matrix-1', undefined))
+    expect($sessions.get()).toEqual([])
+    expect($archivedSessions.get()).toEqual([])
+    expect($removedSessionIds.get().has('matrix-1')).toBe(true)
+  })
 })
 
 describe('SessionsSettings unarchive', () => {

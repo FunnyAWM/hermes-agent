@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { restoreListedSession } from '@/app/session/hooks/use-session-actions/utils'
+import { dropListedSession, restoreListedSession } from '@/app/session/hooks/use-session-actions/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tip } from '@/components/ui/tooltip'
@@ -22,13 +22,25 @@ import { hostHas } from '@/lib/host-capabilities'
 import { Archive, ArchiveOff, FolderOpen, Loader2, Trash2 } from '@/lib/icons'
 import { purgeInFlightTurnJournals } from '@/lib/inflight-turn-journal'
 import { formatCombo } from '@/lib/keybinds/combo'
+import { invalidateSessionListQueries } from '@/lib/query-client'
 import { confirm } from '@/store/confirm'
 import { bindingsFor } from '@/store/keybinds'
 import { notify, notifyError } from '@/store/notifications'
-import { $connection, applyConfiguredDefaultProjectDir, ensureDefaultWorkspaceCwd } from '@/store/session'
-import { untombstoneSessions } from '@/store/session-removal'
+import {
+  $connection,
+  applyConfiguredDefaultProjectDir,
+  ensureDefaultWorkspaceCwd,
+  sessionMatchesStoredId
+} from '@/store/session'
+import {
+  beginSessionMutation,
+  endSessionMutation,
+  tombstoneSessions,
+  untombstoneSessions
+} from '@/store/session-removal'
+import { broadcastSessionsChanged, onSessionsChanged } from '@/store/session-sync'
 import { forgetSessionUnread } from '@/store/session-unread'
-import { listEveryArchivedSession } from '@/store/sidebar-archive'
+import { $archivedSessions, listEveryArchivedSession } from '@/store/sidebar-archive'
 import type { HermesConfigRecord, SessionInfo } from '@/types/hermes'
 
 import { EmptyState, ListRow, SectionHeading, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
@@ -71,21 +83,32 @@ function ArchivedSessionsSettings({ includeDefaultDirectory }: { includeDefaultD
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true)
+      }
 
-    try {
-      setLocalSessions(await listEveryArchivedSession())
-    } catch (err) {
-      notifyError(err, s.failedLoad)
-    } finally {
-      setLoading(false)
-    }
-  }, [s.failedLoad])
+      try {
+        setLocalSessions(await listEveryArchivedSession())
+      } catch (err) {
+        notifyError(err, s.failedLoad)
+      } finally {
+        if (!silent) {
+          setLoading(false)
+        }
+      }
+    },
+    [s.failedLoad]
+  )
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Another window archiving/restoring/deleting a chat leaves this page's
+  // local list stale. Reload silently so the rows settle without the skeleton.
+  useEffect(() => onSessionsChanged(() => void load(true)), [load])
 
   const unarchive = useCallback(
     async (session: SessionInfo) => {
@@ -97,7 +120,10 @@ function ArchivedSessionsSettings({ includeDefaultDirectory }: { includeDefaultD
         // Surface it again in the sidebar without waiting for a full refresh, and
         // lift any optimistic eviction so the grouped tree shows it again too.
         untombstoneSessions([session.id, session._lineage_root_id])
+        $archivedSessions.set($archivedSessions.get().filter(row => !sessionMatchesStoredId(row, session.id)))
         restoreListedSession({ ...session, archived: false })
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ released: [session.id, session._lineage_root_id] })
         triggerHaptic('selection')
         notify({ durationMs: 2_000, kind: 'success', message: s.restored })
       } catch (err) {
@@ -123,6 +149,12 @@ function ArchivedSessionsSettings({ includeDefaultDirectory }: { includeDefaultD
 
       setBusyId(session.id)
 
+      const removedIds = [session.id, session._lineage_root_id]
+      // Tombstone before the RPC: an in-flight sidebar/tree refresh can still
+      // carry the row, and this page is not the only surface listing it.
+      tombstoneSessions(removedIds)
+      beginSessionMutation(removedIds)
+
       try {
         await deleteSession(session.id, session.profile)
         // Permanent delete bypasses removeSession, so retire the persisted
@@ -134,11 +166,23 @@ function ArchivedSessionsSettings({ includeDefaultDirectory }: { includeDefaultD
         // stored tip and the durable lineage root — the journal keys on the
         // stored id and the row may carry either.
         purgeInFlightTurnJournals([session.id, session._lineage_root_id])
+        // Evict from every shared list, not just this page's local state: the
+        // sidebar's archived view reads $archivedSessions, and a stale refresh
+        // could otherwise re-list the row. Other windows and the cached
+        // server pages (the /resume picker, the command palette) get the push.
+        dropListedSession(session.id)
+        $archivedSessions.set($archivedSessions.get().filter(row => !sessionMatchesStoredId(row, session.id)))
         setLocalSessions(prev => prev.filter(s => s.id !== session.id))
+        invalidateSessionListQueries()
+        // The ids ride along: the receiver tombstones them, so its pinned /
+        // selected keep set cannot re-admit the deleted row on the next pull.
+        broadcastSessionsChanged({ removed: removedIds })
         triggerHaptic('warning')
       } catch (err) {
+        untombstoneSessions(removedIds)
         notifyError(err, s.deleteFailed)
       } finally {
+        endSessionMutation(removedIds)
         setBusyId(null)
       }
     },

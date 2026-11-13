@@ -125,8 +125,24 @@ export function tombstoneRowIds(session: {
   return [session.id, ...(session._lineage_root_id ? [session._lineage_root_id] : []), ...(session._lineage_ids ?? [])]
 }
 
-export function tombstoneSessions(ids: Array<null | string | undefined>): void {
-  const next = new Set($removedSessionIds.get())
+/** Drop rows the user just removed from any cached server page (React Query
+ *  surfaces such as the `/resume` picker and the command palette). Matches on
+ *  every id the conversation answers to, like the sidebar's `dropTombstoned`,
+ *  and keeps the array identity when nothing was removed. */
+export function dropTombstonedSessions<T extends { _lineage_ids?: null | string[]; _lineage_root_id?: null | string; id: string }>(
+  sessions: T[],
+  tombstones: ReadonlySet<string> = $removedSessionIds.get()
+): T[] {
+  if (!tombstones.size) {
+    return sessions
+  }
+
+  const kept = sessions.filter(session => !tombstoneRowIds(session).some(id => tombstones.has(id)))
+
+  return kept.length === sessions.length ? sessions : kept
+}
+
+export function tombstoneSessions(ids: Array<null | string | undefined>): void {  const next = new Set($removedSessionIds.get())
 
   for (const id of ids) {
     const trimmed = id?.trim()

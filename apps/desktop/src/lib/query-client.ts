@@ -71,6 +71,16 @@ export function keepWarmNousRow(oldData: unknown, newData: unknown): unknown {
 
 queryClient.setQueryDefaults(['model-options'], { structuralSharing: keepWarmNousRow })
 
+// Every cached server page that lists sessions roots here (the `/resume` picker,
+// the command palette, the import browser's post-import refresh). A delete or
+// archive must invalidate the whole root: those surfaces are unmounted most of
+// the time, so nothing else can tell them a row is gone.
+export const SESSION_LIST_QUERY_ROOT = ['sessions'] as const
+
+export function invalidateSessionListQueries(): void {
+  void queryClient.invalidateQueries({ queryKey: SESSION_LIST_QUERY_ROOT })
+}
+
 // Curried, setState-shaped cache writer for optimistic write-through: keeps
 // mutation sites terse (`setX(next)` or `setX(prev => …)`) over one query key.
 export const writeCache =

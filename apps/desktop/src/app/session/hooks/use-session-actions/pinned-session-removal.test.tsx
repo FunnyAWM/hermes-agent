@@ -4,6 +4,7 @@ import type { MutableRefObject } from 'react'
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
 import { deleteSession, type SessionInfo, setSessionArchived, setSessionPinnedRemote } from '@/hermes'
+import { queryClient } from '@/lib/query-client'
 import { $pinnedSessionIds } from '@/store/layout'
 import { $sessions, setSessions } from '@/store/session'
 import { resetSessionPinMirror, watchSessionPins } from '@/store/session-pin-sync'
@@ -87,8 +88,7 @@ afterEach(() => {
   $sessionMutationsInFlight.set(new Set())
 })
 
-it.each(['archiveSession', 'removeSession'] as const)('%s does not issue a competing unpin', async action => {
-  let handle!: Handle
+it.each(['archiveSession', 'removeSession'] as const)('%s does not issue a competing unpin', async action => {  let handle!: Handle
   render(
     <Harness
       onReady={value => {
@@ -139,5 +139,29 @@ it.each(['archiveSession', 'removeSession'] as const)(
     expect($sessions.get().map(row => row.id)).toEqual(['tip'])
     expect($pinnedSessionIds.get()).toEqual(['root'])
     expect(setSessionPinnedRemote).not.toHaveBeenCalled()
+  }
+)
+
+it.each(['archiveSession', 'removeSession'] as const)(
+  '%s invalidates the cached session pages other surfaces read',
+  async action => {
+    let handle!: Handle
+    render(
+      <Harness
+        onReady={value => {
+          handle = value
+        }}
+      />
+    )
+    const mutate = action === 'archiveSession' ? vi.mocked(setSessionArchived) : vi.mocked(deleteSession)
+    mutate.mockResolvedValue({ ok: true })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await act(() => handle[action]('tip'))
+
+    // The /resume picker and the command palette cache the same backend page;
+    // the tombstone only hides the row on this window's stores.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['sessions'] })
+    invalidate.mockRestore()
   }
 )
