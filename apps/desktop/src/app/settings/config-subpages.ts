@@ -40,7 +40,13 @@ const CONFIG_SUBPAGE_DEFINITIONS: Record<string, ConfigSubpageDefinition[]> = {
     {
       id: 'shell',
       labelKey: 'workspaceShell',
-      fields: ['terminal.persistent_shell', 'terminal.env_passthrough']
+      fields: [
+        'terminal.persistent_shell',
+        'terminal.env_passthrough',
+        'terminal.sandbox.enabled',
+        'terminal.sandbox.escalation',
+        'terminal.sandbox.backend'
+      ]
     },
     {
       id: 'files',

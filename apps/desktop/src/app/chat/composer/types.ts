@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 import type { SubmitTextOptions } from '@/app/session/hooks/use-prompt-actions/utils'
 import type { HermesGateway, ResolvedOwner } from '@/hermes'
+import type { ApprovalMode } from '@/store/approval-mode'
 
 import type { DroppedFile } from '../hooks/use-composer-actions'
 
@@ -32,8 +33,24 @@ export interface ChatBarState {
      *  undefined while unknown (loading) so the pill stays put. */
     supportsReasoning?: boolean
   }
+  /** Undefined while the config is loading or when the command sandbox is off. */
+  sandbox?: {
+    active: string
+    /** True while the profile's approval mode is the per-call Auto Review gate. */
+    approvalMode: ApprovalMode
+    profiles: SandboxProfileChoice[]
+    /** Persists the pick; the caller surfaces a rejection via the composer copy. */
+    onPick: (name: string) => Promise<void>
+    /** Turns Auto Review on, or restores the mode it replaced. Throws on a failed write. */
+    onToggleAutoReview: (enabled: boolean) => Promise<void>
+  }
   tools: { enabled: boolean; label: string; suggestions?: ContextSuggestion[] }
   voice: { enabled: boolean; active: boolean }
+}
+
+export interface SandboxProfileChoice {
+  name: string
+  preset: string
 }
 
 export interface ChatBarProps {
