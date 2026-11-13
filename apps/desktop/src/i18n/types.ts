@@ -1037,7 +1037,12 @@ export interface Translations extends NoticeTranslations {
       screenRecording: string
       driverHealth: string
     }
-    about: { updates: string; channel: UpdateChannelCopy }
+    about: {
+      updates: string
+      channel: UpdateChannelCopy
+      /** Upstream credit shown at the bottom of the About page. */
+      attribution: { builtOn: string; copyright: string }
+    }
     config: {
       minimizeToTrayTitle: string
       minimizeToTrayDesc: string

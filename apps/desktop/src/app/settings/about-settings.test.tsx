@@ -118,6 +118,16 @@ describe('AboutSettings', (): void => {
     expect(checkBackendUpdates).toHaveBeenCalledTimes(2)
   })
 
+  it('credits the upstream Hermes Agent project and its license', (): void => {
+    render(<AboutSettings />)
+    const attribution = en.settings.about.attribution
+
+    expect(screen.getByText(new RegExp(attribution.builtOn))).toBeTruthy()
+    expect(screen.getByRole('link', { name: attribution.copyright }).getAttribute('href')).toBe(
+      'https://github.com/NousResearch/hermes-agent'
+    )
+  })
+
   it('hides the Hermes Cloud backend update card and never checks it', (): void => {
     $connection.set({ ...connection('remote'), baseUrl: 'https://lab.agents.nousresearch.com', remoteKind: 'cloud' })
     render(<AboutSettings />)

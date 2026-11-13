@@ -28,9 +28,9 @@ import { ruUpdateChannel } from './ru_update_channel'
 
 export const ruOverrides = {
   gatewayGroupOpen: {
-    opening: "Открываем групповой чат…",
-    lookupFailed: "Не удалось найти эту группу на шлюзе. Попробуйте ещё раз.",
-    missing: "Этот групповой чат больше не существует."
+    opening: 'Открываем групповой чат…',
+    lookupFailed: 'Не удалось найти эту группу на шлюзе. Попробуйте ещё раз.',
+    missing: 'Этот групповой чат больше не существует.'
   },
   catalog: ruCatalog,
   connectors: ruConnectors.connectors,
@@ -961,7 +961,8 @@ export const ruOverrides = {
             'Дополнительные правила для проверяющего. Это ваш доверенный текст; сам вызов инструмента всегда недоверенный.',
           historyMessages: 'Сколько последних сообщений диалога видит проверяющий (0–50).',
           maxArgChars: 'Сколько символов каждого аргумента инструмента видит проверяющий (500–20000).',
-          skipTools: 'Имена инструментов, которые никогда не проверяются. Локальные инструменты только для чтения пропускаются всегда.'
+          skipTools:
+            'Имена инструментов, которые никогда не проверяются. Локальные инструменты только для чтения пропускаются всегда.'
         }
       },
       security: {
@@ -1018,7 +1019,14 @@ export const ruOverrides = {
           'Когда Hermes обновляет себя из приложения (без запроса в терминале), сохранять локальные правки исходников (stash) или выбрасывать (discard). Обновления из терминала всегда спрашивают.'
       }
     }),
-    about: { updates: 'Обновления', channel: ruUpdateChannel },
+    about: {
+      updates: 'Обновления',
+      channel: ruUpdateChannel,
+      attribution: {
+        builtOn: 'На основе Hermes Agent',
+        copyright: 'Hermes Agent © 2025 Nous Research · MIT License'
+      }
+    },
     config: {
       minimizeToTrayTitle: 'Сворачивать в трей',
       minimizeToTrayDesc:
@@ -1473,8 +1481,9 @@ export const ruOverrides = {
         reimportSignins: 'Импортировать входы заново',
         signinsImportedTitle: 'Входы во встроенном браузере',
         signinsImported: count => `Встроенный браузер вошёл с cookie из профиля браузера: ${count}.`,
-        signinsRemote: 'Этот бэкенд работает на другом компьютере, поэтому его профиль браузера не импортируется во встроенный браузер.',
-        signinsFailed: 'Не удалось импортировать входы во встроенный браузер',
+        signinsRemote:
+          'Этот бэкенд работает на другом компьютере, поэтому его профиль браузера не импортируется во встроенный браузер.',
+        signinsFailed: 'Не удалось импортировать входы во встроенный браузер'
       },
       loadingConfig: 'Загрузка конфигурации',
       savedTitle: 'Учётные данные сохранены',
@@ -2021,7 +2030,8 @@ export const ruOverrides = {
     relayLink: {
       title: 'Team Gateway',
       badge: 'Токен бота не нужен',
-      intro: (platform: string) => `${platform} связывается с этим агентом через общий бот Hermes. Привяжите свой аккаунт ${platform} и напишите боту, чтобы говорить с агентом.`,
+      intro: (platform: string) =>
+        `${platform} связывается с этим агентом через общий бот Hermes. Привяжите свой аккаунт ${platform} и напишите боту, чтобы говорить с агентом.`,
       link: (platform: string) => `Привязать ${platform}`,
       linkAnother: (platform: string) => `Привязать ещё один аккаунт ${platform}`,
       linkedAccounts: 'Привязанные аккаунты',
@@ -2039,10 +2049,12 @@ export const ruOverrides = {
       refused: (platform: string) => `${platform} отклонил привязку. Получите новый код и попробуйте снова.`,
       qrAlt: (platform: string) => `QR-код общего бота ${platform}`,
       managed: 'Под управлением Team Gateway',
-      managedNote: (platform: string) => `На этом экземпляре сообщения идут через Team Gateway, поэтому шлюз отключает прямое подключение ${platform} при каждом запуске. Чтобы использовать его вместе с ретранслятором, задайте GATEWAY_RELAY_ALLOW_DIRECT_PLATFORMS=true в окружении шлюза (прямое подключение не даёт экземпляру масштабироваться до нуля и может доставлять сообщения дважды).`,
+      managedNote: (platform: string) =>
+        `На этом экземпляре сообщения идут через Team Gateway, поэтому шлюз отключает прямое подключение ${platform} при каждом запуске. Чтобы использовать его вместе с ретранслятором, задайте GATEWAY_RELAY_ALLOW_DIRECT_PLATFORMS=true в окружении шлюза (прямое подключение не даёт экземпляру масштабироваться до нуля и может доставлять сообщения дважды).`,
       managedIntro: 'Аккаунты этого агента привязываются в Nous Portal.',
       openPortal: 'Привязать аккаунты в Nous Portal',
-      noNewAccount: (platform: string) => `Код больше не активен, и новый аккаунт не появился. Если вашего аккаунта ${platform} нет в списке, получите новый код и попробуйте снова.`
+      noNewAccount: (platform: string) =>
+        `Код больше не активен, и новый аккаунт не появился. Если вашего аккаунта ${platform} нет в списке, получите новый код и попробуйте снова.`
     },
     telegramQr: {
       title: 'Выберите способ подключения Telegram-бота',
@@ -2716,10 +2728,10 @@ export const ruOverrides = {
     muted: 'Приглушено',
     sandboxProfile: 'Профиль песочницы',
     autoReview: 'Auto Review',
-    autoReviewDescription: 'Каждый вызов инструмента проверяется вспомогательной моделью перед выполнением; отклонённый вызов запросит подтверждение.',
+    autoReviewDescription:
+      'Каждый вызов инструмента проверяется вспомогательной моделью перед выполнением; отклонённый вызов запросит подтверждение.',
     autoReviewSaveFailed: 'Не удалось изменить Auto Review.',
-    sandboxProfileHint:
-      'Каждая команда выполняется внутри выбранного профиля; выбор применяется к следующей команде.',
+    sandboxProfileHint: 'Каждая команда выполняется внутри выбранного профиля; выбор применяется к следующей команде.',
     sandboxProfileSaveFailed: 'Не удалось изменить профиль песочницы.',
     sandboxProfileFullAccessTitle: 'Включить полный доступ?',
     sandboxProfileFullAccessDesc:

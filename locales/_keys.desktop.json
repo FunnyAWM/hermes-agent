@@ -2901,6 +2901,8 @@
     "sessionImport.subtitle",
     "sessionImport.title",
     "sessionImport.you",
+    "settings.about.attribution.builtOn",
+    "settings.about.attribution.copyright",
     "settings.about.channel.allChanges",
     "settings.about.channel.branch",
     "settings.about.channel.change",

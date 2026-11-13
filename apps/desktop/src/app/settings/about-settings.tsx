@@ -4,6 +4,7 @@ import { type ReactElement, useEffect } from 'react'
 import { UpdateStatusCard, VersionHero } from '@/components/update-status'
 import { VersionDetails } from '@/components/version-details'
 import { useI18n } from '@/i18n'
+import { ExternalLink } from '@/lib/external-link'
 import { RefreshCw } from '@/lib/icons'
 import { $cloudOwnsUpdates } from '@/store/cloud-updates'
 import { $connection } from '@/store/session'
@@ -18,6 +19,9 @@ import { useSettingDeepLink } from './use-setting-deep-link'
 interface AboutSettingsProps {
   subpage?: string
 }
+
+/** The upstream project this fork is built on: code and the MIT copyright it carries. */
+const UPSTREAM_URL = 'https://github.com/NousResearch/hermes-agent'
 
 export function AboutSettings({ subpage }: AboutSettingsProps = {}): ReactElement {
   useSettingDeepLink('about', page => subpage === undefined || page === subpage)
@@ -71,8 +75,22 @@ function AppUpdatesSettings({ includeUninstall }: AppUpdatesSettingsProps): Reac
           </>
         )}
         {version && <VersionDetails version={version} />}
+        <AboutAttribution />
         {includeUninstall && <UninstallSection />}
       </div>
     </SettingsContent>
+  )
+}
+
+function AboutAttribution(): ReactElement {
+  const { t } = useI18n()
+  const attribution = t.settings.about.attribution
+
+  return (
+    <p className="mt-6 text-center text-xs leading-relaxed text-(--ui-text-tertiary)" data-slot="about-attribution">
+      {attribution.builtOn}
+      {' · '}
+      <ExternalLink href={UPSTREAM_URL}>{attribution.copyright}</ExternalLink>
+    </p>
   )
 }
