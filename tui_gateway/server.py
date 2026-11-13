@@ -659,7 +659,9 @@ def _approval_request_payload(data: dict | None) -> dict:
                 choices.append("always")
         payload["choices"] = choices + ["deny"]
     from gateway.run import _redact_approval_command  # description too: consent prompts carry MCP/vault text
-    payload.update({k: _redact_approval_command(payload[k]) for k in ("command", "description") if k in payload})
+    payload.update(
+        {k: _redact_approval_command(payload[k]) for k in ("command", "description", "justification") if k in payload}
+    )
     return payload
 
 
@@ -1251,7 +1253,7 @@ def _write_config_keys(updates: dict) -> None:
 
 
 _STATUSBAR_MODES = frozenset({"off", "top", "bottom"})
-_APPROVAL_MODES = frozenset({"manual", "smart", "off"})
+_APPROVAL_MODES = frozenset({"manual", "smart", "auto", "off"})
 
 # Appearance switches the renderer owns but the AGENT must see (each gates a tool's `check_fn`). `config.set`
 # answers 4002 for unlisted keys — a mirrored switch missing here writes nothing and its tool stays dark.
