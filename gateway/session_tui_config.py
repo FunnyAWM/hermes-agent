@@ -320,11 +320,11 @@ def _set_profile_leaf(cfg, key, value):
 def _set_approval_mode(connection, value):
     """``/approvals <mode>``'s own write (``hermes_cli.approval_mode``) for this profile."""
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.approval_mode import run_approval_mode_command
+    from hermes_cli.approval_mode import VALID_APPROVAL_MODES, run_approval_mode_command
     with _profile_runtime_scope(Path(connection.authority.profile_id)), _WRITE_LOCK:
         result = run_approval_mode_command(_word(value) or None)
     if not result.ok:
-        raise RuntimeStoreError('invalid_params' if _word(value) not in ('manual', 'smart', 'off')
+        raise RuntimeStoreError('invalid_params' if _word(value) not in VALID_APPROVAL_MODES
                                 else 'storage_unavailable')
     return {'key': 'approvals.mode', 'value': result.mode}
 

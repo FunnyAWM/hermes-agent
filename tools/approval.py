@@ -542,7 +542,8 @@ def is_approval_bypass_active_for_session(session_key: str) -> bool:
     """Canonical three-source bypass check: process ``--yolo`` (frozen at import), the
     session-scoped gateway ``/yolo`` toggle, ``approvals.mode: off``. Pure bypass
     sub-expression only — hardline blocklist / permanent allowlist are the caller's job."""
-    return (_YOLO_MODE_FROZEN or is_session_yolo_enabled(session_key) or approval_context._get_approval_mode() == "off")
+    return (_YOLO_MODE_FROZEN or is_session_yolo_enabled(session_key)
+            or approval_context._get_approval_mode() == "off")
 
 
 def is_approval_bypass_active() -> bool:
@@ -601,7 +602,7 @@ def _gateway_notify_cb(session_key: str):
 
 def _pending_result(spec, session_key: str, *, command: str, description: str,
                     pattern_key: str, pattern_keys: list[str], body: str | None,
-                    smart_denied: bool) -> dict:
+                    smart_denied: bool, justification: str = "") -> dict:
     """Queue an approval nobody can answer right now (no gateway notifier, no CLI panel) for
     ``/approve`` / ``/deny`` review. Command/code gates return the backward-compatible
     ``pending_approval`` shape (``pattern_keys`` + STOP text); the action gate ``approval_required``."""
@@ -609,6 +610,8 @@ def _pending_result(spec, session_key: str, *, command: str, description: str,
     if spec.pending_keys:
         pending["pattern_keys"] = pattern_keys
     pending["description"] = description
+    if justification:
+        pending["justification"] = justification
     if smart_denied:
         pending.update(smart_denied=True, allow_permanent=False)
     submit_pending(session_key, pending)
@@ -873,10 +876,20 @@ def _smart_gate(spec: _GateSpec, command: str, description: str, pattern_key: st
     }, True
 
 
+def _redacted_justification(justification: str) -> dict:
+    """The display-only justification field, redacted, only when the caller supplied one."""
+    from agent.redact import redact_approval_display
+
+    if not justification:
+        return {}
+    return {"justification": redact_approval_display(justification)}
+
+
 def _human_decision(spec: _GateSpec, *, command: str, description: str,
                     pattern_key: str, pattern_keys: list[str],
                     session_key: str, approval_callback, is_cli: bool, is_gateway: bool,
-                    is_ask: bool, smart: bool = False, pending_body=None) -> dict:
+                    is_ask: bool, smart: bool = False, pending_body=None,
+                    justification: str = "") -> dict:
     """Ask a human (after the optional guardian-LLM step) and turn the answer into the gate result.
 
     ``pattern_keys`` are what :func:`_persist_choice` stores on session/always; a smart-DENY
@@ -934,6 +947,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         # command still executes after approval and persistence keys off pattern_key.
         display_command = redact_approval_display(command)
         display_description = redact_approval_display(description)
+        justification_field = _redacted_justification(justification)
         notify_cb = _gateway_notify_cb(session_key)
         if notify_cb is not None:
             # Smart DENY overrides are one-operation decisions, so the UI must not offer a
@@ -943,6 +957,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
                 "pattern_keys": pattern_keys, "description": display_description,
                 "allow_permanent": not smart_denied,
                 "allow_session": not smart_denied,
+                **justification_field,
             }
             if smart_denied:
                 data["smart_denied"] = True
@@ -981,6 +996,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
             return _pending_result(
                 spec, session_key, command=display_command, description=display_description, pattern_key=pattern_key,
                 pattern_keys=pattern_keys, body=pending_body, smart_denied=smart_denied,
+                justification=justification_field.get("justification", ""),
             )
 
     # CLI interactive: single combined prompt, wrapped in the pre/post plugin hooks.
@@ -1051,7 +1067,7 @@ def _run_approval_gate(
     advice: str = "Find an alternative approach that avoids this action.",
     cron_deny_message: str = "", single_query_deny_message: str = "", unattended_deny_message: str = "",
     autoapprove_log_prefix: str, fail_closed_when_no_human: bool = False, no_human_block_message: str = "",
-    pattern_keys: list[str] | None = None,
+    pattern_keys: list[str] | None = None, justification: str = "",
 ) -> dict:
     """Shared human-approval gate for a flagged action (tool call or write): decision core for
     :func:`request_tool_approval` and the file-tool write gates.
@@ -1117,6 +1133,7 @@ def _run_approval_gate(
         _ACTION_GATE, command=display_target, description=description, pattern_key=pattern_key,
         pattern_keys=pattern_keys or [pattern_key], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
+        justification=justification,
     )
 
 
@@ -1185,7 +1202,7 @@ def check_dangerous_command(command: str, env_type: str,
     blocked = _floor_block(command)
     if blocked is not None:
         return blocked
-    if _yolo_active() or approval_context._get_approval_mode() == "off":
+    if _yolo_active() or approval_context._get_approval_mode() in ("off", "auto"):
         return _approved()
     if _command_matches_permanent_allowlist(command):
         return _allowlisted(command)
@@ -1205,7 +1222,9 @@ def check_dangerous_command(command: str, env_type: str,
     )
 
 
-def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None) -> dict:
+def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None,
+                          no_human_block_message: str | None = None, command: str = "",
+                          justification: str = "") -> dict:
     """Escalate an arbitrary tool call to the human-approval gate.
 
     Entry point for a plugin ``pre_tool_call`` hook returning ``{"action": "approve", ...}``:
@@ -1222,14 +1241,17 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
     subject = f"Tool '{tool_name}' requires approval ({description})"
     return _run_approval_gate(
         # Namespaced so plugin-rule approvals share the allowlist machinery without ever colliding with a real
-        # command pattern key; the display target is a synthetic label for the display/allowlist layer.
+        # command pattern key. ``command`` (when the caller has the real pending call) is display-only: the card
+        # then shows what would run instead of the synthetic label.
         pattern_key=f"plugin_rule:{rule_key}", description=description,
-        display_target=f"<{tool_name}> (plugin approval rule)", approval_callback=approval_callback,
+        display_target=command or f"<{tool_name}> (plugin approval rule)", approval_callback=approval_callback,
         subject=subject, advice="Find an alternative approach.",
         autoapprove_log_prefix=f"plugin-escalated tool call '{tool_name}' in non-interactive non-gateway context",
         fail_closed_when_no_human=True,
-        no_human_block_message=(f"BLOCKED: {subject} but no interactive user or gateway is present "
-                                "to approve it. A plugin flagged this action for human confirmation."),
+        no_human_block_message=no_human_block_message or (
+            f"BLOCKED: {subject} but no interactive user or gateway is present "
+            "to approve it. A plugin flagged this action for human confirmation."),
+        justification=justification,
     )
 
 
@@ -1254,7 +1276,7 @@ def check_all_command_guards(command: str, env_type: str,
         return prepared
 
     approval_mode = approval_context._get_approval_mode()
-    if _yolo_active() or approval_mode == "off":
+    if _yolo_active() or approval_mode in ("off", "auto"):
         return _approved()
     if _command_matches_permanent_allowlist(command):
         return _allowlisted(command)
@@ -1328,7 +1350,7 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
     if _should_skip_container_guards(env_type, has_host_access=has_host_access):
         return _approved()
     approval_mode = approval_context._get_approval_mode()
-    if _yolo_active() or approval_mode == "off":
+    if _yolo_active() or approval_mode in ("off", "auto"):
         return _approved()
 
     # (-q clears the presence flags, but its unattended context resolves first anyway.)

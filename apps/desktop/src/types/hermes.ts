@@ -898,7 +898,7 @@ export interface SessionRuntimeInfo {
   /** Canonical snapshot only: the session replay epoch and event sequence its pending set reflects. */
   replay_epoch?: string
   last_sequence?: number
-  approval_mode?: 'manual' | 'off' | 'smart'
+  approval_mode?: 'manual' | 'off' | 'smart' | 'auto'
   branch?: string
   config_warning?: string
   credential_warning?: string
