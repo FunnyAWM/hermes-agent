@@ -6,9 +6,10 @@ Android PRD v3.0 (同 02 修订) brings chat sessions into the sync whitelist as
 - ``export_bot_sessions`` writes the Bot's own user/assistant conversations (state.db,
   the main-loop surfaces only) as KouriChat Next session files so a phone pulling from
   this master — or the next negotiation when this device is the secondary — carries them.
-- ``import_synced_sessions`` imports the session files a negotiation landed in
-  ``HERMES_HOME/sessions/`` into the Bot's conversation history (source
-  ``kourichat-sync``), so the Bot's record includes chats that happened on the phone.
+- ``import_synced_sessions`` folds every session file a negotiation landed into the
+  **canonical Bot history** (the single ``Bot Chat`` session the product presents), never
+  into a new row in the session list: the Bot has one history, and a phone's chats are
+  part of it.
 
 Both directions use the exact Android ``SessionStore`` JSON shapes (``meta.json`` five
 fields; one ``ChatMessage`` per JSONL line with every kotlinx default serialized) and the
@@ -29,6 +30,10 @@ from sync.scope import _SESSION_MESSAGES_NAME, _SESSION_META_NAME
 _BOT_SOURCES = ("cli", "tui", "desktop", "webui", "gui", "gateway")
 _BOT_ROLES = ("user", "assistant")
 
+#: The single Bot history every synced conversation is folded into. Must stay equal to
+#: ``tools.bot_mode_probe.BOT_CHAT_TITLE`` (the desktop Bot plugin adopts that title).
+_BOT_CHAT_TITLE = "Bot Chat"
+
 #: KouriChat ``SessionStore`` file names (kept in scope.py's whitelist in lockstep).
 _STATE_FILE = "session-bridge.json"
 
@@ -43,6 +48,13 @@ def export_bot_sessions(root: Path) -> int:
     db = SessionDB()
     try:
         sessions = db.list_sessions_rich(sources=list(_BOT_SOURCES), limit=500, min_message_count=1)
+        # The Bot has one history: once the canonical ``Bot Chat`` exists, that session is
+        # what the chain carries. Other desktop sessions (scratch work, subagent watch,
+        # imports) stay local. Without a Bot Chat — a plain, non-Bot profile — every
+        # main-loop session keeps syncing, exactly as before.
+        bot_history = _bot_history_session_id(db)
+        if bot_history:
+            sessions = [row for row in sessions if str(row.get("id") or "") == bot_history]
         state = _load_state(root)
         exported = 0
         for row in sessions:
@@ -70,32 +82,108 @@ def export_bot_sessions(root: Path) -> int:
 
 
 def import_synced_sessions(root: Path) -> int:
-    """Import session files the sync landed into the Bot's history; returns the number
-    of messages added. Existing sessions merge by role+content+createdAt (the Android
-    ``mergeMessages`` identity), so a repeated sync never duplicates."""
+    """Fold every landed session file into the canonical Bot history; returns the number
+    of messages added.
+
+    The Bot has ONE history. A phone's chats must read as part of it, not as a fresh row
+    in the desktop session list, so every transcript under ``HERMES_HOME/sessions/`` is
+    merged into the ``Bot Chat`` session (created on first sync if the Bot has none yet)
+    instead of being imported as its own session. Existing messages merge by
+    role+content+createdAt (the Android ``mergeMessages`` identity), so a repeated sync
+    never duplicates."""
     from hermes_state import SessionDB
 
     sessions_dir = Path(root) / "sessions"
     if not sessions_dir.is_dir():
         return 0
+    transcripts = []
+    for directory in sorted(sessions_dir.iterdir()):
+        if not directory.is_dir() or directory.name.startswith("."):
+            continue
+        transcript = _read_session_files(directory)
+        if transcript is not None:
+            transcripts.append(transcript)
+    if not transcripts:
+        return 0
+
+    # One chronological stream: files are per-device, so interleave them by createdAt
+    # (stable sort keeps each file's own order for identical timestamps).
+    merged: list[dict] = []
+    seen: set[tuple[str, str, int]] = set()
+    for _meta, messages in transcripts:
+        for message in messages:
+            identity = (message["role"], message["content"], message["createdAt"])
+            if identity in seen:
+                continue
+            seen.add(identity)
+            merged.append(message)
+    merged.sort(key=lambda message: message["createdAt"])
+
     db = SessionDB()
     try:
-        imported = 0
-        for directory in sorted(sessions_dir.iterdir()):
-            if not directory.is_dir() or directory.name.startswith("."):
-                continue
-            transcript = _read_session_files(directory)
-            if transcript is None:
-                continue
-            meta, messages = transcript
-            existing = db.get_messages(directory.name)
-            if not existing:
-                imported += _import_new(db, directory.name, meta, messages)
-            else:
-                imported += _merge_into_existing(db, directory.name, existing, messages)
-        return imported
+        target_id = _bot_history_session_id(db)
+        if target_id is None:
+            return _create_bot_history(db, merged)
+        return _merge_into_existing(db, target_id, db.get_messages(target_id), merged)
     finally:
         db.close()
+
+
+def _bot_history_session_id(db) -> str | None:
+    """The id of the canonical ``Bot Chat`` session, resolved through its lineage tip
+    (compression rotates ids) — ``None`` when this Bot has no history yet."""
+    try:
+        resolved = db.resolve_session_by_title(_BOT_CHAT_TITLE)
+    except Exception as error:  # health: allow BLE001 -- resolution is best-effort; the caller falls back to creating the history
+        logging.getLogger(__name__).debug("bot chat resolution skipped: %s", error)
+        resolved = None
+    if resolved:
+        return str(resolved)
+    row = None
+    try:
+        row = db.get_session_by_title(_BOT_CHAT_TITLE)
+    except Exception as error:  # health: allow BLE001 -- same best-effort lookup as above
+        logging.getLogger(__name__).debug("bot chat title lookup skipped: %s", error)
+    if row:
+        return str(row.get("id") or "") or None
+    return None
+
+
+def _create_bot_history(db, messages: list[dict]) -> int:
+    """First sync on a Bot with no history: the canonical session IS the imported
+    conversation, titled ``Bot Chat`` so the Bot plugin adopts it as the one history."""
+    session_id = _new_session_id()
+    payload = [
+        {"role": message["role"], "content": message["content"], "timestamp": message["createdAt"] / 1000}
+        for message in messages
+    ]
+    first_chunk, rest = payload[:_IMPORT_MAX_MESSAGES], payload[_IMPORT_MAX_MESSAGES:]
+    result = db.import_sessions(
+        [
+            {
+                "id": session_id,
+                "source": "desktop",
+                "title": _BOT_CHAT_TITLE,
+                "started_at": messages[0]["createdAt"] / 1000,
+                "messages": first_chunk,
+            }
+        ]
+    )
+    if not result.get("imported"):
+        return 0
+    while rest:
+        chunk, rest = rest[:_IMPORT_MAX_MESSAGES], rest[_IMPORT_MAX_MESSAGES:]
+        db.append_messages_batch(session_id, chunk)
+    stamp_profile_owner(db)
+    return len(payload)
+
+
+def _new_session_id() -> str:
+    """The store's id convention (``YYYYMMDD_HHMMSS_xxxxxx``) so the Bot history sorts
+    and routes like every other session."""
+    from datetime import datetime
+
+    return f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
 
 def _bot_messages(db, session_id: str) -> list[dict]:
@@ -168,34 +256,6 @@ def _read_session_files(directory: Path):
     if not pairs:
         return None
     return meta, pairs
-
-
-def _import_new(db, bridge_id: str, meta: dict, messages: list[dict]) -> int:
-    """One brand-new session: a single-transaction import (idempotent — an id that
-    already exists is skipped), chunked past the per-call message ceiling."""
-    payload_messages = [
-        {"role": message["role"], "content": message["content"], "timestamp": message["createdAt"] / 1000}
-        for message in messages
-    ]
-    first_chunk, rest = payload_messages[:_IMPORT_MAX_MESSAGES], payload_messages[_IMPORT_MAX_MESSAGES:]
-    result = db.import_sessions(
-        [
-            {
-                "id": bridge_id,
-                "source": "kourichat-sync",
-                "title": str(meta.get("title") or ""),
-                "started_at": messages[0]["createdAt"] / 1000,
-                "messages": first_chunk,
-            }
-        ]
-    )
-    if not result.get("imported"):
-        return 0
-    while rest:
-        chunk, rest = rest[:_IMPORT_MAX_MESSAGES], rest[_IMPORT_MAX_MESSAGES:]
-        db.append_messages_batch(bridge_id, chunk)
-    stamp_profile_owner(db)
-    return len(payload_messages)
 
 
 def _merge_into_existing(db, bridge_id: str, existing: list[dict], messages: list[dict]) -> int:

@@ -47,18 +47,27 @@ ends only ever change together.
 (state.db) and the synced session files: `export_bot_sessions` writes the main-loop
 surfaces' conversations as KouriChat session files (uuid directory names; every kotlinx
 default serialized; incremental via `.meta/session-bridge.json`), and
-`import_synced_sessions` lands the files a negotiation brought in as Bot history with
-`source="kourichat-sync"`, merging by role+content+createdAt — the Android
-``mergeMessages`` identity, so nothing ever duplicates. The manager takes them as
+`import_synced_sessions` folds every landed file into the Bot's SINGLE history — the
+canonical `Bot Chat` session (created on first sync when the Bot has none) — never into
+one session row per phone conversation. Imported and local messages merge by
+role+content+createdAt, the Android ``mergeMessages`` identity, so nothing ever
+duplicates. Once a `Bot Chat` exists, export carries only that session: the Bot has one
+history, and the session list is not a sync target. The manager takes both as
 `pre_sync`/`post_sync` hooks (the sync package stays storage-agnostic).
 
 ## Discovery, QR and exit sync
 
 - `sync/discovery.py` mirrors the Android NSD records (`_kourichat-sync._tcp.` / service
   name `KouriChat Next`) via the OPTIONAL `zeroconf` dependency: the master registers
-  with `start_server`, a secondary falls back to browsing when its saved endpoint is
-  unreachable. Without the dependency both are safe no-ops (manual endpoint still
-  works); do not make zeroconf a hard dependency without a lockfile in hand. Declaring
+  with `start_server` (auto-started by `create_chain`, and by a master-role `sync_now`
+  when it is not serving), and a secondary rediscovers on EVERY cycle — the saved
+  `master_endpoint` is a fallback, not the truth, because DHCP/Wi-Fi-roam/VPN moves the
+  address. Browsing is capped at 2.5s and followed by a direct TCP probe of the local
+  /24 on the sync port (`probe_subnet`), which is what makes discovery work on networks
+  where multicast is filtered; a false positive costs one failed handshake, never a
+  wrong pair. Without the dependency both mDNS paths are safe no-ops (the probe and the
+  manual endpoint still work); do not make zeroconf a hard dependency without a lockfile
+  in hand. Declaring
   the `[sync]` extra means editing pyproject.toml AND relocking (`hermes pm lock`, which
   needs github.com reachable for the psutil git pin) in the same commit — never declare
   it without the lock, or `uv sync --locked` breaks for everyone.

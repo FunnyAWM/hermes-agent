@@ -232,7 +232,7 @@ class TestDiscoveryJoin:
         secondary = _manager(tmp_path / "secondary")
         budgets: list[int] = []
 
-        def discover(timeout_ms: int = 4_000):
+        def discover(timeout_ms: int = 4_000, *, port: int | None = None):
             budgets.append(timeout_ms)
             return [("127.0.0.1", server.bound_port)]
 
@@ -256,7 +256,7 @@ class TestDiscoveryJoin:
             monkeypatch.setattr(
                 secondary._discovery,
                 "discover",
-                lambda timeout_ms=4_000: [("127.0.0.1", other_server.bound_port), ("127.0.0.1", server.bound_port)],
+                lambda timeout_ms=4_000, port=None: [("127.0.0.1", other_server.bound_port), ("127.0.0.1", server.bound_port)],
             )
             secondary.join_chain(words)
 
@@ -268,7 +268,7 @@ class TestDiscoveryJoin:
     def test_join_without_candidates_leaves_nothing_paired(self, tmp_path, running_master, monkeypatch):
         _master, _server, words = running_master
         secondary = _manager(tmp_path / "secondary")
-        monkeypatch.setattr(secondary._discovery, "discover", lambda timeout_ms=4_000: [])
+        monkeypatch.setattr(secondary._discovery, "discover", lambda timeout_ms=4_000, port=None: [])
 
         with pytest.raises(SyncError) as excinfo:
             secondary.join_chain(words)
@@ -284,7 +284,7 @@ class TestDiscoveryJoin:
         (secondary_home / "notes" / "pre-join.md").write_text("written before pairing", encoding="utf-8")
 
         secondary = _manager(secondary_home)
-        monkeypatch.setattr(secondary._discovery, "discover", lambda timeout_ms=4_000: [("127.0.0.1", server.bound_port)])
+        monkeypatch.setattr(secondary._discovery, "discover", lambda timeout_ms=4_000, port=None: [("127.0.0.1", server.bound_port)])
         secondary.join_chain(words)
 
         assert (master.root / "notes" / "pre-join.md").read_text(encoding="utf-8") == "written before pairing"

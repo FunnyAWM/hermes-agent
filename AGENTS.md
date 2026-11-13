@@ -155,6 +155,7 @@ Every former god file is a **facade** (public entry points + the names other pac
 | `tests/` | `tests/AGENTS.md` | runner, placement, OS markers, `wine2e`, banned test shapes |
 | `pm/`, `pyproject.toml` | `pm/AGENTS.md` | pinning policy, PM-owned environments, plugin quarantine |
 | `hermes_platform/` | `hermes_platform/AGENTS.md` | host facts, resolvers |
+| `sync/`, `hermes sync` | `sync/AGENTS.md` | KouriChat Link device-chain sync: protocol, pairing, desktop surface |
 
 Long-form background: `website/docs/developer-guide/`. Workflow rules (PR/issue/review/salvage
 process) live in the `hermes-agent-dev` skill, not here.

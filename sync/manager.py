@@ -161,6 +161,13 @@ class SyncManager:
             self._mnemonic_store.clear()
             raise SyncError(SyncErrorCode.STATE_CORRUPT, "cannot write sync state")
         self._settings_store.update(replace(self._settings_store.load(), role=ROLE_MASTER))
+        # A master that never starts serving is undiscoverable, which is the most common
+        # "the phone can't find the PC" report: start it as part of becoming the master.
+        # best-effort — a bind failure is surfaced later by start_server/status.
+        try:
+            self.start_server()
+        except Exception as error:  # health: allow BLE001 -- becoming the master must not fail on a port/interface problem; the UI reports serving=false and can retry
+            logging.getLogger(__name__).debug("master auto-serve failed: %s", error)
         return words
 
     def join_chain(self, words: list[str], endpoint: str | None = None) -> SyncState:
@@ -258,6 +265,13 @@ class SyncManager:
         if settings.role == ROLE_MASTER:
             if self._state_store.load() is None:
                 raise SyncError(SyncErrorCode.STATE_CORRUPT, "master state missing; run create-chain again")
+            # Someone is asking for a sync: an idle master (fresh start, port rebound)
+            # must be reachable again, not just refresh its own log.
+            if not self.serving:
+                try:
+                    self.start_server()
+                except Exception as error:  # health: allow BLE001 -- a bind failure is reported by the outcome below; the record refresh still has value
+                    logging.getLogger(__name__).debug("master serve on sync failed: %s", error)
             self._run_hook("pre")
             if not self._engine().refresh_from_local_changes():
                 raise SyncError(SyncErrorCode.STATE_CORRUPT, "record log refresh failed")
@@ -308,11 +322,17 @@ class SyncManager:
         if keys is None:
             raise SyncError(SyncErrorCode.NOT_PAIRED, "stored mnemonic invalid; pair again")
         self._run_hook("pre")
-        candidates: list[tuple[str, int]] = []
+        # The LAN moves (DHCP renewal, Wi-Fi roam, VPN up/down): the saved endpoint is a
+        # hint, never the truth. Every cycle rediscovers first and only falls back to the
+        # last-known address when the scan finds nothing; the winner is written back below.
+        saved: tuple[str, int] | None = None
         if (settings.master_endpoint or "").strip():
-            candidates.append(parse_endpoint(settings.master_endpoint))
+            saved = parse_endpoint(settings.master_endpoint)
+        candidates: list[tuple[str, int]] = []
         if allow_discovery:
-            candidates.extend(self._discovery.discover())
+            candidates.extend(self._discovery.discover(port=saved[1] if saved else DEFAULT_PORT))
+        if saved is not None and saved not in candidates:
+            candidates.append(saved)
         if not candidates:
             raise SyncError(SyncErrorCode.NOT_PAIRED, "no master endpoint configured and none discovered")
         client = SyncClient()

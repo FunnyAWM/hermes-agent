@@ -37,6 +37,25 @@ def _seed_bot_session(db: SessionDB, session_id: str, turns: list[tuple[str, str
     )
 
 
+def _write_phone_session(root: Path, name: str, rows: list[tuple[str, str, int]]) -> None:
+    """A session as the phone's SessionStore would have written it."""
+    directory = root / "sessions" / name
+    directory.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "id": name,
+        "title": "phone chat",
+        "createdAt": rows[0][2],
+        "updatedAt": rows[-1][2],
+        "messageCount": len(rows),
+    }
+    (directory / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    lines = [
+        json.dumps({"role": role, "content": content, "createdAt": at, "image": None, "images": [], "memoryTrace": None})
+        for role, content, at in rows
+    ]
+    (directory / "messages.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def test_export_writes_kourichat_session_files(tmp_path: Path):
     db = SessionDB()
     try:
@@ -84,70 +103,88 @@ def test_export_is_incremental(tmp_path: Path):
 
 def test_import_lands_sessions_in_bot_history(tmp_path: Path):
     bridge_id = str(uuid.uuid4())
-    session_dir = tmp_path / "sessions" / bridge_id
-    session_dir.mkdir(parents=True)
-    (session_dir / "meta.json").write_text(
-        json.dumps({"id": bridge_id, "title": "phone chat", "createdAt": 1000, "updatedAt": 2000, "messageCount": 2}),
-        encoding="utf-8",
-    )
-    (session_dir / "messages.jsonl").write_text(
-        json.dumps({"role": "user", "content": "from the phone", "createdAt": 1000, "image": None, "images": [], "memoryTrace": None})
-        + "\n"
-        + json.dumps({"role": "assistant", "content": "phone reply", "createdAt": 2000, "image": None, "images": [], "memoryTrace": None})
-        + "\n",
-        encoding="utf-8",
-    )
+    _write_phone_session(tmp_path, bridge_id, [("user", "from the phone", 1000), ("assistant", "phone reply", 2000)])
 
     assert import_synced_sessions(tmp_path) == 2
 
     db = SessionDB()
     try:
-        messages = db.get_messages(bridge_id)
+        # One Bot history, not a new row in the session list: the conversation went into
+        # the canonical "Bot Chat" session the product presents.
+        row = db.resolve_session_by_title("Bot Chat")
+        assert row
+        messages = db.get_messages(row)
         assert [(m["role"], m["content"]) for m in messages] == [("user", "from the phone"), ("assistant", "phone reply")]
         assert all(abs(m["timestamp"] * 1000 - ms) < 1 for m, ms in zip(messages, (1000, 2000)))
-        row = db.get_session(bridge_id)
-        assert row["source"] == "kourichat-sync"
+        assert db.get_session(bridge_id) is None
         # profile_name is backfilled so the owner ladder can route the session.
-        assert row.get("profile_name")
+        assert db.get_session(row).get("profile_name")
+    finally:
+        db.close()
+
+
+def test_import_folds_several_phone_sessions_into_one_history(tmp_path: Path):
+    _write_phone_session(tmp_path, "phone-a", [("user", "a1", 1000), ("assistant", "a2", 2000)])
+    _write_phone_session(tmp_path, "phone-b", [("user", "b1", 1500), ("assistant", "b2", 2500)])
+
+    assert import_synced_sessions(tmp_path) == 4
+
+    db = SessionDB()
+    try:
+        row = db.resolve_session_by_title("Bot Chat")
+        assert row
+        assert [m["content"] for m in db.get_messages(row)] == ["a1", "b1", "a2", "b2"]
+        assert db.get_session("phone-a") is None and db.get_session("phone-b") is None
     finally:
         db.close()
 
 
 def test_import_is_idempotent_and_merges(tmp_path: Path):
-    bridge_id = str(uuid.uuid4())
-    session_dir = tmp_path / "sessions" / bridge_id
-    session_dir.mkdir(parents=True)
-    (session_dir / "meta.json").write_text(
-        json.dumps({"id": bridge_id, "title": "", "createdAt": 1000, "updatedAt": 2000, "messageCount": 1}),
-        encoding="utf-8",
-    )
-    message = {"role": "user", "content": "hello", "createdAt": 1000, "image": None, "images": [], "memoryTrace": None}
-    (session_dir / "messages.jsonl").write_text(json.dumps(message) + "\n", encoding="utf-8")
+    _write_phone_session(tmp_path, "phone", [("user", "hello", 1000)])
 
     assert import_synced_sessions(tmp_path) == 1
     assert import_synced_sessions(tmp_path) == 0  # same file again: nothing to add
 
-    (session_dir / "messages.jsonl").write_text(
-        json.dumps(message) + "\n" + json.dumps({"role": "assistant", "content": "welcome", "createdAt": 2000, "image": None, "images": [], "memoryTrace": None}) + "\n",
-        encoding="utf-8",
-    )
+    _write_phone_session(tmp_path, "phone", [("user", "hello", 1000), ("assistant", "welcome", 2000)])
     assert import_synced_sessions(tmp_path) == 1  # only the fresh tail
 
     db = SessionDB()
     try:
-        assert len(db.get_messages(bridge_id)) == 2
+        row = db.resolve_session_by_title("Bot Chat")
+        messages = db.get_messages(row)
+        assert [(m["role"], m["content"]) for m in messages] == [("user", "hello"), ("assistant", "welcome")]
+    finally:
+        db.close()
+
+
+def test_import_appends_to_an_existing_bot_history(tmp_path: Path):
+    db = SessionDB()
+    try:
+        db.import_sessions([{
+            "id": "20260101_000000_botcha",
+            "source": "desktop",
+            "title": "Bot Chat",
+            "started_at": 500.0,
+            "messages": [{"role": "user", "content": "local first", "timestamp": 500.0}],
+        }])
+    finally:
+        db.close()
+
+    _write_phone_session(tmp_path, "phone", [("user", "from the phone", 600_000)])
+    assert import_synced_sessions(tmp_path) == 1
+
+    db = SessionDB()
+    try:
+        row = db.resolve_session_by_title("Bot Chat")
+        assert [m["content"] for m in db.get_messages(row)] == ["local first", "from the phone"]
+        assert db.get_session("phone") is None
     finally:
         db.close()
 
 
 def test_import_skips_non_bot_and_malformed_rows(tmp_path: Path):
-    bridge_id = str(uuid.uuid4())
-    session_dir = tmp_path / "sessions" / bridge_id
+    session_dir = tmp_path / "sessions" / "phone"
     session_dir.mkdir(parents=True)
-    (session_dir / "meta.json").write_text(
-        json.dumps({"id": bridge_id, "title": "", "createdAt": 1, "updatedAt": 3, "messageCount": 3}),
-        encoding="utf-8",
-    )
     rows = [
         json.dumps({"role": "tool", "content": "internal", "createdAt": 1}),
         json.dumps({"role": "user", "content": "visible", "createdAt": 2000}),
@@ -159,6 +196,7 @@ def test_import_skips_non_bot_and_malformed_rows(tmp_path: Path):
     assert import_synced_sessions(tmp_path) == 1
     db = SessionDB()
     try:
-        assert [m["content"] for m in db.get_messages(bridge_id)] == ["visible"]
+        row = db.resolve_session_by_title("Bot Chat")
+        assert [m["content"] for m in db.get_messages(row)] == ["visible"]
     finally:
         db.close()
