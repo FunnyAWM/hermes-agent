@@ -28,8 +28,8 @@
 | --- | --- |
 | 远程 | `origin` = `https://github.com/FunnyAWM/hermes-agent.git`（个人 fork，非上游 `nousresearch/hermes-agent`） |
 | 分支 | `main`，跟踪 `origin/main` |
-| 基座提交 | `2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19`（2026-11-06，上游 v0.23.0 Release 提交，由使用者核对） |
-| 对应版本 | **v0.23.0 Release**（本地已打 annotated tag `v0.23.0` 指向该提交） |
+| 基座提交 | 上游 v0.23.2 Release 提交（本机无该 tag，待 `git ls-remote --tags` 核对；上一基座 v0.23.0 = `2bd378ed1b8d6bf2192cb26e0a55ff3091e6bd19`） |
+| 对应版本 | **v0.23.2 Release**（分支 `patch/v0.23.2`；本地只有 `v0.23.0` 及更早 tag） |
 | 历史状态 | 2026-11-06 `origin/main` 由 GitHub「Discard commits」硬回退到上游 `90d6b98fd8`；本地 `main` 随后 `reset --hard` 到 v0.23.0，fork 改动移到 `patches-v0.23.0` 分支 |
 
 ⚠️ **上游 tag 列表尚未机器核对**：打 `v0.23.0` 时 GitHub 经代理不可达，`git ls-remote --tags` 取不到上游
@@ -45,8 +45,8 @@ tag 清单，「`2bd378e` = 上游 v0.23.0 Release」按使用者核对记录。
 | 冲突 | 下列本地私有路径保留本地版；内核补丁按 `PRD.md` §5.4 登记表逐条 rebase，不允许「取其一」 |
 | 失败 | 停在当前基座继续开发，不阻塞 |
 
-**版本号（2026-10-28 定）**：`上游版本-fork.<N>`，当前桌面 `apps/desktop/package.json` = `0.23.0-fork.1`，
-Python `pyproject.toml` = `0.23.0+fork1`（PEP 440 本地版本写法，同义不同串）。
+**版本号（2026-10-28 定）**：`上游版本-fork.<N>`，当前桌面 `apps/desktop/package.json` = `0.23.2-fork.1`，
+Python `pyproject.toml` = `0.23.2+fork1`（PEP 440 本地版本写法，同义不同串）。
 换上游基座时 N 归 1，同一基座上重新出包则 N+1。这是**同步后必做的一步**，不是一次性动作：
 两处 `version` 都随上游每次发版变化，合并后必须按新 tag 重写，否则安装包会带着上游的号出去。
 

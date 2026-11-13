@@ -676,17 +676,6 @@ def _pre_tool_block(agent, ref: _ToolCallRef):
         return None, ref.args
 
 
-def _auto_review_block(ref, *, messages: list | None,
-                       authorization_gate: _ConcurrentToolAuthorizationGate | None):
-    """``approvals.mode: auto`` gate for one call; returns ``(block_body, error_type)``."""
-    from tools.auto_review import gate_tool_call
-
-    return gate_tool_call(
-        ref.name, ref.args, messages=messages,
-        serialize=None if authorization_gate is None else authorization_gate.run,
-    )
-
-
 def _dispatch_authorized_once(
     agent,
     state: _ManagedToolResult,
@@ -740,7 +729,9 @@ def _dispatch_authorized_once(
             block_error_type = _PRUNED_TOOL_ARGUMENTS_ERROR
 
     if block_body is None:
-        block_body, error_type = _auto_review_block(
+        from agent.tool_executor_auto_review import auto_review_block
+
+        block_body, error_type = auto_review_block(
             ref, messages=messages, authorization_gate=authorization_gate,
         )
         if block_body is not None:

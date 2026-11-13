@@ -95,12 +95,12 @@ PM 会优先复用你机器上已有的合格版本，复用不上才下载受�
 | `ripgrep` | 代码搜索，缺失降级 grep | 15.2.0 | `rg --version` |
 | `uv` | 依赖安装与锁文件 | 0.13.5 | `uv --version` |
 | `node` | npx 型 MCP、部分技能 | 26.12.1 | `node -v` |
-| `npm` | 包安装 | 12.0.2 | `npm -v` |
+| `pnpm` | JS 工作区安装（版本由 `pm/lock.json` 钉死） | 12.15.0 | `pnpm -v` |
 | `ffmpeg` | 音视频转码 | 9.0.1 | `ffmpeg -version` |
 | `gh` | GitHub 操作 | 2.97.0 | `gh --version` |
 
 ```bat
-.venv\Scripts\hermes.exe pm install git ripgrep uv node npm ffmpeg gh
+.venv\Scripts\hermes.exe pm install git ripgrep uv node pnpm ffmpeg gh
 ```
 
 按能力选装：

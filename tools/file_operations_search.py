@@ -626,7 +626,7 @@ class SearchMixin:
         except OSError as exc:
             return ExecuteResult(stdout=f"rg: {exc}", exit_code=2)
         # Record the group at spawn, as LocalEnvironment._run_bash does: rg can exit between the
-# poll and the kill below, and on macOS a not-yet-reaped child has no pgid any more. It is
+        # poll and the kill below, and on macOS a not-yet-reaped child has no pgid any more. It is
         # rg's pid by construction (start_new_session), never a getpgid read-back that same race loses.
         from gateway.status import get_process_start_time
         proc._hermes_pgid = proc.pid

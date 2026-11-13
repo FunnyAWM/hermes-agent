@@ -7,7 +7,7 @@
 // upstream does not have can never conflict.
 //
 // Usage (bypassing scripts/run-electron-builder.mjs, see the note below):
-//   npm run build
+//   pnpm run build
 //   npx electron-builder --config electron-builder.fork.cjs --win nsis --x64
 //
 // @ts-check

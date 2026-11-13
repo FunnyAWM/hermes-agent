@@ -17,7 +17,7 @@
 
 .PARAMETER StageToPayload
     After a complete download, copy the verified tools into
-    apps\desktop\build\agent-payload\tools so `npm run payload` can reuse them
+    apps\desktop\build\agent-payload\tools so `pnpm run payload` can reuse them
     without downloading the tool layer again.
 
 .PARAMETER ListOnly
@@ -182,7 +182,7 @@ if (-not $ListOnly) {
     Write-Host ""
     Write-Host "Managed tools are ready."
     if (-not $StageToPayload) {
-        Write-Host "For an offline `npm run payload`, re-run with -StageToPayload."
+        Write-Host "For an offline `pnpm run payload`, re-run with -StageToPayload."
     }
     Write-Host "Python wheels still come from PyPI during the payload venv step unless the uv cache is warm."
 }

@@ -2,7 +2,7 @@
   "name": "hermes",
   "productName": "KouriChat Next",
   "private": true,
-  "version": "0.23.0-fork.1",
+  "version": "0.23.2-fork.1",
   "description": "Native desktop shell for Rosmontis.",
   "author": {
     "name": "FunnyAWM",
