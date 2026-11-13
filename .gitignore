@@ -347,3 +347,6 @@ apps/desktop/.dist-previous*
 # Mimosa security-scan plugin state (hook transcripts, baselines) — tool-local, never repo content
 /.mimosa/
 apps/desktop/.mimosa/
+
+# The command-sandbox launcher is downloaded locally; electron-builder stages it into resources
+/vendor/
