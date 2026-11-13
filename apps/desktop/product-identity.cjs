@@ -22,7 +22,13 @@ const variants = {
     pascal: 'HermesBundled'
   },
   headless: {
-    display: 'KouriChat Next Headless',
+    // The installed face carries NO "Headless" suffix (user request): same display
+    // name as the regular app, while the disk artifacts stay suffixed (the package
+    // files keep the HermesHeadless prefix) and appId stays hermes-headless so a
+    // regular + headless side-by-side install keeps separate identities. The
+    // userData dir is pinned (userDataDirName below) to the historical directory so
+    // an in-place upgrade of an existing headless install keeps its preferences.
+    display: 'KouriChat Next',
     kebab: 'hermes-headless',
     pascal: 'HermesHeadless'
   }
@@ -73,6 +79,12 @@ const identity = {
   light,
   displayName,
   appId: `com.nousresearch.${name.kebab}${kebabSuffix}`,
+  // Stable headless pins its userData to the historical directory: its display
+  // name now matches the regular app, and Electron derives userData from the
+  // product name — without the pin, an existing headless install would silently
+  // start reading the regular app's state (and vice versa). Commit/canary builds
+  // keep their suffixed appNamePascal directory via the existing branch.
+  ...(variant === 'headless' && !buildCommit && !canary ? { userDataDirName: 'KouriChat Next Headless' } : {}),
   // Store and commit builds do not publish a release feed.
   channel: store || buildCommit ? null : light ? (canary ? 'light-canary' : 'light') : (canary ? 'canary' : 'latest'),
   appNamePascal: `${name.pascal}${pascalSuffix}`,

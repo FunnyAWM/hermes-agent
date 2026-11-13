@@ -25,6 +25,16 @@ module.exports = {
   // upstream releases as "updates" and silently replace this fork.
   publish: null,
 
+  // The command-sandbox launcher ships with the app: a confined local command runs
+  // through it, and `resolve_binary` falls back to this copy when `sandctl` is not on
+  // PATH. `from` is relative to apps/desktop, where this config lives.
+  extraResources: [
+    ...base.extraResources,
+    ...(process.platform === 'win32'
+      ? [{ from: '../../vendor/sandctl/sandctl.exe', to: 'sandctl/sandctl.exe' }]
+      : [])
+  ],
+
   win: {
     ...base.win,
     // A store build must stay MSIX: Partner Center only accepts that identity.
@@ -38,10 +48,14 @@ module.exports = {
     // portable pass then silently overwrites the installer. Per-target names
     // keep both artifacts, which is what §5.5 asks for.
     artifactName: `${artifactNamePascal}-\${version}-\${os}-\${arch}-setup.\${ext}`,
-    // Per-user install: no administrator prompt, and the install tree stays out
-    // of Program Files. Application data lives in HERMES_HOME, not here, so an
-    // overwrite install never touches memories/ or notes/ (T-12's criterion).
-    oneClick: true,
+    // Guided install: the user picks the installation directory (user request) —
+    // the default stays per-user (%LOCALAPPDATA%\Programs\<product>), and
+    // allowToChangeInstallationDirectory is what surfaces the path page. Still no
+    // elevation and never per-machine: Application data lives in HERMES_HOME, not
+    // here, so an overwrite install never touches memories/ or notes/ (T-12).
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    allowElevation: false,
     perMachine: false
   },
 

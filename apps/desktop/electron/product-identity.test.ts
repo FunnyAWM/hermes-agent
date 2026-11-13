@@ -117,11 +117,42 @@ test('nonstable runtime pins userData before the app name can change', async ():
   }
 })
 
+test('stable headless pins userData to its historical directory', async (): Promise<void> => {
+  // The display name now matches the regular app, so without the pin an existing
+  // headless install would silently start reading the regular app's state dir.
+  const headless: ProductIdentity = await identityForVariant('headless')
+  const runtime: { applyDesktopIdentity: typeof applyDesktopIdentity } = await import('./product-identity')
+  const root: string = fs.mkdtempSync(path.join(os.tmpdir(), 'identity-headless-'))
+  const paths: Record<string, string> = { appData: root }
+  let name: string = ''
+
+  const app: Parameters<typeof applyDesktopIdentity>[0] = {
+    getPath: (key: string): string => paths[key],
+    setPath: (key: string, value: string): void => {
+      assert.ok(fs.statSync(value).isDirectory())
+      paths[key] = value
+    },
+    setName: (value: string): void => {
+      name = value
+    }
+  }
+
+  try {
+    assert.equal(runtime.applyDesktopIdentity(app, headless), headless.displayName)
+    assert.equal(paths.userData, path.join(paths.appData, 'KouriChat Next Headless'))
+    assert.equal(name, 'KouriChat Next')
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test.each([
   [undefined, 'KouriChat Next', 'hermes', 'latest', 'canary'],
   ['bundled', 'KouriChat Next Agent', 'hermes', 'latest', 'canary'],
   ['light', 'KouriChat Next Light', 'hermes-light', 'light', 'light-canary'],
-  ['headless', 'KouriChat Next Headless', 'hermes', 'latest', 'canary']
+  // The installed face carries no "Headless" suffix (user request); the package
+  // files keep the HermesHeadless prefix and appId stays hermes-headless.
+  ['headless', 'KouriChat Next', 'hermes', 'latest', 'canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (
@@ -188,8 +219,17 @@ test('light and bundled retain distinct OS markers from the full client', async 
   for (const variant of ['bundled', 'light', 'headless']) {
     const other: ProductIdentity = await identityForVariant(variant)
 
-    for (const field of ['displayName', 'appId', 'appNamePascal'] as const) {
+    // Headless's displayName INTENTIONALLY matches the full client now (user request:
+    // no "Headless" suffix on the installed face) — its separation lives in appId,
+    // the package prefix, and the pinned userDataDirName instead.
+    const distinctFields: readonly (keyof ProductIdentity)[] =
+      variant === 'headless' ? ['appId', 'appNamePascal'] : ['displayName', 'appId', 'appNamePascal']
+    for (const field of distinctFields) {
       assert.notEqual(other[field], full[field])
+    }
+
+    if (variant === 'headless') {
+      assert.equal(other.userDataDirName, 'KouriChat Next Headless')
     }
 
     if (variant === 'light') {
