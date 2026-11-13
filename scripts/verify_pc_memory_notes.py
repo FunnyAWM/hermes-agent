@@ -119,7 +119,8 @@ def _notes(home: Path) -> None:
     section("T-04 notes shards: category enum, path safety, index cap")
     from hermes_notes import (
         CATEGORY_DISPLAY_NAMES,
-        MAX_INDEX_ENTRIES,
+        DEFAULT_HARD_LIMIT,
+        DEFAULT_SOFT_LIMIT,
         WRITABLE_CATEGORIES,
         NotesStore,
     )
@@ -129,7 +130,9 @@ def _notes(home: Path) -> None:
           ", ".join(sorted(CATEGORY_DISPLAY_NAMES)))
     check("docs is read-only to the model", set(WRITABLE_CATEGORIES) == expected - {"docs"},
           ", ".join(sorted(WRITABLE_CATEGORIES)))
-    check("index cap is 64", MAX_INDEX_ENTRIES == 64, str(MAX_INDEX_ENTRIES))
+    check("soft limit defaults to 128 with no hard cap",
+          DEFAULT_SOFT_LIMIT == 128 and DEFAULT_HARD_LIMIT is None,
+          f"{DEFAULT_SOFT_LIMIT}/{DEFAULT_HARD_LIMIT}")
 
     store = NotesStore(home)
     rejected = 0
@@ -189,12 +192,16 @@ def _notes(home: Path) -> None:
           and "IMPORTED_BODY" not in rendered)
     check("five shards listed", len(store.list_entries()) == 5, str(len(store.list_entries())))
 
-    for index in range(MAX_INDEX_ENTRIES + 5):
+    for index in range(DEFAULT_SOFT_LIMIT + 5):
         path = store.note_path("other", f"cap-{index}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"---\nname: n{index}\ndescription: d{index}\n---\n", encoding="utf-8")
-    capped = store.list_entries()
-    check("index is capped at 64 entries", len(capped) == MAX_INDEX_ENTRIES, str(len(capped)))
+    check("no hard cap lists every note", len(store.list_entries()) == 5 + DEFAULT_SOFT_LIMIT + 5,
+          str(len(store.list_entries())))
+    capped = NotesStore(home, soft_limit=DEFAULT_SOFT_LIMIT, hard_limit=DEFAULT_SOFT_LIMIT)
+    check("explicit hard cap truncates the index", len(capped.list_entries()) == DEFAULT_SOFT_LIMIT,
+          str(len(capped.list_entries())))
+    check("hard cap omission is stated", "hard cap" in capped.render_index())
 
 
 def main() -> int:

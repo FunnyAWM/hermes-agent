@@ -307,6 +307,17 @@ class MemoryStore:
         from tools import memory_tool  # get_memory_dir is monkeypatched there
         return memory_tool.get_memory_dir() / ("USER.md" if target == "user" else "MEMORY.md")
 
+    @staticmethod
+    def _archive_before_write(path: Path) -> None:
+        """Copy the current memory file into ``.versions/`` before an accepted rewrite (T-28)."""
+        try:
+            from hermes_constants import get_hermes_home
+            from hermes_notes.lifecycle import archive_before_overwrite
+
+            archive_before_overwrite(Path(str(get_hermes_home())), path)
+        except (ImportError, OSError, ValueError) as error:
+            logger.debug("memory archive skipped for %s: %s", path, error)
+
     def _entries_for(self, target: str) -> list[str]:
         return self.user_entries if target == "user" else self.memory_entries
 
@@ -409,6 +420,7 @@ class MemoryStore:
             from hermes_constants import mkdir_under_hermes_home
 
             mkdir_under_hermes_home(path.parent)
+            self._archive_before_write(path)
             self._write_file(path, result[0])
             return self._success_response(target, result[1], **extra_fields)
 

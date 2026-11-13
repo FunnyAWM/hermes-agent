@@ -2,7 +2,8 @@
 
 from .store import (
     CATEGORY_DISPLAY_NAMES,
-    MAX_INDEX_ENTRIES,
+    DEFAULT_HARD_LIMIT,
+    DEFAULT_SOFT_LIMIT,
     WRITABLE_CATEGORIES,
     NoteEntry,
     NotesStore,
@@ -10,7 +11,8 @@ from .store import (
 
 __all__ = [
     "CATEGORY_DISPLAY_NAMES",
-    "MAX_INDEX_ENTRIES",
+    "DEFAULT_HARD_LIMIT",
+    "DEFAULT_SOFT_LIMIT",
     "WRITABLE_CATEGORIES",
     "NoteEntry",
     "NotesStore",

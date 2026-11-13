@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from agent.system_prompt import build_system_prompt_parts
-from hermes_notes import CATEGORY_DISPLAY_NAMES, MAX_INDEX_ENTRIES, NotesStore
+from hermes_notes import CATEGORY_DISPLAY_NAMES, DEFAULT_SOFT_LIMIT, NotesStore
 
 
 def test_notes_store_validates_categories_and_renders_summary_only(tmp_path: Path):
@@ -63,32 +63,34 @@ def test_notes_index_is_after_user_block(tmp_path: Path, monkeypatch):
     assert volatile.index("USER") < volatile.index("NOTES INDEX") < volatile.index("SKILLS")
 
 
-def test_notes_index_caps_entries(tmp_path: Path):
+def test_notes_index_lists_everything_until_a_hard_cap_is_set(tmp_path: Path):
     store = NotesStore(tmp_path)
-    for index in range(MAX_INDEX_ENTRIES + 3):
+    for index in range(DEFAULT_SOFT_LIMIT + 3):
         path = store.note_path("other", f"note-{index}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"---\nname: {index}\ndescription: item {index}\nupdated: 2026-10-{index % 28 + 1:02d}\n---\n", encoding="utf-8")
-    assert len(store.list_entries()) == MAX_INDEX_ENTRIES
+    assert len(store.list_entries()) == DEFAULT_SOFT_LIMIT + 3
+    capped = NotesStore(tmp_path, soft_limit=DEFAULT_SOFT_LIMIT, hard_limit=DEFAULT_SOFT_LIMIT)
+    assert len(capped.list_entries()) == DEFAULT_SOFT_LIMIT
 
 
 def test_notes_index_announces_omitted_entries(tmp_path: Path):
-    # PRD §7.4: 被截断的条数必须明示,不静默丢弃.
-    store = NotesStore(tmp_path)
+    # PRD §7.4: 被截断的条数必须明示,不静默丢弃. 软上限本身不截断，硬上限才截断。
+    store = NotesStore(tmp_path, soft_limit=10, hard_limit=10)
     assert store.render_index() == ""
     assert store.omitted_count() == 0
-    for index in range(MAX_INDEX_ENTRIES + 2):
+    for index in range(12):
         path = store.note_path("other", f"note-{index}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"---\nname: n{index}\ndescription: d{index}\nupdated: 2026-10-{index % 28 + 1:02d}\n---\n", encoding="utf-8")
     rendered = store.render_index()
-    assert "(-2 older notes beyond this index's 64-entry cap" in rendered
-    assert len(store.list_entries()) == MAX_INDEX_ENTRIES
+    assert "(-2 older notes beyond this index's 10-entry hard cap" in rendered
+    assert len(store.list_entries()) == 10
     assert store.omitted_count() == 2
 
 
 def test_notes_index_keeps_newest_note_even_when_path_sorts_last(tmp_path: Path):
-    store = NotesStore(tmp_path, max_entries=1)
+    store = NotesStore(tmp_path, soft_limit=1, hard_limit=1)
     for topic, updated in (("aaa-new", "2026-11-03"), ("zzz-old", "2026-10-20")):
         path = store.note_path("work", topic)
         path.parent.mkdir(parents=True, exist_ok=True)

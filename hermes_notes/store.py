@@ -20,7 +20,10 @@ CATEGORY_DISPLAY_NAMES: Final[dict[str, str]] = {
 # ``docs`` is an imported-source directory: scanning/indexing includes it, but the
 # model may never create notes there (Android 记 04 / D8).
 WRITABLE_CATEGORIES: Final[frozenset[str]] = frozenset(CATEGORY_DISPLAY_NAMES) - {"docs"}
-MAX_INDEX_ENTRIES: Final[int] = 64
+# Android 设 13 parity: listing has a soft limit that only gates expiry cleanup, plus an
+# optional hard limit that truncates the prompt index (with an explicit omitted count).
+DEFAULT_SOFT_LIMIT: Final[int] = 128
+DEFAULT_HARD_LIMIT: Final[int | None] = None
 _MAX_SUMMARY_CHARS: Final[int] = 40
 _FRONT_MATTER_RE: Final[re.Pattern[str]] = re.compile(r"^---\s*\n(?P<body>.*?)(?:\n---\s*\n|\Z)", re.DOTALL)
 _FIELD_RE: Final[re.Pattern[str]] = re.compile(r"^(name|description|updated):\s*(.*?)\s*$", re.MULTILINE)
@@ -42,12 +45,16 @@ class NoteEntry:
 class NotesStore:
     """Read and validate notes beneath one Hermes home."""
 
-    def __init__(self, home: Path, *, max_entries: int = MAX_INDEX_ENTRIES) -> None:
+    def __init__(self, home: Path, *, soft_limit: int = DEFAULT_SOFT_LIMIT,
+                 hard_limit: int | None = DEFAULT_HARD_LIMIT) -> None:
         self.home = home
         self.root = home / "notes"
-        if max_entries <= 0:
-            raise ValueError("max_entries must be positive")
-        self.max_entries = max_entries
+        if soft_limit <= 0:
+            raise ValueError("soft_limit must be positive")
+        if hard_limit is not None and hard_limit < soft_limit:
+            raise ValueError("hard_limit must be >= soft_limit")
+        self.soft_limit = soft_limit
+        self.hard_limit = hard_limit
 
     def validate_category(self, category: str, *, for_write: bool = False) -> str:
         if category not in CATEGORY_DISPLAY_NAMES:
@@ -94,7 +101,8 @@ class NotesStore:
                 continue
             entries.append(NoteEntry(category, name, summary, path, fields.get("updated", "")))
         entries.sort(key=lambda entry: (entry.updated, entry.path.as_posix()), reverse=True)
-        return entries, entries[: self.max_entries]
+        listed = entries if self.hard_limit is None else entries[: self.hard_limit]
+        return entries, listed
 
     def render_index(self) -> str:
         total, entries = self._scan()
@@ -104,7 +112,7 @@ class NotesStore:
         lines.extend(f"- {entry.display_line}" for entry in entries)
         omitted = len(total) - len(entries)
         if omitted > 0:
-            lines.append(f"(-{omitted} older notes beyond this index's {self.max_entries}-entry cap; "
+            lines.append(f"(-{omitted} older notes beyond this index's {self.hard_limit}-entry hard cap; "
                          "list notes/<category>/ to read one)")
         return "\n".join(lines)
 

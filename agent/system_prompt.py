@@ -70,6 +70,32 @@ MEMORY_ROOT_PROMPT = (
 )
 
 
+# Restated at the TAIL of the prompt, not just in MEMORY_ROOT_PROMPT: the root
+# conventions sit thousands of tokens above the conversation inside a huge
+# tool-heavy prompt, and a real model test on the Android side showed the write
+# trigger is what decays (facts "remembered" in the reply, never written). Same
+# constant text every build, so the prefix cache pays for it once per session.
+# Wording stays tool-agnostic: the PC writes notes with write_file/patch and
+# MEMORY.md through the `memory` tool.
+MEMORY_WRITE_REMINDER = (
+    "Memory write trigger. When the user states — or you learn — something that must outlive this "
+    "turn (a date, place, amount, promise, preference, identity detail), write it before replying: "
+    "durable facts go to notes/<category>/<topic>.md (a name/description header, then the fact), and "
+    "MEMORY.md keeps only what this stretch of conversation was about, at most pointing at the note "
+    "that holds a fact. Claim something is remembered only after the write succeeded."
+)
+
+
+def _memory_write_reminder(agent: Any) -> Optional[str]:
+    """The trigger reminder, only when this agent can actually persist it.
+
+    Gate on a writable surface rather than on the memory feature alone: notes are
+    written with the file tools, so a file-tool-only agent still needs the trigger,
+    and a read-only agent must not be told to write at all."""
+    tools = set(agent.valid_tool_names or ())
+    return MEMORY_WRITE_REMINDER if tools & {"memory", "write_file", "patch"} else None
+
+
 def _model_gate(setting: Any, model: Optional[str], default_models) -> bool:
     """Resolve a config gate: True/"true"-ish -> on, False/"false"-ish -> off,
     list -> case-insensitive model-substring match, anything else ("auto") ->
@@ -566,8 +592,12 @@ def _memory_parts(agent: Any) -> list[str]:
     # configuration has already gated off (#81014).
     try:
         from hermes_notes import NotesStore
+        from hermes_notes.settings import load_notes_settings
         from hermes_constants import get_hermes_home
-        notes_index = NotesStore(get_hermes_home()).render_index()
+        settings = load_notes_settings()
+        notes_index = NotesStore(
+            get_hermes_home(), soft_limit=settings.soft_limit, hard_limit=settings.hard_limit,
+        ).render_index()
     except (ImportError, OSError, ValueError):
         notes_index = ""
     if notes_index:
@@ -841,6 +871,9 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
         # Embedder hints are prose too; reserve the delimiter for the renderer.
         environment_hints = environment_hints.replace(_pb.RUNTIME_ENVIRONMENT_HEADING, "> " + _pb.RUNTIME_ENVIRONMENT_HEADING)
         volatile_parts.append(f"{_pb.RUNTIME_ENVIRONMENT_HEADING}\n\n{environment_hints}\n\n{_pb.RUNTIME_ENVIRONMENT_END}")
+    # Deliberately the LAST block: the write trigger has to be the freshest thing
+    # in context, not a rule buried above thousands of tokens of tool guidance.
+    volatile_parts.append(_memory_write_reminder(agent))
     return {"stable": _join_tier(stable_parts), "context": _join_tier(context_parts), "volatile": _join_tier(volatile_parts)}
 
 
