@@ -63,8 +63,8 @@ def strip_supervisor_markers(env: dict) -> dict:
 # Installing the task is not offered: registered through the UAC hand-off it can start the gateway
 # elevated too (#152218).
 CLIENT_ELEVATED_REMEDY = (
-    "Hermes is running as administrator, and a gateway it started would run as administrator too, "
-    "which locks every normal Hermes window out of it. Start Hermes from a normal (non-administrator) window")
+    "Kouri Harness is running as administrator, and a gateway it started would run as administrator too, "
+    "which locks every normal Kouri Harness window out of it. Start Kouri Harness from a normal (non-administrator) window")
 
 
 def spawn_unmanaged_gateway(profile_home: Path, *, deadline: float, idle_exit: bool = False,

@@ -593,7 +593,7 @@ def _init_prompt_cache_config(agent):
         # Config values and traceback frames may contain credentials.
         logger.warning(
             "Agent configuration for prompt_caching.cache_ttl could not be loaded (%s); "
-            "using default prompt caching settings. Check the active Hermes Python "
+            "using default prompt caching settings. Check the active Kouri Harness Python "
             "environment and dependencies; run 'hermes config check' after "
             "configuration imports work again.",
             type(exc).__name__,
@@ -1232,6 +1232,10 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform, memory_manager=None):
 
 
 def _apply_agent_section(agent, _agent_cfg):
+    # Conversation windows (Android 设 08): X caps user turns per request, Y freezes the prefix.
+    from agent.session_window import window_settings
+    agent._session_window_turns, agent._frozen_window_turns = window_settings(_agent_cfg)
+
     # Skills config: nudge interval for skill creation reminders
     agent._skill_nudge_interval = 10
     with suppress(Exception):
@@ -1939,12 +1943,12 @@ def _enforce_minimum_context(agent):
         raise ValueError(
             f"Model {agent.model} has a context window of {_ctx:,} tokens, "
             f"which is below the minimum {MINIMUM_CONTEXT_LENGTH:,} required "
-            f"by Hermes Agent.  {remedy}"
+            f"by Kouri Harness.  {remedy}"
         )
 
 
 def _warn_nonagentic_hermes_model(agent):
-    # Nous Hermes 3/4 are chat models, not tool-call-tuned. cli.py show_banner() already
+    # Nous Kouri Harness 3/4 are chat models, not tool-call-tuned. cli.py show_banner() already
     # warns on the CLI, so skip platform=="cli"; non-quiet non-CLI surfaces still get it.
     if agent.quiet_mode or (agent.platform or "cli") == "cli":
         return
@@ -1953,7 +1957,7 @@ def _warn_nonagentic_hermes_model(agent):
         _hermes_warn = _check_hermes_model_warning(agent.model or "")
         if _hermes_warn:
             _user_msg = (
-                "⚠ Nous Research Hermes 3 & 4 models are NOT agentic — they "
+                "⚠ Nous Research Kouri Harness 3 & 4 models are NOT agentic — they "
                 "lack reliable tool-calling for agent workflows (delegation, "
                 "cron, proactive tools). Consider an agentic model instead "
                 "(Claude, GPT, Gemini, Qwen-Coder, etc.)."
@@ -2184,7 +2188,7 @@ def init_agent(
         logger.warning(
             "Agent configuration could not be loaded (%s); using defaults for "
             "memory, skills, compression and related settings. Check the active "
-            "Hermes Python environment and dependencies; run 'hermes config check' "
+            "Kouri Harness Python environment and dependencies; run 'hermes config check' "
             "after configuration imports work again.",
             type(exc).__name__,
         )

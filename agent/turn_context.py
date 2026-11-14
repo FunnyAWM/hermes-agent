@@ -47,12 +47,31 @@ def _str_attr(agent: Any, name: str) -> str:
     return getattr(agent, name, "") or ""
 
 
+def _window_start_index(agent: Any, messages: list[dict[str, Any]]) -> int:
+    """First message the request keeps under the conversation windows; 0 = full history."""
+    from agent.session_window import request_start_index
+
+    return request_start_index(
+        messages,
+        int(getattr(agent, "_session_window_turns", 0) or 0),
+        int(getattr(agent, "_frozen_window_turns", 0) or 0),
+    )
+
+
 def _preflight_request_tokens(
     agent: Any, messages: list[dict[str, Any]], system_prompt: str
 ) -> int:
     """Token estimate for automatic preflight compression: a valid provider usage anchor,
     else the checkpoint-pruned native wire payload, else the generic estimator."""
-    anchored = anchored_context_tokens(messages, getattr(agent, "_usage_anchor", None))
+    _window_start = _window_start_index(agent, messages)
+    if _window_start > 0:
+        # A windowed request ships less than the transcript, so the usage anchor (priced over
+        # the full history) and the full-transcript estimate would both overstate pressure.
+        messages = messages[_window_start:]
+    anchored = (
+        None if _window_start > 0
+        else anchored_context_tokens(messages, getattr(agent, "_usage_anchor", None))
+    )
     agent._request_pressure_anchored = anchored is not None
     if anchored is not None:
         return anchored
@@ -1486,6 +1505,14 @@ def build_api_messages(
     turn_now = agent._current_turn_timestamp
     split = current_turn_user_idx if has_current else 0
     canonical_messages = canonicalize_replay_history(messages[:split], now=turn_now) + messages[split:]
+    # Sliding / frozen window (config: context.session_window_turns / frozen_window_turns).
+    # Applied to the wire copy only — the persisted transcript keeps every turn — and never
+    # ahead of this turn's user row, so retries/continues always keep their own prompt.
+    window_start = _window_start_index(agent, canonical_messages)
+    if has_current:
+        window_start = min(window_start, split)
+    if window_start > 0:
+        canonical_messages = canonical_messages[window_start:]
 
     api_messages = []
     for idx, msg in enumerate(canonical_messages):

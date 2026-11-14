@@ -4,7 +4,7 @@ Android PRD v3.0 (同 02 修订) brings chat sessions into the sync whitelist as
 ``sessions/<id>/{meta.json,messages.jsonl}``. This module is the PC-side seam:
 
 - ``export_bot_sessions`` writes the Bot's own user/assistant conversations (state.db,
-  the main-loop surfaces only) as KouriChat Next session files so a phone pulling from
+  the main-loop surfaces only) as Kouri Harness session files so a phone pulling from
   this master — or the next negotiation when this device is the secondary — carries them.
 - ``import_synced_sessions`` folds every session file a negotiation landed into the
   **canonical Bot history** (the single ``Bot Chat`` session the product presents), never

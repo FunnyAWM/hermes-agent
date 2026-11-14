@@ -679,7 +679,7 @@ def _ensure_repo(cwd: str) -> None:
     else:
         needs_root = not _ref_exists(cwd, "HEAD", run=_git_write)
     if needs_root:
-        _git_ok(cwd, ["-c", "user.email=hermes@localhost", "-c", "user.name=Hermes",
+        _git_ok(cwd, ["-c", "user.email=hermes@localhost", "-c", "user.name=Kouri Harness",
                       "commit", "--allow-empty", "-m", "Initial commit"])
 
 

@@ -473,7 +473,7 @@ def _spawn_whatsapp_pairing_process(session_path: Path, mode: str) -> subprocess
     store_umask = ensure_private_store(session_path)  # pairing writes creds.json + signal keys (#80090)
 
     from tools.environments.local import hermes_subprocess_env
-    # bridge.js and its npm deps never see Hermes' credentials; it needs only the mode and policy below.
+    # bridge.js and its npm deps never see Kouri Harness' credentials; it needs only the mode and policy below.
     env = with_hermes_node_path(hermes_subprocess_env())
     env["WHATSAPP_MODE"] = mode
     env["WHATSAPP_DM_POLICY"] = "pairing"
@@ -876,7 +876,7 @@ async def _telegram_onboarding_request(method: str, path: str, *, body=None, bea
 
 @router.post("/api/messaging/telegram/onboarding/start")
 async def start_telegram_onboarding(body: TelegramOnboardingStart):
-    bot_name = (body.bot_name or "Hermes Agent").strip() or "Hermes Agent"
+    bot_name = (body.bot_name or "Kouri Harness").strip() or "Kouri Harness"
     payload = await _telegram_onboarding_request("POST", "/v1/telegram/pairings", body={"bot_name": bot_name})
 
     def field(key: str) -> str:
@@ -967,7 +967,7 @@ async def apply_telegram_onboarding(pairing_id: str, body: TelegramOnboardingApp
         _telegram_onboarding_pairings.pop(pairing_id, None)
 
     # Best-effort restart: the QR flow pulls users into Telegram on another device, so a
-    # saved token waiting on a manual restart click reads as "Hermes is broken" from the
+    # saved token waiting on a manual restart click reads as "Kouri Harness is broken" from the
     # chat side. The save stays authoritative; a failed restart is reported for the UI banner.
     restart_result = _restart_gateway_after(effective_profile, what="Telegram onboarding", label="Telegram onboarding")
     return {

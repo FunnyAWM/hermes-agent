@@ -1,4 +1,4 @@
-"""Hermes CLI - Unified command-line interface for Hermes Agent."""
+"""Kouri Harness CLI - Unified command-line interface for Kouri Harness."""
 
 import sys
 

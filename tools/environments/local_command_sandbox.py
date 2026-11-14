@@ -693,7 +693,7 @@ def _note_once(dropped: list[str]) -> str:
         _reported_notes.add(note)
     logger.warning("sandctl boundary is weaker than the policy asks on this host:\n%s", "\n".join(dropped))
     return ("[WARN] This host cannot confine reads to the grants: paths outside them stay "
-            "readable. Writes, the deny list and network egress are enforced. Full detail in the Hermes log.\n")
+            "readable. Writes, the deny list and network egress are enforced. Full detail in the Kouri Harness log.\n")
 
 
 def failure_note(returncode: int, output: str) -> str:

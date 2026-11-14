@@ -1,4 +1,4 @@
-"""Cloud peer access: ``/api/peer/...`` carries another Hermes agent's API calls to this agent's
+"""Cloud peer access: ``/api/peer/...`` carries another Kouri Harness agent's API calls to this agent's
 gateway api_server on loopback, so ``hermes peer`` can reach a hosted agent without its key.
 
 The bearer is a short-lived pass minted for this one agent, verified before this route runs
@@ -6,7 +6,7 @@ The bearer is a short-lived pass minted for this one agent, verified before this
 not listed is never forwarded, which keeps machine plumbing (``/api/cron/fire``, platform event
 intake, RoomLink grants, ``/health/detailed``) off this route. The request goes on with the
 API_SERVER_KEY the listener checks, which never leaves the machine, and with the pass holder's id
-in ``X-Hermes-Peer-Principal`` so jobs they create stay attributable. Every turn is credited to the
+in ``X-Kouri Harness-Peer-Principal`` so jobs they create stay attributable. Every turn is credited to the
 pass holder. A messaging pass reaches only the agent's canonical Bot Chat, the one session every
 peer message lands in; a control pass has key-holder parity. Control actions are written to the
 dashboard-auth audit log. ``/api/peer/p/<profile>/...`` reaches one profile.
@@ -326,7 +326,7 @@ async def peer_forward(request: Request, path: str):
                and not name.lower().startswith(("x-forwarded-", "x-hermes-peer-"))
                and (name.lower() not in _CONTROL_ONLY or control)
                and (body is None or name.lower() not in _BODY_HEADERS)}
-    headers.update({"Authorization": f"Bearer {key}", "X-Hermes-Peer-Principal": principal.principal})
+    headers.update({"Authorization": f"Bearer {key}", "X-Kouri Harness-Peer-Principal": principal.principal})
     if client_ip(request):
         headers["X-Forwarded-For"] = client_ip(request)
     if body is not None:

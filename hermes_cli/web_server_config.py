@@ -117,8 +117,8 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     "auth.adopt_external_logins": {
         "type": "boolean",
         "description": (
-            "Borrow and refresh the Codex CLI / Claude Code logins when Hermes has no usable login of its own. "
-            "Off: Hermes uses only its own logins (`hermes auth add <provider>`)."
+            "Borrow and refresh the Codex CLI / Claude Code logins when Kouri Harness has no usable login of its own. "
+            "Off: Kouri Harness uses only its own logins (`hermes auth add <provider>`)."
         ),
         "category": "security",
     },
@@ -159,7 +159,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
         "", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
     ),
     "updates.non_interactive_local_changes": _select(
-        "When the chat app / gateway updates Hermes (no terminal prompt), "
+        "When the chat app / gateway updates Kouri Harness (no terminal prompt), "
         "what to do with uncommitted local source edits. 'stash' keeps them "
         "and re-applies them after the update; 'discard' throws them away. "
         "Terminal updates always ask, regardless of this setting.",
@@ -237,6 +237,29 @@ _CATEGORY_MERGE: dict[str, str] = {
 
 _UI_TYPES = ((bool, "boolean"), (int, "number"), (float, "number"), (list, "list"), (dict, "object"))
 
+# Sliding / frozen conversation windows (KouriChat Next Android 设 08, agent/session_window.py).
+# 0 = off; frozen is only effective while 1 <= Y < X. Read with a 0 fallback at runtime, so
+# they stay schema-only virtual fields instead of DEFAULT_CONFIG leaves (that file is at its
+# FILE_LINES ratchet).
+_WINDOW_SCHEMA_FIELDS: dict[str, dict[str, Any]] = {
+    "context.session_window_turns": {
+        "type": "number",
+        "description": (
+            "Keep only the latest N user turns in each model request "
+            "(0 = send the full history)."
+        ),
+        "category": "agent",
+    },
+    "context.frozen_window_turns": {
+        "type": "number",
+        "description": (
+            "Once the window is full, freeze the latest M turns as the cached prefix and "
+            "append newer turns until it refills "
+            "(0 = off; must be less than the session window)."
+        ),
+        "category": "agent",
+    },
+}
 
 def _infer_type(value: Any) -> str:
     """Infer a UI field type from a Python value."""
@@ -273,6 +296,7 @@ def _config_schema_with_virtual_fields() -> dict[str, dict[str, Any]]:
         ordered[key] = entry
         if key == "model":
             ordered["model_context_length"] = _SCHEMA_OVERRIDES["model_context_length"]
+    ordered.update(_WINDOW_SCHEMA_FIELDS)
     return ordered
 
 
@@ -453,7 +477,7 @@ _AUX_TASK_SLOTS: tuple[str, ...] = (
 
 def _plugin_aux_tasks() -> list[dict[str, Any]]:
     """Auxiliary tasks registered by plugins (``PluginContext.register_auxiliary_task``) for the
-    Hermes home active in this context.
+    Kouri Harness home active in this context.
 
     Callers run inside ``_profile_scope`` / ``_config_profile_scope``, and ``get_plugin_manager()``
     keys its manager on the same context-local home, so a request for profile B enumerates
@@ -511,10 +535,10 @@ def _dashboard_skew_restart_hint() -> str:
     if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
         return (
             "restart the Desktop-owned backend to load the new code "
-            "(use Restart backend in Hermes Desktop, or quit and reopen the app)"
+            "(use Restart backend in Kouri Harness Desktop, or quit and reopen the app)"
         )
     return (
-        "restart this Hermes process to load the new code "
+        "restart this Kouri Harness process to load the new code "
         "(hermes dashboard --port <port>, or the equivalent service restart for this install)"
     )
 

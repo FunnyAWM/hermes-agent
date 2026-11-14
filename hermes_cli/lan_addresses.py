@@ -71,6 +71,6 @@ def lan_banner_lines(host: str, port: int, *, scheme: str = "http") -> list[str]
         return []
     if not urls:
         return ["  No LAN IPv4 address found; phones cannot reach this bind yet."]
-    lines = [f"  Hermes Web UI (LAN) → {url}" for url in urls]
+    lines = [f"  Kouri Harness Web UI (LAN) → {url}" for url in urls]
     lines.append("  Pair a phone with: hermes device-pair generate")
     return lines

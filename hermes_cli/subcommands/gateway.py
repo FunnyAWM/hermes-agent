@@ -143,7 +143,7 @@ def build_gateway_parser(
     attach_mode = gateway_attach.add_mutually_exclusive_group()
     _flag(attach_mode, "--start", help="Start the gateway when none serves this profile")
     _flag(attach_mode, "--recover",
-        help="Discover first; start (or replace an older Hermes's) gateway only when it is not ready")
+        help="Discover first; start (or replace an older Kouri Harness's) gateway only when it is not ready")
     gateway_attach.add_argument("--timeout", default="60",
                                 help="Start deadline in seconds for --start/--recover (default: 60)")
     gateway_attach.set_defaults(func=cmd_gateway_attach)
@@ -211,7 +211,7 @@ def build_gateway_parser(
 
     gateway_migrate_legacy = gateway_subparsers.add_parser(
         "migrate-legacy", help="Remove legacy hermes.service units from pre-rename installs",
-        description="Stop, disable, and remove legacy Hermes gateway unit files "
+        description="Stop, disable, and remove legacy Kouri Harness gateway unit files "
             "(e.g. hermes.service) left over from older installs. Profile "
             "units (hermes-gateway-<profile>.service) and unrelated "
             "third-party services are never touched.")
@@ -233,7 +233,7 @@ def build_gateway_parser(
     _flag(gateway_migrate, "-y", "--yes", dest="yes", help="Apply without confirmation")
     _flag(gateway_migrate, "--backends", dest="backends",
         help="Report serve/dashboard background services and their ownership; "
-        "changes no service (normal Hermes startup bookkeeping still runs)")
+        "changes no service (normal Kouri Harness startup bookkeeping still runs)")
     _flag(gateway_migrate, "--json", dest="json", help="With --backends: print the report as JSON")
 
     # enroll: redeem a single-use connector token for the per-gateway secret + per-tenant

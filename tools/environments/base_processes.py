@@ -174,7 +174,7 @@ class LongLivedProcessMixin:
                     pipe.close()
         if owned_pgid is not None:
             # A host-owned group (``spawn_owned``): stopped, so the owner-death supervisor stops covering it
-            # once it is empty (a member that survived both signals stays covered and dies with Hermes).
+            # once it is empty (a member that survived both signals stays covered and dies with Kouri Harness).
             from hermes_cli.process_identity import release_process_group_once_empty
             release_process_group_once_empty(owned_pgid, proc=proc)
 

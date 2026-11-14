@@ -8,7 +8,7 @@ therefore reaches the assignee's turns, and an overlay can replace a value but n
 scrub of the dispatcher's environment only catches the names it knows (provider keys, the
 dispatcher's ``terminal.env_passthrough``); a token systemd or ``op run`` injected under any other
 name went through. So the dispatcher's environment is reduced to host process plumbing and
-Hermes' own location before the dispatcher adds the claim.
+Kouri Harness' own location before the dispatcher adds the claim.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ _HOST_NAMES = frozenset({
     "NUMBER_OF_PROCESSORS", "PUBLIC", "ALLUSERSPROFILE", "PROGRAMDATA", "PROGRAMFILES",
     "PROGRAMFILES(X86)", "PROGRAMW6432", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "USERDOMAIN",
     "USERNAME", "HOMEDRIVE", "HOMEPATH", "COMPUTERNAME", "PROCESSOR_ARCHITEW6432",
-    # Hermes' own location, install and host policy, read before any profile config loads: the
+    # Kouri Harness' own location, install and host policy, read before any profile config loads: the
     # host-wide gateway lock directory (else a cold-started gateway takes a different "host" lock),
     # the no-install policy, and the shared board root and its lock's busy timeout.
     "HERMES_HOME", "HERMES_REAL_HOME", "HERMES_SCRATCH_DIR", "HERMES_RUNTIME_DIR", "HERMES_INSTALL_ROOT",

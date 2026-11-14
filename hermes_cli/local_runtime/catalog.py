@@ -130,7 +130,7 @@ class CatalogEntry:
     recommend: bool = True
     # Reasoning-effort levels this model's chat template accepts; empty when it accepts every
     # level. Qwen3.8's template raises on any other level and llama-server answers HTTP 500, so
-    # Hermes sends the nearest listed level in its place.
+    # Kouri Harness sends the nearest listed level in its place.
     reasoning_efforts: tuple = ()
 
     @property

@@ -228,7 +228,7 @@ def _ws_auth_reason(ws: WebSocket, *, allow_internal: bool = False,
     must not grant access.
 
     Either mode: a local Desktop (no static token) presents the private one-use
-    ``X-Hermes-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
+    ``X-Kouri Harness-Gateway-Ticket`` grant its REST calls use (``authenticate_native_ws``).
     A socket that sends that header is judged by it alone: on a core socket
     (``/api/ws``, ``/api/pty``, the audio streams) the grant is refused
     (``native_invalid``) even when a valid ``token`` query credential rides along.

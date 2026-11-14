@@ -47,7 +47,7 @@ def _layer_hex(palette: dict[str, Any], key: str, default: str) -> str:
 
 def _render_active_theme_bootstrap_css() -> str:
     """Critical-CSS ``<style>`` shim for the active *user* theme, so the first paint uses the
-    target palette instead of flashing the bundle's default Hermes Teal until
+    target palette instead of flashing the bundle's default Kouri Harness Teal until
     ``ThemeProvider.applyTheme()`` runs. Built-in themes return "" (the bundle owns them).
 
     Variable names MUST match what the bundle consumes (``layerVars()`` /
@@ -115,13 +115,13 @@ def _bundle_unavailable(request: Request, message: str, status_code: int) -> Res
     html = (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        "<title>Hermes is unavailable</title><style>"
+        "<title>Kouri Harness is unavailable</title><style>"
         "body{font-family:system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 1rem;"
         "line-height:1.5;color:#1c1c1c;background:#fafafa}"
         "@media (prefers-color-scheme:dark){body{color:#e8e8e8;background:#141414}}"
-        "</style></head><body><h1>Hermes is unavailable</h1>"
+        "</style></head><body><h1>Kouri Harness is unavailable</h1>"
         f"<p>{escape(message)}</p>"
-        "<p>Ask whoever runs this Hermes host to run that command, then reload this page.</p>"
+        "<p>Ask whoever runs this Kouri Harness host to run that command, then reload this page.</p>"
         "</body></html>"
     )
     return HTMLResponse(html, status_code=status_code, headers=page_headers(request, html, _NO_STORE))
@@ -329,8 +329,8 @@ def mount_spa(application: FastAPI):
 
 # Built-in themes — label + description only; colors live in web/src/themes/presets.ts.
 _BUILTIN_DASHBOARD_THEMES = [
-    {"name": "default",       "label": "Hermes Teal",         "description": "Classic dark teal — the canonical Hermes look"},
-    {"name": "default-large", "label": "Hermes Teal (Large)", "description": "Hermes Teal with bigger fonts and roomier spacing"},
+    {"name": "default",       "label": "Kouri Harness Teal",         "description": "Classic dark teal — the canonical Kouri Harness look"},
+    {"name": "default-large", "label": "Kouri Harness Teal (Large)", "description": "Kouri Harness Teal with bigger fonts and roomier spacing"},
     {"name": "nous-blue",     "label": "Nous Blue",           "description": "Light mode — vivid Nous-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
@@ -988,7 +988,7 @@ class PluginApiWebSocketGate:
 
 @contextmanager
 def _native_ws_scope(scope):
-    """Yield whether a plugin socket's native grant (``X-Hermes-Gateway-Ticket``) was admitted,
+    """Yield whether a plugin socket's native grant (``X-Kouri Harness-Gateway-Ticket``) was admitted,
     with that grant's home and secret scope bound for the rest of the connection; without the
     header, True and the ambient scope. The grant is redeemed here only: the route's credential
     check reads the principal stamped on the connection, and its scope dependency resolves the
@@ -1128,7 +1128,7 @@ def _try_hot_mount_plugin_api(name: str) -> bool:
     from hermes_cli.plugins_cmd import _get_disabled_set, _get_enabled_set
     from hermes_cli.web_server import _get_dashboard_plugins, app
     from hermes_cli.web_server_plugin_profiles import plugin_api_path, secondary_plugin, secondary_profile_home
-    # A secondary profile reaches this router only for its own bundled copy (Hermes code), and its
+    # A secondary profile reaches this router only for its own bundled copy (Kouri Harness code), and its
     # own lists decide that one (PLG-3).
     secondary, own, requester_sets = secondary_profile_home() is not None, secondary_plugin(name), _plugin_enable_sets_here()
     with _launch_profile_scope(), _plugin_api_mount_lock:

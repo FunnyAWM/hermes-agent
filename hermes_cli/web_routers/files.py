@@ -355,7 +355,7 @@ def _fs_backend(profile: Optional[str] = None):
     with _profile_scope(profile):
         terminal = dict(load_config().get("terminal") or {})
         profile_env = load_env()
-        # The adapter dials outside this scope; map the profile's own Hermes dirs while its home is bound.
+        # The adapter dials outside this scope; map the profile's own Kouri Harness dirs while its home is bound.
         terminal["cwd"] = coerce_ssh_remote_cwd(terminal.get("cwd"), "ssh")
     for key, env_name in {
         "ssh_host": "TERMINAL_SSH_HOST",

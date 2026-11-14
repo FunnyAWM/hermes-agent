@@ -43,7 +43,7 @@ _IPV6_RE = re.compile(r"^[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._-]+)?$")
 
 
 class SshReachError(RuntimeError):
-    """A classified failure reaching or starting a remote Hermes over SSH."""
+    """A classified failure reaching or starting a remote Kouri Harness over SSH."""
 
     def __init__(self, kind: str, message: str):
         super().__init__(message)
@@ -56,7 +56,7 @@ class SshReachError(RuntimeError):
 
 _REDACTIONS = (
     (re.compile(r"(HERMES_DASHBOARD_SESSION_TOKEN=)(\S+)"), r"\1<redacted>"),
-    (re.compile(r"""(X-Hermes-Session-Token["']?\s*[:=]\s*["']?)([^\s"'&]+)""", re.IGNORECASE), r"\1<redacted>"),
+    (re.compile(r"""(X-Kouri Harness-Session-Token["']?\s*[:=]\s*["']?)([^\s"'&]+)""", re.IGNORECASE), r"\1<redacted>"),
     (re.compile(r"""(Authorization["']?\s*:\s*Bearer\s+)(\S+)""", re.IGNORECASE), r"\1<redacted>"),
     (re.compile(r"""([?&](?:token|ticket)=)([^\s&"']+)""", re.IGNORECASE), r"\1<redacted>"),
     # A mistyped password in the host field (user@host:SECRET) must never reach logs verbatim.
@@ -281,7 +281,7 @@ def ssh_error_message(kind: str, endpoint: SshEndpoint, stderr: str = "") -> str
             f"change is expected, then remove the old key with `ssh-keygen -R {endpoint.host}` and reconnect."
             f"\n\n{detail}"),
         "auth-failed": (
-            f"SSH authentication to {target} failed. Hermes runs ssh non-interactively (BatchMode), so a "
+            f"SSH authentication to {target} failed. Kouri Harness runs ssh non-interactively (BatchMode), so a "
             "key requiring a passphrase or 2FA must be loaded into ssh-agent first, or set an IdentityFile "
             f"in ~/.ssh/config. Original error: {detail}"),
         "interactive-auth": (

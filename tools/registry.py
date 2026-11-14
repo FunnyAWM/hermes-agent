@@ -335,7 +335,7 @@ def _prune_check_fn_caches(now: float) -> None:
 
 def check_fn_cache_scope() -> Optional[str]:
     """Return the active profile key when availability is profile-scoped. Single-profile
-    processes keep the process-wide cache; a multiplex gateway installs a Hermes-home override
+    processes keep the process-wide cache; a multiplex gateway installs a Kouri Harness-home override
     per profile turn, so the canonical profile key is the boundary."""
     try:
         from agent.secret_scope import serves_routed_profile
@@ -767,7 +767,7 @@ class ToolRegistry:
         return self._plugin_namespace_of_module(mod) if mod else None
 
     def is_builtin(self, entry: ToolEntry) -> bool:
-        """True for a tool Hermes ships: handler defined in the ``tools`` package, and not an
+        """True for a tool Kouri Harness ships: handler defined in the ``tools`` package, and not an
         MCP server's tool (those handlers live in ``tools`` too, under an ``mcp-*`` toolset)."""
         return (not entry.toolset.startswith("mcp-")
                 and self._callable_module(entry.handler).partition(".")[0] == "tools")
