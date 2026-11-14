@@ -1,12 +1,12 @@
 ---
 sidebar_position: 15
-title: "Hermes Web Dashboard"
+title: "Kouri Harness Web Dashboard"
 description: "Browser-based administration panel for managing configuration, API keys, MCP servers, messaging pairing, webhooks, the gateway, memory, credentials, sessions, logs, analytics, cron jobs, and skills"
 ---
 
-# Hermes Web Dashboard
+# Kouri Harness Web Dashboard
 
-The web dashboard is a browser-based UI for managing your Hermes Agent installation. Instead of editing YAML files or running CLI commands, you can configure settings, manage API keys, and monitor sessions from a clean web interface.
+The web dashboard is a browser-based UI for managing your Kouri Harness installation. Instead of editing YAML files or running CLI commands, you can configure settings, manage API keys, and monitor sessions from a clean web interface.
 
 :::tip
 Hosted-mode auth uses Nous Portal OAuth; if you also want the dashboard to talk to a real backend, `hermes setup --portal` wires up the model and tool gateway too. See [Nous Portal](../../integrations/nous-portal.md).
@@ -91,16 +91,16 @@ across profiles with its own filter).
 
 ## Prerequisites
 
-FastAPI, Uvicorn, and the platform PTY helper are core Hermes dependencies.
+FastAPI, Uvicorn, and the platform PTY helper are core Kouri Harness dependencies.
 The `web` extra adds exact constraints for the HTTP stack. The `pty` extra is
 empty because its dependencies are already core. Standard PM setup includes
 `web` through `all`.
 
-If these dependencies are damaged, run `hermes pm repair` and restart Hermes.
+If these dependencies are damaged, run `hermes pm repair` and restart Kouri Harness.
 For source setup, use the [PM developer workflow](../../reference/package-management.md#developer-workflow).
 Messaging and voice extras are separate requests, not implied by `all`.
 
-When you run `hermes dashboard` without the dependencies, it will tell you what to install. If the frontend hasn't been built yet, it builds automatically on first launch with the Node and pnpm Hermes provisions.
+When you run `hermes dashboard` without the dependencies, it will tell you what to install. If the frontend hasn't been built yet, it builds automatically on first launch with the Node and pnpm Kouri Harness provisions.
 
 The Chat tab is part of every `hermes dashboard` launch — the embedded browser chat pane (running the TUI over PTY/WebSocket) is always available, with no extra flag required.
 
@@ -139,7 +139,7 @@ it, and a stale heartbeat renders nothing rather than a spurious alert.
 
 ### Chat
 
-The **Chat** tab embeds the full Hermes TUI (the same interface you get from `hermes --tui`) directly in the browser. Everything you can do in the terminal TUI — slash commands, model picker, tool-call cards, markdown streaming, clarify/sudo/approval prompts, skin theming — works identically here, because the dashboard is running the real TUI binary and rendering its ANSI output through [xterm.js](https://xtermjs.org/) with its WebGL renderer for pixel-perfect cell layout.
+The **Chat** tab embeds the full Kouri Harness TUI (the same interface you get from `hermes --tui`) directly in the browser. Everything you can do in the terminal TUI — slash commands, model picker, tool-call cards, markdown streaming, clarify/sudo/approval prompts, skin theming — works identically here, because the dashboard is running the real TUI binary and rendering its ANSI output through [xterm.js](https://xtermjs.org/) with its WebGL renderer for pixel-perfect cell layout.
 
 **How it works:**
 
@@ -154,7 +154,7 @@ The **Chat** tab embeds the full Hermes TUI (the same interface you get from `he
 
 **Session switcher (right rail):** the Chat tab carries its own ChatGPT-style conversation list in a thin right rail beside the terminal, so you can swap conversations without leaving the page. The rail stacks the model picker on top and the session list directly below it; the terminal takes up most of the screen. The list shows your most recent sessions for the active profile — title (falling back to a message preview), relative last-active time, message count, and the source channel for non-CLI sessions. Click any row to resume it in place (the terminal respawns with that conversation's history); the active session is highlighted. **New chat** starts a fresh session, and a refresh control re-pulls the list. The rail is read-only for switching — delete, rename, export, and bulk cleanup still live on the **Sessions** tab. On narrow screens it folds into a slide-over panel.
 
-**Workspace picker:** a fresh chat starts wherever the dashboard process was launched — useless when you are driving Hermes from a phone and want it in `~/code/foo`. The rail's **workspace** selector lists the same directories the Desktop sidebar knows: your explicit projects (`hermes projects`) and every discovered git repository (session-derived plus the `desktop.repo_scan_roots` scan), most recently active first, with an **Other path…** entry for anything else. The choice is remembered per profile and applies to the next **New chat** (a resumed session keeps its own working directory); the rescan button re-walks the discovery roots on the host, so a repo you just cloned over SSH shows up without a restart. A path that no longer exists is refused with an error instead of silently starting in the launch directory. Backed by `GET /api/chat/workspaces` and the `cwd` parameter of the `/api/pty` WebSocket.
+**Workspace picker:** a fresh chat starts wherever the dashboard process was launched — useless when you are driving Kouri Harness from a phone and want it in `~/code/foo`. The rail's **workspace** selector lists the same directories the Desktop sidebar knows: your explicit projects (`hermes projects`) and every discovered git repository (session-derived plus the `desktop.repo_scan_roots` scan), most recently active first, with an **Other path…** entry for anything else. The choice is remembered per profile and applies to the next **New chat** (a resumed session keeps its own working directory); the rescan button re-walks the discovery roots on the host, so a repo you just cloned over SSH shows up without a restart. A path that no longer exists is refused with an error instead of silently starting in the launch directory. Backed by `GET /api/chat/workspaces` and the `cwd` parameter of the `/api/pty` WebSocket.
 
 **Prerequisites:**
 
@@ -164,11 +164,11 @@ The **Chat** tab embeds the full Hermes TUI (the same interface you get from `he
 
 Close the browser tab and the PTY is reaped cleanly on the server. Re-opening spawns a fresh session.
 
-To point [Hermes Desktop](#connecting-hermes-desktop-to-a-remote-backend) at a dashboard running on another machine instead of its own bundled backend, see the remote-backend section below.
+To point [Kouri Harness Desktop](#connecting-hermes-desktop-to-a-remote-backend) at a dashboard running on another machine instead of its own bundled backend, see the remote-backend section below.
 
-### Connecting Hermes Desktop to a remote backend
+### Connecting Kouri Harness Desktop to a remote backend
 
-Hermes Desktop normally launches its own local backend, but it can also attach to a dashboard running on a remote machine (a VM, a homelab box, etc.) via **Settings → Gateways → Remote gateway**. This is the most common source of "Desktop says the backend is ready but chat never works" reports, because Desktop's readiness check verifies less than the live chat connection actually needs.
+Kouri Harness Desktop normally launches its own local backend, but it can also attach to a dashboard running on a remote machine (a VM, a homelab box, etc.) via **Settings → Gateways → Remote gateway**. This is the most common source of "Desktop says the backend is ready but chat never works" reports, because Desktop's readiness check verifies less than the live chat connection actually needs.
 
 :::info Prerequisite: a `hermes dashboard` must be running on the remote host
 The "remote backend" Desktop connects to **is** a `hermes dashboard` process running on the remote machine — the same server this page documents. It has to be up and reachable before any of the steps below matter; Desktop attaches to it, it doesn't start it for you. Keep it running under `systemd`/`tmux`/etc. so it survives logout and reboots. The **gateway** (Telegram/Discord/Slack/etc.) is a *separate* long-running process — start it independently if you rely on messaging channels; it is not the thing the desktop app connects to.
@@ -322,7 +322,7 @@ Create and manage scheduled cron jobs that run agent prompts on a recurring sche
 
 ### Profiles
 
-Create and manage [profiles](../profiles.md) — isolated Hermes instances with their own config, skills, and sessions.
+Create and manage [profiles](../profiles.md) — isolated Kouri Harness instances with their own config, skills, and sessions.
 
 - **Profile cards** — each shows its model/provider, skill count, gateway state, description, and badges (active, default, alias)
 - **Create** — name + optional clone-from-default / clone-everything / no-bundled-skills, description, and model; the dedicated Profile Builder page (`/profiles/new`) offers the full flow (model, MCPs, skills)
@@ -390,7 +390,7 @@ onboards Telegram/Discord/etc. users to a paired gateway. Full parity with
 
 ### Channels
 
-Connect Hermes to any messaging platform from the browser — full parity with
+Connect Kouri Harness to any messaging platform from the browser — full parity with
 `hermes setup gateway`. The page lists every supported channel (Telegram,
 Discord, Slack, Matrix, Mattermost, WhatsApp, Signal, BlueBubbles/iMessage,
 Email, SMS/Twilio, DingTalk, Feishu/Lark, WeCom, WeChat, QQ Bot, plus
@@ -407,7 +407,7 @@ the API server and webhook endpoints) with its live connection status; platforms
 
 A consolidated administration panel for installation-wide operations:
 
-- **Host** — live system stats: OS / kernel, architecture, hostname, Python and Hermes versions, CPU core count + utilization, memory, disk usage of the Hermes home, uptime, and load average. (CPU/memory/disk come from `psutil` when installed; identity fields are always shown.) The Hermes version shows an **update-status badge** (up to date / N commits behind) and a **Check for updates** button. When an update is available on a git install, an **Update now** button opens a confirmation dialog — showing how many commits you'll pull — before running `hermes update` in the background. On Docker/Nix installs the dashboard can't apply the update in place, so it shows the correct out-of-band command instead.
+- **Host** — live system stats: OS / kernel, architecture, hostname, Python and Kouri Harness versions, CPU core count + utilization, memory, disk usage of the Kouri Harness home, uptime, and load average. (CPU/memory/disk come from `psutil` when installed; identity fields are always shown.) The Kouri Harness version shows an **update-status badge** (up to date / N commits behind) and a **Check for updates** button. When an update is available on a git install, an **Update now** button opens a confirmation dialog — showing how many commits you'll pull — before running `hermes update` in the background. On Docker/Nix installs the dashboard can't apply the update in place, so it shows the correct out-of-band command instead.
 - **Nous Portal** — login status, the active inference provider, and the Tool Gateway routing table (which tools run via the Portal vs. locally), with a link to manage your subscription. Read-only mirror of `hermes portal`.
 - **Skill curator** — the background skill-maintenance status (active / paused, interval, last run) with pause/resume and a run-now button. Mirrors `hermes curator`.
 - **Gateway** — start, stop, and restart the messaging gateway, with live status (running/stopped, PID, state)
@@ -433,7 +433,7 @@ The web dashboard reads and writes your `.env` file, which contains API keys and
 
 ## Reporting dashboard background services
 
-Hermes never installs a service for `hermes dashboard` or `hermes serve`, so any that run in the
+Kouri Harness never installs a service for `hermes dashboard` or `hermes serve`, so any that run in the
 background were set up by hand: a systemd unit copied from this page, a launchd plist, the Nix
 `hermes-backend` unit, the Docker image's `dashboard` slot or Compose sidecar, or a Desktop SSH
 backend. To list them and their current ownership:
@@ -447,7 +447,7 @@ For each backend the report shows its supervisor (systemd unit name, scope and u
 label and plist; Nix-managed; s6 slot; container; Desktop; detached process; or unknown), the
 `HERMES_HOME` it serves, and its ownership. Backend migration is not available yet. The report never
 stops, restarts or kills anything, never edits or writes a service file, unit, plist or ledger, and opens no network
-connection; it exits 0 even when a scan fails. Normal Hermes startup still runs first, as for any
+connection; it exits 0 even when a scan fails. Normal Kouri Harness startup still runs first, as for any
 `hermes` command: it creates the `HERMES_HOME` layout and a default `SOUL.md` if missing, records the
 install under `HERMES_HOME/installs/`, opens `logs/agent.log` and `logs/errors.log`, and prunes
 `cache/scratch`. Running backends are found by what they run, whatever the unit is called; units
@@ -681,10 +681,10 @@ same auth gate as the rest of `/api/`.
 
 ## Authentication (gated mode)
 
-When the dashboard is bound to a public or non-loopback address — anything other than `127.0.0.1` / `localhost` — Hermes Agent engages an auth gate. Every request must carry a verified session cookie or it's bounced to the login page. Three providers ship in the box:
+When the dashboard is bound to a public or non-loopback address — anything other than `127.0.0.1` / `localhost` — Kouri Harness engages an auth gate. Every request must carry a verified session cookie or it's bounced to the login page. Three providers ship in the box:
 
 - **[Username/password](#usernamepassword-provider-no-oauth-idp)** — the simplest way to put auth on a self-hosted / on-prem / homelab dashboard. No external identity provider. **Use it only on a trusted network or behind a VPN — not for public-internet exposure.**
-- **[OAuth (Nous Portal)](#default-provider-nous-research)** — for hosted deployments and any dashboard reachable over the public internet, and the recommended path for a [remote Hermes Desktop connection](#connecting-hermes-desktop-to-a-remote-backend). Every login is verified against your Nous account, so this is the provider suitable for internet-facing use.
+- **[OAuth (Nous Portal)](#default-provider-nous-research)** — for hosted deployments and any dashboard reachable over the public internet, and the recommended path for a [remote Kouri Harness Desktop connection](#connecting-hermes-desktop-to-a-remote-backend). Every login is verified against your Nous account, so this is the provider suitable for internet-facing use.
 - **[Self-hosted OIDC](#self-hosted-oidc-provider)** — for bringing your own identity provider via standard OpenID Connect (Keycloak, Auth0, Okta, Google, GitHub via an OIDC bridge, etc.). No Nous Portal involved; suitable for public-internet exposure when fronted by a conformant OIDC server.
 
 Operator-owned dashboards bound to loopback are unaffected — no auth, no login page.
@@ -706,7 +706,7 @@ Since the June 2026 hardening, `--insecure` no longer bypasses dashboard authent
 
 If the gate would engage but **no** `DashboardAuthProvider` is registered (no Nous plugin, no custom plugin), `hermes dashboard` refuses to bind with an explicit error message. There is no "default-deny but accept everything" fallback — a misconfigured gated dashboard never starts.
 
-When you run `hermes dashboard --host 0.0.0.0` **interactively** (a real terminal) and no provider is configured yet, Hermes doesn't just fail — it offers to set one up on the spot: pick **username & password** (writes `dashboard.basic_auth` to `config.yaml` and you're running in seconds) or **OAuth** (points you at `hermes dashboard register`). Non-interactive callers — Docker/s6, CI, piped runs — skip the prompt and hit the fail-closed error above, so an unattended deploy still never starts without auth.
+When you run `hermes dashboard --host 0.0.0.0` **interactively** (a real terminal) and no provider is configured yet, Kouri Harness doesn't just fail — it offers to set one up on the spot: pick **username & password** (writes `dashboard.basic_auth` to `config.yaml` and you're running in seconds) or **OAuth** (points you at `hermes dashboard register`). Non-interactive callers — Docker/s6, CI, piped runs — skip the prompt and hit the fail-closed error above, so an unattended deploy still never starts without auth.
 
 ### Default provider: Nous Research
 
@@ -747,7 +747,7 @@ dashboard:
 |---------|-----------|--------|----------------|
 | `HERMES_DASHBOARD_OAUTH_CLIENT_ID` | `dashboard.oauth.client_id` | `agent:{instance_id}` | `hermes dashboard register` |
 
-Per the Hermes Agent convention (`~/.hermes/.env` is for API keys / secrets only), **`config.yaml` is the recommended place to set these values** for local dev, on-prem, and any deployment you control directly. The environment-variable path exists so a hosting platform's secret injection can push per-deploy `client_id`s without anyone having to edit `config.yaml` inside the image — that's its primary purpose.
+Per the Kouri Harness convention (`~/.hermes/.env` is for API keys / secrets only), **`config.yaml` is the recommended place to set these values** for local dev, on-prem, and any deployment you control directly. The environment-variable path exists so a hosting platform's secret injection can push per-deploy `client_id`s without anyone having to edit `config.yaml` inside the image — that's its primary purpose.
 
 Empty environment values are treated as unset, so a provisioned-but-not-populated platform secret can't accidentally shadow a valid `config.yaml` entry.
 
@@ -773,7 +773,7 @@ There is no unauthenticated public-bind option — to keep it local, bind
 
 #### Worked example: Nous Research
 
-From a logged-in Hermes install to a Nous-gated dashboard in three steps.
+From a logged-in Kouri Harness install to a Nous-gated dashboard in three steps.
 
 **1. Log in and register the dashboard.** `hermes dashboard register` uses your existing Nous login to provision an OAuth client and writes `HERMES_DASHBOARD_OAUTH_CLIENT_ID` into `~/.hermes/.env` for you:
 
@@ -804,7 +804,7 @@ curl -s http://<host>:9119/api/status | jq '.auth_required, .auth_providers'
 
 If you don't want to wire up an OAuth identity provider — a self-hosted "just put a password on my dashboard" deployment — the bundled `plugins/dashboard_auth/basic` plugin registers a `DashboardAuthProvider` named `basic` that authenticates with a **username and password** instead of an OAuth redirect.
 
-It plugs into the same gate as the OAuth provider: the gate engages on a non-loopback bind, the login page renders a credential form for this provider (instead of a "Log in with X" button), and everything downstream of login — session cookies, transparent refresh, WS tickets, logout, the audit log — is identical to the OAuth path. Sessions are HMAC-signed tokens the provider mints itself, so there's **no database and no external IDP**. The signing key is bound to the configured username and password, so changing either ends every existing session; logout revokes that login (and its renewals) via a small `dashboard_auth/basic-revoked-sessions.json` file in the Hermes home. Password hashing uses stdlib `scrypt` (no third-party dependency).
+It plugs into the same gate as the OAuth provider: the gate engages on a non-loopback bind, the login page renders a credential form for this provider (instead of a "Log in with X" button), and everything downstream of login — session cookies, transparent refresh, WS tickets, logout, the audit log — is identical to the OAuth path. Sessions are HMAC-signed tokens the provider mints itself, so there's **no database and no external IDP**. The signing key is bound to the configured username and password, so changing either ends every existing session; logout revokes that login (and its renewals) via a small `dashboard_auth/basic-revoked-sessions.json` file in the Kouri Harness home. Password hashing uses stdlib `scrypt` (no third-party dependency).
 
 :::warning Use this on trusted networks only — not the public internet
 The username/password provider is intended for self-hosted / on-prem / homelab dashboards on a **trusted network**, or reachable only over a **VPN**. It protects a single shared credential with no external identity provider, MFA, or per-user accounts behind it, so it is **not suitable for exposing a dashboard directly to the public internet**. For an internet-facing dashboard, use the [Nous Research provider](#default-provider-nous-research) (or your own [self-hosted OIDC](#self-hosted-oidc-provider) / [custom OAuth](#custom-providers) provider) instead.
@@ -885,9 +885,9 @@ curl -s http://<host>:9119/api/status | jq '.auth_required, .auth_providers'
 
 ### Deployment session-token provider (token-only deployments)
 
-The bundled `plugins/dashboard_auth/session_token` plugin makes the **deployment session token** (`HERMES_DASHBOARD_SESSION_TOKEN`) a first-class gated-mode credential. This is the shape secret-managed deployments already provision — a single shared token (nix/agenix hands it over as a decrypted file; the Nix modules set `HERMES_DASHBOARD_SESSION_TOKEN=file:<path>` from `backend.sessionTokenFile`) that Hermes Desktop's remote-gateway **"Session token"** field presents. Without this provider, a non-loopback bind with only a provisioned token hit the fail-closed gate and pushed the operator into basic-auth or OAuth credentials the deployment never asked for.
+The bundled `plugins/dashboard_auth/session_token` plugin makes the **deployment session token** (`HERMES_DASHBOARD_SESSION_TOKEN`) a first-class gated-mode credential. This is the shape secret-managed deployments already provision — a single shared token (nix/agenix hands it over as a decrypted file; the Nix modules set `HERMES_DASHBOARD_SESSION_TOKEN=file:<path>` from `backend.sessionTokenFile`) that Kouri Harness Desktop's remote-gateway **"Session token"** field presents. Without this provider, a non-loopback bind with only a provisioned token hit the fail-closed gate and pushed the operator into basic-auth or OAuth credentials the deployment never asked for.
 
-When the env var is provisioned, the provider registers automatically and `verify_session` constant-time-compares the presented credential against it. Both legs a token-mode client uses run through that seam — REST, where Desktop's "Session token" connection sends the token in the `X-Hermes-Session-Token` header (a bearer token in the `Authorization` header works too and wins when both are sent; only this provider's token works in the dedicated header), and the `/api/ws` `?token=` upgrade credential — so one provisioned token authorizes both. There is **no browser sign-in flow**: `/login` renders a note explaining the credential channel instead of sign-in buttons, and the provider is never offered by the auto-SSO redirect.
+When the env var is provisioned, the provider registers automatically and `verify_session` constant-time-compares the presented credential against it. Both legs a token-mode client uses run through that seam — REST, where Desktop's "Session token" connection sends the token in the `X-Kouri Harness-Session-Token` header (a bearer token in the `Authorization` header works too and wins when both are sent; only this provider's token works in the dedicated header), and the `/api/ws` `?token=` upgrade credential — so one provisioned token authorizes both. There is **no browser sign-in flow**: `/login` renders a note explaining the credential channel instead of sign-in buttons, and the provider is never offered by the auto-SSO redirect.
 
 :::warning Treat the token like a password
 The provisioned token grants full dashboard access to whoever holds it. Provision it from a secret manager (never a Nix store path), rotate by redeploying the secret — rotation invalidates every saved client copy, which surfaces as "HTTP reachable but the WebSocket fails" in Desktop until the new token is pasted in. There is no per-user identity behind it: for shared or internet-facing deployments prefer the [Nous Research](#default-provider-nous-research) or [self-hosted OIDC](#self-hosted-oidc-provider) provider.
@@ -978,7 +978,7 @@ The ID token is what establishes identity — the access token is treated as opa
   "clients": [
     {
       "clientId": "hermes-dashboard",
-      "name": "Hermes Agent Dashboard",
+      "name": "Kouri Harness Dashboard",
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,
@@ -1066,7 +1066,7 @@ guard.
 
 Declaring a non-loopback `public_url` always engages the dashboard auth gate,
 even when the backend binds to loopback. Configure a password or OAuth provider
-first; without one, Hermes fails closed at startup. This prevents the local SPA
+first; without one, Kouri Harness fails closed at startup. This prevents the local SPA
 session token from becoming a remote authentication mechanism through the
 proxy. Uvicorn also enables proxy-header processing in this mode. Loopback
 proxies are trusted automatically. If the TLS terminator connects from another
@@ -1081,7 +1081,7 @@ dashboard:
 ```
 
 Only listed peers may supply `X-Forwarded-Proto` and `X-Forwarded-For`.
-Hermes always preserves loopback trust and rejects `*`, `0.0.0.0/0`, and
+Kouri Harness always preserves loopback trust and rejects `*`, `0.0.0.0/0`, and
 `::/0`. Trusting a network means every container or machine on that network
 can supply forwarding metadata, so prefer an exact proxy IP or a dedicated
 proxy-only network. Without a trusted-proxy entry, clients behind that proxy
@@ -1182,7 +1182,7 @@ Custom providers can implement `supports_token`/`verify_token` the same way to e
 
 ### Peer passes (`/api/peer`)
 
-A provider can also accept **peer passes** (`supports_peer_pass = True` + `verify_peer_pass(token=...)`): short-lived tokens minted for one agent that let another Hermes agent call this agent's API server through the dashboard, without the agent's `API_SERVER_KEY`.
+A provider can also accept **peer passes** (`supports_peer_pass = True` + `verify_peer_pass(token=...)`): short-lived tokens minted for one agent that let another Kouri Harness agent call this agent's API server through the dashboard, without the agent's `API_SERVER_KEY`.
 
 - `/api/peer/<path>` forwards to the gateway API server on loopback and adds the API server key on the way; `/api/peer/p/<profile>/<path>` reaches one profile, named as the API server's `/p/<profile>/` prefix names it (`hermes` is the default profile unless a profile has that name).
 - Each path needs a permission the pass carries.
@@ -1190,7 +1190,7 @@ A provider can also accept **peer passes** (`supports_peer_pass = True` + `verif
   Each turn runs with the agent's tools, terminal included, so a messaging pass lets its holder have the agent carry out tasks.
   A messaging turn carries only its message (and, for a run, the Bot Chat's session id); choosing the model, the system prompt or the history needs `agents:control`.
   `agents:control` includes messaging in any session and adds the rest of the user-facing API: run approvals, clarify, steer and resolve-unknown; session listing, fork, messages, model, rename and delete; scheduled jobs, which keep running after the pass expires; models, skills and toolsets; chat completions and responses.
-  Only `agents:control` may set or receive `X-Hermes-Session-Key`, which picks the API server's memory scope.
+  Only `agents:control` may set or receive `X-Kouri Harness-Session-Key`, which picks the API server's memory scope.
 - Every chat turn and run is credited to the pass holder: the turn author's id is set to the verified holder, whatever the request body says.
 - Any other path is never forwarded, including `/api/cron/fire`, platform event intake, RoomLink grants and `/health/detailed`.
 - A gateway that is asleep or restarting answers 503 with `Retry-After`. A request the gateway dropped after receiving it answers 502 `peer_gateway_dropped` with no retry hint, because it may have run.
@@ -1225,9 +1225,9 @@ curl -s http://127.0.0.1:9119/api/status | jq '.auth_required, .auth_providers'
 
 The dashboard's React StatusPage shows the same fields under "Web server". A sidebar AuthWidget surfaces the current identity once you've signed in.
 
-## Connecting Hermes Desktop to a remote backend
+## Connecting Kouri Harness Desktop to a remote backend
 
-Hermes Desktop can drive a Hermes backend running on another machine (a VPS, a home server, a Mini behind Tailscale). In the app this lives under **Settings → Gateways → Remote gateway**, which asks for a **Remote URL** and a way to **Sign in**. (For the desktop app itself — install, settings, chat — see the [Hermes Desktop](../desktop.md) page.)
+Kouri Harness Desktop can drive a Kouri Harness backend running on another machine (a VPS, a home server, a Mini behind Tailscale). In the app this lives under **Settings → Gateways → Remote gateway**, which asks for a **Remote URL** and a way to **Sign in**. (For the desktop app itself — install, settings, chat — see the [Kouri Harness Desktop](../desktop.md) page.)
 
 You protect the remote dashboard with one of the bundled auth providers, and the desktop app signs in against whichever one the backend advertises. For a backend reachable beyond your own machine — a VPS, a public host, anything internet-facing — the recommended provider is **OAuth (Nous Portal)** (register it with [`hermes dashboard register`](#registering-a-dashboard) and sign in with *Sign in with Nous Research*). The bundled [username/password provider](#usernamepassword-provider-no-oauth-idp) is the quickest option when the backend is on a trusted LAN or reachable only over a VPN, but is **not suitable for direct public-internet exposure**. Binding the dashboard to a non-loopback address engages its auth gate; once signed in, Desktop reuses the session for the chat WebSocket automatically — there is no token to copy or paste.
 
@@ -1261,7 +1261,7 @@ If you run the dashboard as a systemd service, `~/.hermes/.env` is picked up aut
 The dashboard reads and writes your `.env` (API keys, secrets) and can run agent commands. The **username/password** setup shown here is for a trusted network — never expose a password-protected dashboard directly to the open internet. Put it behind a VPN. [Tailscale](https://tailscale.com/) is the clean option: bind to the machine's tailscale IP (`--host <tailscale-ip>`) and use `http://<tailscale-ip>:9119` as the Remote URL. Only devices on your tailnet can reach it. To reach a backend over the public internet, use the **OAuth (Nous Portal)** provider instead.
 :::
 
-### In Hermes Desktop
+### In Kouri Harness Desktop
 
 **Settings → Gateways → Remote gateway:**
 
@@ -1341,7 +1341,7 @@ The build is CPU- and memory-intensive (Vite 8's Rust-native Rolldown bundler pa
 
 ## Automatic Build on Update
 
-When you run `hermes update`, the web frontend is automatically rebuilt with the Node and pnpm Hermes provisions. This keeps the dashboard in sync with code updates. If the update cannot provision them (for example with lazy installs disabled), it skips the frontend build and `hermes dashboard` will build it on first launch.
+When you run `hermes update`, the web frontend is automatically rebuilt with the Node and pnpm Kouri Harness provisions. This keeps the dashboard in sync with code updates. If the update cannot provision them (for example with lazy installs disabled), it skips the frontend build and `hermes dashboard` will build it on first launch.
 
 ## Themes & plugins
 
@@ -1355,8 +1355,8 @@ Built-in themes:
 
 | Theme | Character |
 |-------|-----------|
-| **Hermes Teal** (`default`) | Dark teal + cream, system fonts, comfortable spacing |
-| **Hermes Teal (Large)** (`default-large`) | Same as default with 18px text and roomier spacing |
+| **Kouri Harness Teal** (`default`) | Dark teal + cream, system fonts, comfortable spacing |
+| **Kouri Harness Teal (Large)** (`default-large`) | Same as default with 18px text and roomier spacing |
 | **Nous Blue** (`nous-blue`) | Nous-branded blue accents with airy spacing |
 | **Midnight** (`midnight`) | Deep blue-violet, Inter + JetBrains Mono |
 | **Ember** (`ember`) | Warm crimson + bronze, Spectral serif + IBM Plex Mono |

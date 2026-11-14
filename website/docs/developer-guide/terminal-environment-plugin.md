@@ -1,6 +1,6 @@
 # Terminal Environment Provider Plugins
 
-Hermes runs shell commands through a pluggable set of **terminal backends**.
+Kouri Harness runs shell commands through a pluggable set of **terminal backends**.
 The built-in backends (local, Docker, Modal, Daytona, Vercel Sandbox, SSH)
 live in the core repo under `tools/environments/`. The official
 [Singularity/Apptainer plugin](https://github.com/NousResearch/hermes-official-plugins/tree/main/singularity)
@@ -137,7 +137,7 @@ and background-process plumbing) but not required.
 ## Background processes and `cleanup()`
 
 A background command (`terminal(background=true)`) on a non-local backend is
-polled through the environment object that spawned it. When Hermes tears that
+polled through the environment object that spawned it. When Kouri Harness tears that
 environment down (`cleanup()` on session close, idle reaping, or eviction after
 a connection failure), it marks those processes `lost` so their pollers stop.
 It does that only after `cleanup()` returned without raising (or reported the
@@ -184,14 +184,14 @@ class AcmeJailEnvironment(LocalEnvironment):
 ```
 
 Leave it unset on backends that don't subclass `LocalEnvironment`; the default
-is `False`. Hermes v0.22.5 and earlier ignore the attribute and use the host
+is `False`. Kouri Harness v0.22.5 and earlier ignore the attribute and use the host
 fast path for every `LocalEnvironment` subclass, so pin `requires_hermes` past
 that.
 
 ## Images
 
 Your backend reads its own image setting (a `config_schema` key, or a
-`terminal.<name>_image` key you document). Hermes passes `image=` only for a
+`terminal.<name>_image` key you document). Kouri Harness passes `image=` only for a
 per-task override: a batch run (`batch_runner.py`) giving each prompt its own
 container registers it as `<name>_image` for the active backend, and that value
 reaches `create_environment(image=...)`. Otherwise `image` is `""`; fall back to
@@ -210,7 +210,7 @@ absolute in-sandbox path to start somewhere else:
 ```
 
 When the home directory is only known once the sandbox is up, return `"~"`
-instead. Hermes then passes `cwd="~"` to `create_environment()` (it never
+instead. Kouri Harness then passes `cwd="~"` to `create_environment()` (it never
 expands it on the host), and your environment sets `self.cwd` to the absolute
 home it resolved:
 
@@ -222,7 +222,7 @@ class AcmeBoxEnvironment(BaseEnvironment):
         super().__init__(cwd=cwd, timeout=timeout)
 ```
 
-Hermes keeps `~` as the backend default, so every new sandbox resolves its
+Kouri Harness keeps `~` as the backend default, so every new sandbox resolves its
 own home, and records the path each environment resolved on that environment.
 Commands can also arrive with `cwd="~"`; `BaseEnvironment` already `cd`s
 there correctly. A `cd` anywhere under that home is kept for later commands
@@ -231,7 +231,7 @@ sandbox path like `/home/acme/project` would be discarded as if it were a
 host path.
 
 `default_cwd` is read on every command, so keep it cheap (no network calls).
-Relative paths are ignored, because Hermes would anchor them on the host.
+Relative paths are ignored, because Kouri Harness would anchor them on the host.
 
 ## Bot Desktop and `computer_use`
 
@@ -244,7 +244,7 @@ stdout left open. A plugin backend can opt in the same way:
 2. Give the environment an `exec_prefix(*, user=None, interactive=True)` method.
    It returns a local argv that runs whatever follows it inside the sandbox,
    with stdin and stdout open (the shape of `docker exec -i <container>`), or
-   `None` when it can't right now. Hermes appends `bash -c <script>` as
+   `None` when it can't right now. Kouri Harness appends `bash -c <script>` as
    separate words, so the client must pass them through unchanged and the
    sandbox needs `bash`. `user` names the account to run as; ignore it if your
    backend can't switch users. Return a list, not a single command string.
@@ -279,12 +279,12 @@ other.
 
 ## Hosted scopes
 
-A hosted deployment runs many tenants' agents in one Hermes process, and each
+A hosted deployment runs many tenants' agents in one Kouri Harness process, and each
 agent's commands, code, background processes and files live in that agent's
 own remote sandbox. A backend that provides those sandboxes sets
 `serves_hosted_scopes = True`. With a hosted `hermes_scope.Scope` bound
-(a tenant other than `local`), Hermes refuses every backend without it, the
-built-ins included, so nothing a hosted agent runs ever runs on the Hermes host.
+(a tenant other than `local`), Kouri Harness refuses every backend without it, the
+built-ins included, so nothing a hosted agent runs ever runs on the Kouri Harness host.
 
 **Identity.** The sandbox is the agent's, not the task's or the session's:
 `SandboxIdentity(scope.tenant, scope.agent)` from
@@ -295,7 +295,7 @@ additionally receives `scope=` (the bound scope) and `sandbox=` (the
 identity), and `task_id` is `sandbox.key`. Create or resume the sandbox that
 `sandbox` names and nothing else.
 
-**The guard.** Hermes wraps the environment you return in
+**The guard.** Kouri Harness wraps the environment you return in
 `ScopedEnvironment`. Every call made through it first checks that the bound
 scope names the same agent, and raises `CrossAgentHandleRefused` otherwise
 (including when no scope is bound), then passes that scope to your method as
@@ -341,7 +341,7 @@ def stop_process(self, name, *, scope): ...                          # -> bool
 ```
 
 `ProcessStream` (from `sandbox_scope`) holds byte pipes `stdin` and `stdout`
-and a `poll()` that returns the exit status or `None`. The stream Hermes hands
+and a `poll()` that returns the exit status or `None`. The stream Kouri Harness hands
 back wraps yours: every pipe operation and `poll()` checks the bound scope, so
 a stream acquired by one agent is refused to any other holder. A later call in the same
 session attaches with the `ProcessRef` from the first stream; a reference that
@@ -353,10 +353,10 @@ and network isolation between sandboxes, are yours.
 
 **Credentials** reach a hosted sandbox as broker references
 (`sandbox_scope.CredentialRef`), never as values from the secret store. No
-broker exists yet, so Hermes passes none.
+broker exists yet, so Kouri Harness passes none.
 
 **Conformance.** `tools/environments/sandbox_conformance.py` holds the
-isolation checks Hermes runs against its recording stub backend
+isolation checks Kouri Harness runs against its recording stub backend
 (`tests/tools/test_sandbox_scope_conformance.py`): A's tools only address A's
 sandbox; a handle naming another agent is refused; no file tool or media read
 touches the host filesystem (checked with a planted host file and symlink, an

@@ -1,6 +1,6 @@
 # KouriChat Link — device-chain sync
 
-KouriChat Link mirrors your files between the Android client (KouriChat Next) and this
+KouriChat Link mirrors your files between the Android client (Kouri Harness) and this
 desktop app over your local network. There is no cloud server: one device is the
 **chain master** (it serves the data), the others join as **secondaries**. Both roles
 are available on PC.

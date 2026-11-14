@@ -1,4 +1,4 @@
-# KouriChat Next Headless · 环境与安装说明
+# Kouri Harness Headless · 环境与安装说明
 
 **适用对象**：`apps/desktop/release-headless/` 下的两个包——安装版
 `HermesHeadless-0.23.0-fork.1-win-x64-setup.exe` 与免安装版
@@ -6,7 +6,7 @@
 （`2bd378ed1b`）。
 
 **这个包是什么**：`headless` 指**包里不携带运行时**，不是无界面程序。它照常打开桌面窗口，
-Agent 跑在你机器上已有的 Hermes 源码树 + venv 上。好处是包小（约 140 MB）、升级源码不动包；
+Agent 跑在你机器上已有的 Kouri Harness 源码树 + venv 上。好处是包小（约 140 MB）、升级源码不动包；
 代价是需要你自己把环境补齐。想要开箱即用的完整版（运行时密封进包）目前没有发行计划——
 包体会涨到 3.7 GB 以上，改为按需补环境。
 
@@ -18,7 +18,7 @@ Agent 跑在你机器上已有的 Hermes 源码树 + venv 上。好处是包小�
 | --- | --- | --- |
 | 操作系统 | Windows 10 / 11，x64 | 安装包是 per-user，不需要管理员权限 |
 | 磁盘 | 源码树 + venv 预留 3 GB；工具按需另计 | Chromium 约 170 MB，llama.cpp 变体每个约 100 MB |
-| Hermes 源码树 | 任意路径的一份检出 | 必须含 `hermes_cli\main.py`；桌面端按下面的阶梯找它 |
+| Kouri Harness 源码树 | 任意路径的一份检出 | 必须含 `hermes_cli\main.py`；桌面端按下面的阶梯找它 |
 | Python | **3.11–3.14**（`pyproject.toml`：`>=3.11,<3.15`） | 必须是真实 CPython，Microsoft Store 的 `python` 是重定向 stub，建不出 venv |
 | uv | 建议 0.13.x | 用于建 venv、装依赖、装受管工具 |
 | 网络 | 首次装依赖需要访问 PyPI | 走镜像见 §6 |
@@ -27,11 +27,11 @@ Agent 跑在你机器上已有的 Hermes 源码树 + venv 上。好处是包小�
 ## 2. 安装
 
 1. 双击 `...-setup.exe`。它是引导式、per-user 安装：**不弹管理员提示**，默认装到
-   `%LOCALAPPDATA%\Programs\KouriChat Next\`，安装过程中**可以自选安装目录**；不进 Program Files。
+   `%LOCALAPPDATA%\Programs\Kouri Harness\`，安装过程中**可以自选安装目录**；不进 Program Files。
 2. 免安装就双击 `...-portable.exe`，解压即用。
-3. 安装后的程序名、快捷方式与窗口标题均为「KouriChat Next」（不带 Headless 后缀）。
-   桌面端自己的偏好数据仍落在独立目录 `%APPDATA%\KouriChat Next Headless\`（appId
-   `com.nousresearch.hermes-headless`），与正式版的 `%APPDATA%\KouriChat Next` 互不相通——
+3. 安装后的程序名、快捷方式与窗口标题均为「Kouri Harness」（不带 Headless 后缀）。
+   桌面端自己的偏好数据仍落在独立目录 `%APPDATA%\Kouri Harness Headless\`（appId
+   `com.nousresearch.hermes-headless`），与正式版的 `%APPDATA%\Kouri Harness` 互不相通——
    两份安装可以并存、互不覆盖；若同时安装正式版，请在安装时选择不同的安装目录。
 4. Agent 的运行数据（配置、会话、记忆、笔记、日志、工具）落在 **`%LOCALAPPDATA%\hermes\`**，
    与安装包位置无关：
@@ -73,8 +73,8 @@ bootstrap 装运行时。**
 找不到运行时时弹出的原文是：
 
 ```
-This headless build found no local Hermes runtime, and it never installs one.
-Point HERMES_DESKTOP_HERMES_ROOT at a checkout, or install Hermes with `hermes pm install`.
+This headless build found no local Kouri Harness runtime, and it never installs one.
+Point HERMES_DESKTOP_HERMES_ROOT at a checkout, or install Kouri Harness with `hermes pm install`.
 ```
 
 处理方式：把 `HERMES_DESKTOP_HERMES_ROOT` 设成源码树绝对路径（用户环境变量里设一次即可），
@@ -154,8 +154,8 @@ set UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 - [ ] `cd /d D:\path\to\hermes-agent && .venv\Scripts\hermes.exe --version` 有版本输出
 - [ ] `.venv\Scripts\hermes.exe doctor` 无 FAIL，重点看 Required Packages、External Tools、
       Tool Availability 三节
-- [ ] 启动 `KouriChat Next.exe`（或开始菜单的「KouriChat Next」），`%LOCALAPPDATA%\hermes\logs\desktop.log` 里出现
-      `[backend] using Hermes source at <你的源码树>` 与 `published connection=local`
+- [ ] 启动 `Kouri Harness.exe`（或开始菜单的「Kouri Harness」），`%LOCALAPPDATA%\hermes\logs\desktop.log` 里出现
+      `[backend] using Kouri Harness source at <你的源码树>` 与 `published connection=local`
 - [ ] 设置 → About → Runtime 显示 `external/source`，不是 bootstrap
 - [ ] 发一条消息得到回复；机器人页只有一个默认助手（本版按单机器人形态收敛）
 
@@ -174,7 +174,7 @@ set UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
-| 启动提示找不到 Hermes 运行时 | 烘焙路径在这台机器不存在，或该树没有 `.venv` | 设 `HERMES_DESKTOP_HERMES_ROOT` / `HERMES_DESKTOP_PYTHON`，或按 §3 建 venv |
+| 启动提示找不到 Kouri Harness 运行时 | 烘焙路径在这台机器不存在，或该树没有 `.venv` | 设 `HERMES_DESKTOP_HERMES_ROOT` / `HERMES_DESKTOP_PYTHON`，或按 §3 建 venv |
 | `ModuleNotFoundError` | 依赖没装齐，或装到了别的解释器 | 在**要用的那个** venv 里重跑 `uv sync --all-extras --no-extra kittentts` |
 | `uv sync` 报 `setuptools` 无解 | 镜像不报上传时间 | 换 §6 验证过的镜像，或用默认 PyPI |
 | 浏览器工具说缺 Chromium | 既没装受管包也没配路径 | `hermes pm install chromium` 或设 `browser.executable_path` |
