@@ -9,7 +9,7 @@ import { parseLocalRuntimeVersion, resolveLocalRuntimeVersion, type VersionProbe
 
 describe('local client version source', (): void => {
   it('parses the exact version line emitted by the local launcher', (): void => {
-    expect(parseLocalRuntimeVersion('Hermes Agent v0.21.5+6644.gb412ee9 (2026.9.24)\n')).toBe('0.21.5+6644.gb412ee9')
+    expect(parseLocalRuntimeVersion('Kouri Harness v0.21.5+6644.gb412ee9 (2026.9.24)\n')).toBe('0.21.5+6644.gb412ee9')
     expect(parseLocalRuntimeVersion('gateway: v0.21.5+6634\n')).toBe('')
   })
 
@@ -21,13 +21,15 @@ describe('local client version source', (): void => {
       expect(options.maxBuffer).toBe(64 * 1024)
       expect(options.env.HERMES_HOME).toBe('/isolated/home')
 
-      return 'Hermes Agent v0.21.5+6644.gb412ee9 (local)\n'
+      return 'Kouri Harness v0.21.5+6644.gb412ee9 (local)\n'
     })
 
-    await expect(resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', {
-      launcher: '/isolated/hermes/.hermes/bin/hermes',
-      run
-    })).resolves.toBe('0.21.5+6644.gb412ee9')
+    await expect(
+      resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', {
+        launcher: '/isolated/hermes/.hermes/bin/hermes',
+        run
+      })
+    ).resolves.toBe('0.21.5+6644.gb412ee9')
     expect(run).toHaveBeenCalledTimes(1)
   })
 
@@ -36,16 +38,20 @@ describe('local client version source', (): void => {
       throw new Error('timeout')
     })
 
-    await expect(resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', {
-      launcher: '/isolated/hermes/.hermes/bin/hermes',
-      run
-    })).resolves.toBe('')
+    await expect(
+      resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', {
+        launcher: '/isolated/hermes/.hermes/bin/hermes',
+        run
+      })
+    ).resolves.toBe('')
   })
 
   it('does not invoke a missing installation launcher', async (): Promise<void> => {
     const run: VersionProbeRunner = vi.fn()
 
-    await expect(resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', { launcher: null, run })).resolves.toBe('')
+    await expect(
+      resolveLocalRuntimeVersion('/isolated/hermes', '/isolated/home', { launcher: null, run })
+    ).resolves.toBe('')
     expect(run).not.toHaveBeenCalled()
   })
 
@@ -66,13 +72,15 @@ describe('local client version source', (): void => {
         fs.mkdirSync(path.join(home, 'bin'), { recursive: true })
         fs.writeFileSync(
           path.join(home, 'bin', 'hermes'),
-          `#!/bin/sh\nsleep 1\nprintf '%s\\n' 'Hermes Agent v1.2.3 (2026.10.1)' 'Install directory: ${root}'\n`,
+          `#!/bin/sh\nsleep 1\nprintf '%s\\n' 'Kouri Harness v1.2.3 (2026.10.1)' 'Install directory: ${root}'\n`,
           { mode: 0o755 }
         )
 
         for (const _call of ['first', 'cached']) {
           let timerFired = false
-          const timer = setTimeout(() => { timerFired = true }, 10)
+          const timer = setTimeout(() => {
+            timerFired = true
+          }, 10)
           const startedAt: number = Date.now()
           const pending: Promise<string> = resolveLocalRuntimeVersion(root, home, { isWindows: false })
 

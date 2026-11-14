@@ -92,7 +92,7 @@ export function registerGlobalRoute(
   const existing = registry.connections.find(c => c.kind === 'ssh' && sshRouteKey(c) === key)
 
   if (existing) {
-    // Same gateway (user, host, port, profile): carry a corrected key or Hermes path onto it.
+    // Same gateway (user, host, port, profile): carry a corrected key or Kouri Harness path onto it.
     const aligned = { ...existing }
     delete aligned.keyPath
     delete aligned.remoteHermesPath

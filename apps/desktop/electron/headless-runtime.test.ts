@@ -84,7 +84,7 @@ function notACheckout(): string {
 function backendAt(root: string): SourceBackend {
   return {
     kind: 'python',
-    label: `Hermes source at ${root}`,
+    label: `Kouri Harness source at ${root}`,
     command: 'python',
     args: [],
     env: {},
@@ -95,7 +95,7 @@ function backendAt(root: string): SourceBackend {
   }
 }
 
-function rungs(backendFor: (root: string) => Promise<SourceBackend | null> = async (root) => backendAt(root)) {
+function rungs(backendFor: (root: string) => Promise<SourceBackend | null> = async root => backendAt(root)) {
   return { backendFor: vi.fn(backendFor), log: vi.fn() }
 }
 
@@ -111,7 +111,11 @@ describe('explicitSourceBackend', () => {
     const bakedRoot = checkout()
     const hooks = rungs()
 
-    const backend = await explicitSourceBackend(stamp('headless', bakedRoot), { HERMES_DESKTOP_HERMES_ROOT: overrideRoot }, hooks)
+    const backend = await explicitSourceBackend(
+      stamp('headless', bakedRoot),
+      { HERMES_DESKTOP_HERMES_ROOT: overrideRoot },
+      hooks
+    )
 
     expect(backend?.root).toBe(path.resolve(overrideRoot))
     expect(hooks.backendFor).toHaveBeenCalledTimes(1)
@@ -121,7 +125,11 @@ describe('explicitSourceBackend', () => {
     const bakedRoot = checkout()
     const hooks = rungs()
 
-    const backend = await explicitSourceBackend(stamp('headless', bakedRoot), { HERMES_DESKTOP_HERMES_ROOT: notACheckout() }, hooks)
+    const backend = await explicitSourceBackend(
+      stamp('headless', bakedRoot),
+      { HERMES_DESKTOP_HERMES_ROOT: notACheckout() },
+      hooks
+    )
 
     expect(backend?.root).toBe(path.resolve(bakedRoot))
   })
@@ -137,7 +145,7 @@ describe('explicitSourceBackend', () => {
     const hooks = rungs()
 
     expect(await explicitSourceBackend(stamp('headless', notACheckout()), {}, hooks)).toBeNull()
-    expect(hooks.log).toHaveBeenCalledWith(expect.stringContaining('not a Hermes checkout'))
+    expect(hooks.log).toHaveBeenCalledWith(expect.stringContaining('not a Kouri Harness checkout'))
   })
 
   it('logs and continues when the recorded checkout has no usable Python', async () => {

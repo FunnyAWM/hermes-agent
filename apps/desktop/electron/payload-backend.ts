@@ -67,7 +67,7 @@ export function payloadPycacheEnv(
 }
 
 /**
- * The bundled shim is the Hermes CLI, not an interpreter, so it rejects the
+ * The bundled shim is the Kouri Harness CLI, not an interpreter, so it rejects the
  * ticket bridge's `-P -u -c`. Ticket minting runs the payload python against
  * the same import closure and bytecode cache the shim gives the CLI.
  */

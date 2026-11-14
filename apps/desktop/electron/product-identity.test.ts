@@ -140,19 +140,19 @@ test('stable headless pins userData to its historical directory', async (): Prom
   try {
     assert.equal(runtime.applyDesktopIdentity(app, headless), headless.displayName)
     assert.equal(paths.userData, path.join(paths.appData, 'KouriChat Next Headless'))
-    assert.equal(name, 'KouriChat Next')
+    assert.equal(name, 'Kouri Harness')
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
 })
 
 test.each([
-  [undefined, 'KouriChat Next', 'hermes', 'latest', 'canary'],
-  ['bundled', 'KouriChat Next Agent', 'hermes', 'latest', 'canary'],
-  ['light', 'KouriChat Next Light', 'hermes-light', 'light', 'light-canary'],
+  [undefined, 'Kouri Harness', 'hermes', 'latest', 'canary'],
+  ['bundled', 'Kouri Harness Agent', 'hermes', 'latest', 'canary'],
+  ['light', 'Kouri Harness Light', 'hermes-light', 'light', 'light-canary'],
   // The installed face carries no "Headless" suffix (user request); the package
   // files keep the HermesHeadless prefix and appId stays hermes-headless.
-  ['headless', 'KouriChat Next', 'hermes', 'latest', 'canary']
+  ['headless', 'Kouri Harness', 'hermes', 'latest', 'canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (
@@ -268,9 +268,7 @@ test('packaging isolates boot metadata and executable names without renaming rel
     assert.notEqual(config.extraMetadata.name, stableIdentity.appNamePascal)
     assert.equal(config.win.executableName, identity.windowsExecutableName)
 
-    const {
-      AppInfo
-    }: { AppInfo: typeof BuilderAppInfo } = require('app-builder-lib')
+    const { AppInfo }: { AppInfo: typeof BuilderAppInfo } = require('app-builder-lib')
 
     const appInfo: BuilderAppInfo = new AppInfo(
       { config, metadata: { ...pkg, ...config.extraMetadata } } as Packager,

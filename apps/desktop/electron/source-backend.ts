@@ -72,7 +72,7 @@ export async function resolveSourceInstallationBackend(
 
   return {
     kind: 'command',
-    label: `Hermes at ${root}`,
+    label: `Kouri Harness at ${root}`,
     command,
     args: [...args],
     env,
@@ -107,7 +107,7 @@ export function createSourcePythonBackend(
 
   return {
     kind: 'python',
-    label: `Hermes source at ${root}`,
+    label: `Kouri Harness source at ${root}`,
     command,
     args: ['-m', 'hermes_cli.main', ...args],
     // The backend runs in the user's workspace cwd, and the selected

@@ -17,7 +17,7 @@
  *  - 'bundled': the agent runtime ships inside the artifact resources.
  *  - 'light': no runtime at all; remote connections only.
  *  - 'headless': no runtime in the artifact and never installs one; it resolves
- *    the machine's existing Hermes (checkout, managed install, launcher) and
+ *    the machine's existing Kouri Harness (checkout, managed install, launcher) and
  *    fails with guidance when there is none.
  * Selected at build time by HERMES_DESKTOP_VARIANT (unset = bootstrap).
  */

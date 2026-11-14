@@ -35,8 +35,8 @@ const SYSTEM_ROOTS = ['/proc', '/sys', '/dev']
 // `/host/proc`, a chroot's `proc`): proc, sysfs, debugfs, tracefs,
 // securityfs, cgroup, cgroup2, bpf, efivarfs, configfs, pstore, selinuxfs.
 const PSEUDO_FS_TYPES = new Set([
-  0x9fa0, 0x62656572, 0x64626720, 0x74726163, 0x73636673, 0x27e0eb, 0x63677270, 0xcafe4a11, 0xde5e81e4,
-  0x62656570, 0x6165676c, 0xf97cff8c
+  0x9fa0, 0x62656572, 0x64626720, 0x74726163, 0x73636673, 0x27e0eb, 0x63677270, 0xcafe4a11, 0xde5e81e4, 0x62656570,
+  0x6165676c, 0xf97cff8c
 ])
 
 const WSL_SHARE_RE = /^\\\\(?:wsl\.localhost|wsl\$)\\[^\\]+/i
@@ -53,7 +53,7 @@ const within = (child: string, parent: string): boolean => {
 export function pathTools(platform: NodeJS.Platform) {
   // Every comparison errs toward refusing. Containment ("may the plugin use
   // this?") compares realpaths exactly, so a case-sensitive volume's `vault`
-  // is never mistaken for the granted `Vault`. Protection ("is this Hermes
+  // is never mistaken for the granted `Vault`. Protection ("is this Kouri Harness
   // data?") also matches case-insensitively where volumes usually are, so a
   // differently-cased spelling of a protected path is still refused.
   const caseless = platform === 'win32' || platform === 'darwin'
@@ -121,7 +121,7 @@ export async function realRoots(roots: string[]): Promise<string[]> {
 }
 
 /**
- * A WSL share path that is Hermes data or not the distro's own files: the
+ * A WSL share path that is Kouri Harness data or not the distro's own files: the
  * distro root, `/home`, a home dir and `/root` each hold a `~/.hermes`, and
  * anything under a `.hermes` segment is one (Windows Desktop cannot know which
  * WSL user runs the gateway, so every WSL home counts); `/proc`, `/sys`,
@@ -233,7 +233,7 @@ export async function overlapsByIdentity(candidate: string, roots: string[]): Pr
 
 /**
  * True when `target`, or a folder between it and `root`, is one of `roots` by
- * filesystem identity: a bind mount of the Hermes home inside a granted folder
+ * filesystem identity: a bind mount of the Kouri Harness home inside a granted folder
  * keeps an inside path but is the protected folder itself.
  */
 export async function protectedIdentityWithin(target: string, root: string, roots: string[]): Promise<boolean> {

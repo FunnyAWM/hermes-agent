@@ -1,7 +1,7 @@
 // headless-runtime.ts — the local-runtime contract of the 'headless' artifact.
 //
 // A headless build carries no agent runtime and never installs one: it drives
-// whatever Hermes this machine already has. The builder records the checkout it
+// whatever Kouri Harness this machine already has. The builder records the checkout it
 // was made against, so a double-click works on that machine; the explicit
 // HERMES_DESKTOP_HERMES_ROOT override still wins, and every installed-runtime
 // rung of resolveHermesBackend() still applies when the record is stale.
@@ -27,8 +27,8 @@ export function headlessRuntime(stamp: Readonly<InstallStamp> | null): HeadlessR
 
 /** Shown when a headless artifact finds nothing to drive; it must not bootstrap. */
 export const HEADLESS_RUNTIME_MISSING =
-  'This headless build found no local Hermes runtime, and it never installs one. ' +
-  'Point HERMES_DESKTOP_HERMES_ROOT at a checkout, or install Hermes with `hermes pm install`.'
+  'This headless build found no local Kouri Harness runtime, and it never installs one. ' +
+  'Point HERMES_DESKTOP_HERMES_ROOT at a checkout, or install Kouri Harness with `hermes pm install`.'
 
 export interface ExplicitSourceHooks {
   backendFor: (root: string) => Promise<SourceBackend | null>
@@ -67,7 +67,7 @@ export async function explicitSourceBackend(
 
     hooks.log(`[boot] headless runtime root ${bakedRoot} has no usable Python; continuing down the ladder`)
   } else {
-    hooks.log(`[boot] headless runtime root is not a Hermes checkout: ${bakedRoot}; continuing down the ladder`)
+    hooks.log(`[boot] headless runtime root is not a Kouri Harness checkout: ${bakedRoot}; continuing down the ladder`)
   }
 
   return null

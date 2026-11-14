@@ -114,12 +114,13 @@ describe('only plain files', () => {
     ])
 
     expect(result).toMatchObject({ ok: false, error: 'not-a-file' })
-    expect(
-      await files.run('plexus', { op: 'writeText', folder: id, path: 'pipe', text: 'x' })
-    ).toMatchObject({ ok: false, error: 'not-a-file' })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'pipe', text: 'x' })).toMatchObject({
+      ok: false,
+      error: 'not-a-file'
+    })
   })
 
-  it.runIf(posix)('refuses a hard link, which may be a second name for Hermes data', async () => {
+  it.runIf(posix)('refuses a hard link, which may be a second name for Kouri Harness data', async () => {
     const id = await grantVault()
     fs.linkSync(path.join(hermesHome, 'config.yaml'), path.join(vault, 'notes', 'c.md'))
 
@@ -127,9 +128,9 @@ describe('only plain files', () => {
       ok: false,
       error: 'protected'
     })
-    expect(
-      await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/c.md', text: 'pwned' })
-    ).toMatchObject({ ok: false, error: 'protected' })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/c.md', text: 'pwned' })).toMatchObject(
+      { ok: false, error: 'protected' }
+    )
     expect(fs.readFileSync(path.join(hermesHome, 'config.yaml'), 'utf8')).toBe('model: secret-config\n')
   })
 })
@@ -153,7 +154,7 @@ describe('a swap between the check and the open is refused', () => {
     }) as never)
   }
 
-  it.runIf(posix)('a parent folder swapped for a link into the Hermes home: no file lands there', async () => {
+  it.runIf(posix)('a parent folder swapped for a link into the Kouri Harness home: no file lands there', async () => {
     const id = await grantVault()
     const sub = path.join(vault, 'sub')
     fs.mkdirSync(sub)
@@ -164,15 +165,18 @@ describe('a swap between the check and the open is refused', () => {
     })
 
     // Refused either as outside the folder or, when the swap lands before the
-    // identity check, as Hermes data.
+    // identity check, as Kouri Harness data.
     expect(
-      ((await files.run('plexus', { op: 'writeText', folder: id, path: 'sub/pwn.txt', text: 'pwned' })) as { error?: string })
-        .error
+      (
+        (await files.run('plexus', { op: 'writeText', folder: id, path: 'sub/pwn.txt', text: 'pwned' })) as {
+          error?: string
+        }
+      ).error
     ).toMatch(/^(outside-folder|protected)$/)
     expect(fs.existsSync(path.join(hermesHome, 'pwn.txt'))).toBe(false)
   })
 
-  it.runIf(posix)('a checked file swapped for a link to Hermes data is not read or written', async () => {
+  it.runIf(posix)('a checked file swapped for a link to Kouri Harness data is not read or written', async () => {
     const id = await grantVault()
     const note = path.join(vault, 'notes', 'a.md')
 
@@ -192,9 +196,9 @@ describe('a swap between the check and the open is refused', () => {
     fs.writeFileSync(note, '# A\n')
     swapAfterCheck('stat', note, swap)
 
-    expect(
-      await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })
-    ).toMatchObject({ ok: false })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })).toMatchObject(
+      { ok: false }
+    )
     expect(fs.readFileSync(path.join(hermesHome, 'config.yaml'), 'utf8')).toBe('model: secret-config\n')
   })
 })
@@ -218,7 +222,7 @@ describe('a swap before the final look is refused too', () => {
     }) as never)
   }
 
-  it.runIf(posix)('a checked file swapped for a link to Hermes data: not read, not written', async () => {
+  it.runIf(posix)('a checked file swapped for a link to Kouri Harness data: not read, not written', async () => {
     const id = await grantVault()
     const note = path.join(vault, 'notes', 'a.md')
 
@@ -238,13 +242,15 @@ describe('a swap before the final look is refused too', () => {
     fs.writeFileSync(note, '# A\n')
     afterRealpath(note, swap)
 
-    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })).toMatchObject({
-      ok: false
-    })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })).toMatchObject(
+      {
+        ok: false
+      }
+    )
     expect(fs.readFileSync(path.join(hermesHome, 'config.yaml'), 'utf8')).toBe('model: secret-config\n')
   })
 
-  it.runIf(posix)('a parent folder swapped for a link into the Hermes home: not read, not written', async () => {
+  it.runIf(posix)('a parent folder swapped for a link into the Kouri Harness home: not read, not written', async () => {
     const id = await grantVault()
     fs.writeFileSync(path.join(hermesHome, 'a.md'), 'hermes-secret\n')
     const notes = path.join(vault, 'notes')
@@ -266,17 +272,19 @@ describe('a swap before the final look is refused too', () => {
     fs.renameSync(path.join(vault, 'notes-old'), notes)
     afterRealpath(note, swap)
 
-    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })).toMatchObject({
-      ok: false
-    })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'notes/a.md', text: 'pwned' })).toMatchObject(
+      {
+        ok: false
+      }
+    )
     expect(fs.readFileSync(path.join(hermesHome, 'a.md'), 'utf8')).toBe('hermes-secret\n')
   })
 })
 
 describe('rename, trash and list after a parent swap', () => {
-  // Another process swaps `notes` for a link into the Hermes home right after
+  // Another process swaps `notes` for a link into the Kouri Harness home right after
   // `resolve` finished (its last look is the second lstat of the entry): the
-  // op must not act on the Hermes home.
+  // op must not act on the Kouri Harness home.
   const swapParentAfterResolve = (entry: string, notes: string) => {
     const original = fs.promises.lstat.bind(fs.promises) as (target: fs.PathLike) => Promise<fs.Stats>
     let seen = 0
@@ -297,7 +305,7 @@ describe('rename, trash and list after a parent swap', () => {
     fs.writeFileSync(path.join(hermesHome, 'a.md'), 'hermes-file\n')
   })
 
-  it.runIf(posix)('rename does not move a Hermes file', async () => {
+  it.runIf(posix)('rename does not move a Kouri Harness file', async () => {
     const id = await grantVault()
     const notes = path.join(vault, 'notes')
     swapParentAfterResolve(path.join(notes, 'a.md'), notes)
@@ -361,7 +369,7 @@ describe('rename, trash and list after a parent swap', () => {
     expect(fs.readFileSync(path.join(hermesHome, 'b.md'), 'utf8')).toBe('hermes-file\n')
   })
 
-  it.runIf(posix)('trash does not remove a Hermes file', async () => {
+  it.runIf(posix)('trash does not remove a Kouri Harness file', async () => {
     const id = await grantVault()
     const notes = path.join(vault, 'notes')
     swapParentAfterResolve(path.join(notes, 'a.md'), notes)
@@ -370,7 +378,7 @@ describe('rename, trash and list after a parent swap', () => {
     expect(fs.readFileSync(path.join(hermesHome, 'a.md'), 'utf8')).toBe('hermes-file\n')
   })
 
-  it.runIf(posix)('list does not return the Hermes home', async () => {
+  it.runIf(posix)('list does not return the Kouri Harness home', async () => {
     const id = await grantVault()
     const sub = path.join(vault, 'notes', 'sub')
     fs.mkdirSync(sub)
@@ -385,8 +393,8 @@ describe('rename, trash and list after a parent swap', () => {
   })
 })
 
-describe('Hermes data mounted inside a granted folder', () => {
-  // Stands in for a bind mount of the Hermes home at Vault/mounted (present
+describe('Kouri Harness data mounted inside a granted folder', () => {
+  // Stands in for a bind mount of the Kouri Harness home at Vault/mounted (present
   // before the grant or added after): same filesystem identity, inside path.
   it('refuses every op under it', async () => {
     const mounted = path.join(vault, 'mounted')
@@ -399,7 +407,9 @@ describe('Hermes data mounted inside a granted folder', () => {
     vi.spyOn(fs.promises, 'stat').mockImplementation((async (target: fs.PathLike, options?: never) => {
       const real = await original(target, options)
 
-      return String(target) === mounted ? Object.assign(Object.create(Object.getPrototypeOf(real)), real, { dev: home.dev, ino: home.ino }) : real
+      return String(target) === mounted
+        ? Object.assign(Object.create(Object.getPrototypeOf(real)), real, { dev: home.dev, ino: home.ino })
+        : real
     }) as never)
 
     for (const request of [
@@ -408,7 +418,10 @@ describe('Hermes data mounted inside a granted folder', () => {
       { op: 'stat', path: 'mounted/config.yaml' },
       { op: 'writeText', path: 'mounted/new.md', text: 'x' }
     ] as const) {
-      expect(await files.run('plexus', { ...request, folder: id } as never)).toMatchObject({ ok: false, error: 'protected' })
+      expect(await files.run('plexus', { ...request, folder: id } as never)).toMatchObject({
+        ok: false,
+        error: 'protected'
+      })
     }
 
     expect(fs.existsSync(path.join(mounted, 'new.md'))).toBe(false)

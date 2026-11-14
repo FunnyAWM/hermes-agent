@@ -129,7 +129,7 @@ async function probeWindowsFiles(ssh, explicitHermesPath = '') {
     'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $true}',
     // HERMES_HOME is only trusted when it names a directory on the REMOTE: a stale User-scope
     // value (older install.ps1 persisted one) or a client path leaked over SSH otherwise fails
-    // assertSafeRemoteHome as "Unsafe remote Hermes home" (#118988).
+    // assertSafeRemoteHome as "Unsafe remote Kouri Harness home" (#118988).
     '$hermesHome=$env:HERMES_HOME',
     'if(-not $hermesHome -or -not (Test-Path -LiteralPath $hermesHome -PathType Container)){$hermesHome=Join-Path $env:LOCALAPPDATA "hermes"}',
     'Assert-NoReparse $hermesHome $true',
@@ -155,9 +155,9 @@ async function probeWindowsFiles(ssh, explicitHermesPath = '') {
     '$candidates+=$fallbackProfileCandidate',
     '$hermes=$null',
     'foreach($candidate in $candidates){Assert-NoReparse $candidate $true;$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidatePython $true;try{$item=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $item.PSIsContainer){$pair=Test-Path -LiteralPath $candidatePython -PathType Leaf;if($pair -or (Split-Path -Leaf (Split-Path -Parent $candidate)) -ieq "bin"){$hermes=$item.FullName;break}}}catch [Management.Automation.ItemNotFoundException]{continue}}',
-    'if(-not $hermes){throw "Hermes is not installed on the remote Windows host."}',
+    'if(-not $hermes){throw "Kouri Harness is not installed on the remote Windows host."}',
     'Assert-NoReparse $hermes $false',
-    'if($explicit -and $hermes -ne $explicit){throw "The configured Hermes path is not an executable file."}',
+    'if($explicit -and $hermes -ne $explicit){throw "The configured Kouri Harness path is not an executable file."}',
     '$python=[IO.Path]::Combine([IO.Path]::GetDirectoryName($hermes), "python.exe")',
     'if(Test-Path -LiteralPath $python -PathType Leaf){Assert-NoReparse $python $false}else{$python=""}',
     '[ordered]@{os="Windows";arch=$env:PROCESSOR_ARCHITECTURE;hermesHome=$hermesHome;hermesPath=$hermes;launcherPath=$hermes;python=$python}|ConvertTo-Json -Compress'
@@ -201,10 +201,10 @@ async function resolveWindowsLauncher(ssh: any, runtime: any) {
     WINDOWS_NO_REPARSE_PS,
     `Assert-NoReparse ${psLiteral(runtime.hermesPath)} $false`,
     `$lines=@(& ${psLiteral(runtime.hermesPath)} '--print-runtime-command');$code=$LASTEXITCODE`,
-    'if($code -ne 0){throw "The Hermes launcher does not support --print-runtime-command; refresh the Windows installation launcher."}',
+    'if($code -ne 0){throw "The Kouri Harness launcher does not support --print-runtime-command; refresh the Windows installation launcher."}',
     '$command=$lines[-1]|ConvertFrom-Json',
-    'if($command -isnot [array] -or $command.Count -lt 2 -or -not [IO.Path]::IsPathRooted([string]$command[0])){throw "Invalid Hermes runtime command"}',
-    'foreach($part in $command){if($part -isnot [string] -or $part.Contains([char]0)){throw "Invalid Hermes runtime argument"}}',
+    'if($command -isnot [array] -or $command.Count -lt 2 -or -not [IO.Path]::IsPathRooted([string]$command[0])){throw "Invalid Kouri Harness runtime command"}',
+    'foreach($part in $command){if($part -isnot [string] -or $part.Contains([char]0)){throw "Invalid Kouri Harness runtime argument"}}',
     'Assert-NoReparse ([string]$command[0]) $false',
     '[ordered]@{python=[string]$command[0];runtimeCommand=@($command)}|ConvertTo-Json -Depth 5 -Compress'
   ].join('\r\n')
@@ -215,12 +215,21 @@ async function resolveWindowsLauncher(ssh: any, runtime: any) {
     const output = await ssh.exec(compressedPowerShellCommand(script))
     resolved = JSON.parse(stripPowerShellNoise(output).pop() || 'null')
 
-    if (!Array.isArray(resolved?.runtimeCommand) || !resolved.runtimeCommand.every(part => typeof part === 'string' && !part.includes('\0')) || typeof resolved.python !== 'string' || !/^[a-z]:[\\/]/i.test(resolved.python)) {
+    if (
+      !Array.isArray(resolved?.runtimeCommand) ||
+      !resolved.runtimeCommand.every(part => typeof part === 'string' && !part.includes('\0')) ||
+      typeof resolved.python !== 'string' ||
+      !/^[a-z]:[\\/]/i.test(resolved.python)
+    ) {
       throw new Error('Invalid Windows launcher runtime response.')
     }
   } catch (cause: any) {
-    if (TRANSPORT_KINDS.has(cause?.kind)) {throw cause}
-    const error: any = new Error('Refresh the remote Windows Hermes launcher: its boot-selecting runtime could not be resolved.')
+    if (TRANSPORT_KINDS.has(cause?.kind)) {
+      throw cause
+    }
+    const error: any = new Error(
+      'Refresh the remote Windows Kouri Harness launcher: its boot-selecting runtime could not be resolved.'
+    )
     error.kind = 'update-required'
     error.cause = cause
     throw error
@@ -317,7 +326,7 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome, python = '
         await ssh.exec(compressedPowerShellCommand(windowsUpdateMarkerProbeScript(hermesHome, python)))
       ).pop() || ''
   } catch (cause) {
-    const error: any = new Error('Could not prove that the remote Hermes install is clear for SSH startup.')
+    const error: any = new Error('Could not prove that the remote Kouri Harness install is clear for SSH startup.')
     error.kind = 'update-in-progress'
     error.cause = cause
     throw error
@@ -331,10 +340,10 @@ async function assertWindowsRemoteInstallUpdateClear(ssh, hermesHome, python = '
 
   const error: any = new Error(
     live
-      ? `Remote Hermes update process ${live[1]} is still running; SSH startup is paused.`
+      ? `Remote Kouri Harness update process ${live[1]} is still running; SSH startup is paused.`
       : observation === 'HELD'
-        ? 'A process the remote Hermes update started still holds the install; SSH startup is paused.'
-        : 'The remote Hermes update marker is unreadable or malformed; refusing SSH startup.'
+        ? 'A process the remote Kouri Harness update started still holds the install; SSH startup is paused.'
+        : 'The remote Kouri Harness update marker is unreadable or malformed; refusing SSH startup.'
   )
 
   error.kind = 'update-in-progress'
@@ -463,9 +472,7 @@ function atomicWindowsSpawnCommand(runtime, reservation: any = {}, payload?: str
         'if(-not $p.HasExited){[ordered]@{existing=$true}|ConvertTo-Json -Compress;exit 0}}catch{}finally{if($p){$p.Dispose()}}}; ' +
         `& ${helper('remove-lock').map(psLiteral).join(' ')} ${psLiteral(reservation.ownershipId)}|Out-Null}`
       : '',
-    reservation.ownershipId
-      ? `  $spawnLines=@(${invokeSpawn}); $spawnExit=$LASTEXITCODE`
-      : `  ${invokeSpawn}`,
+    reservation.ownershipId ? `  $spawnLines=@(${invokeSpawn}); $spawnExit=$LASTEXITCODE` : `  ${invokeSpawn}`,
     reservation.ownershipId
       ? '  if($spawnExit -ne 0){exit $spawnExit}'
       : '  if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}',
@@ -746,7 +753,10 @@ function windowsHelperOwnsRuntime(runtime, inspection) {
 async function inspectWindowsSupport(ssh, runtime) {
   const inspection = await helper(ssh, runtime, 'inspect', [runtime.hermesPath])
 
-  return { version: inspection.version, supported: inspection.supported && windowsHelperOwnsRuntime(runtime, inspection) }
+  return {
+    version: inspection.version,
+    supported: inspection.supported && windowsHelperOwnsRuntime(runtime, inspection)
+  }
 }
 
 async function connectWindowsRemote(deps) {
@@ -773,13 +783,15 @@ async function connectWindowsRemote(deps) {
   const inspection = await helper(ssh, runtime, 'inspect', [runtime.hermesPath])
 
   if (!windowsHelperOwnsRuntime(runtime, inspection)) {
-    const error: any = new Error('The remote Windows SSH helper must be updated with boot-selecting runtime ownership support before connecting.')
+    const error: any = new Error(
+      'The remote Windows SSH helper must be updated with boot-selecting runtime ownership support before connecting.'
+    )
     error.kind = 'update-required'
     throw error
   }
 
   if (!inspection.supported) {
-    const error: any = new Error('Update Hermes on the remote Windows host before connecting with Desktop SSH.')
+    const error: any = new Error('Update Kouri Harness on the remote Windows host before connecting with Desktop SSH.')
     error.kind = 'update-required'
     throw error
   }
@@ -975,7 +987,7 @@ function buildWindowsInteractiveCommand(remoteCwd = '') {
     )
   }
 
-  script.push('$host.UI.RawUI.WindowTitle="Hermes SSH"', 'powershell.exe -NoLogo')
+  script.push('$host.UI.RawUI.WindowTitle="Kouri Harness SSH"', 'powershell.exe -NoLogo')
 
   return powerShellCommand(script.join(';'))
 }

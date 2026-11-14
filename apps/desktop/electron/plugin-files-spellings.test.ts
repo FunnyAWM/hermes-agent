@@ -81,7 +81,7 @@ describe('case on a case-sensitive macOS volume', () => {
     })
   })
 
-  it.runIf(posix)('a differently-cased spelling of the Hermes home still cannot be granted', async () => {
+  it.runIf(posix)('a differently-cased spelling of the Kouri Harness home still cannot be granted', async () => {
     const lookalike = path.join(scratch, 'home', '.HERMES')
     fs.mkdirSync(lookalike)
 
@@ -96,21 +96,23 @@ describe('sensitive names after Unicode folding', () => {
   it.each(['id_r\u017fa', '.ENV', '\uff0eenv', '.env.LOCAL', '.e\u200dnv', 'id_\u200brsa', '.np\ufeffmrc'])(
     'refuses reading or writing %s',
     async name => {
-    const files = make()
-    const id = await grant(files)
-    fs.writeFileSync(path.join(vault, name), 'SECRET=1\n')
+      const files = make()
+      const id = await grant(files)
+      fs.writeFileSync(path.join(vault, name), 'SECRET=1\n')
 
-    expect(await files.run('plexus', { op: 'readText', folder: id, path: name })).toMatchObject({
-      ok: false,
-      error: 'sensitive-file'
-    })
-    fs.mkdirSync(path.join(vault, 'fresh'))
+      expect(await files.run('plexus', { op: 'readText', folder: id, path: name })).toMatchObject({
+        ok: false,
+        error: 'sensitive-file'
+      })
+      fs.mkdirSync(path.join(vault, 'fresh'))
 
-    expect(await files.run('plexus', { op: 'writeText', folder: id, path: `fresh/${name}`, text: 'x' })).toMatchObject({
-      ok: false,
-      error: 'sensitive-file'
-    })
-    expect(fs.existsSync(path.join(vault, 'fresh', name))).toBe(false)
+      expect(
+        await files.run('plexus', { op: 'writeText', folder: id, path: `fresh/${name}`, text: 'x' })
+      ).toMatchObject({
+        ok: false,
+        error: 'sensitive-file'
+      })
+      expect(fs.existsSync(path.join(vault, 'fresh', name))).toBe(false)
     }
   )
 
@@ -145,18 +147,27 @@ describe('macOS named forks', () => {
 })
 
 describe('Windows names that open something else', () => {
-  it.each(['CON', 'nul.txt', 'COM1', 'lpt\u00b9', 'CONIN$', 'conout$.log', 'CLOCK$', 'a.md:secret', '.env.', '.env ', 'notes\\..\\..'])(
-    'refuses the segment %s',
-    async rel => {
-      const files = make('win32')
-      const id = await grant(files)
+  it.each([
+    'CON',
+    'nul.txt',
+    'COM1',
+    'lpt\u00b9',
+    'CONIN$',
+    'conout$.log',
+    'CLOCK$',
+    'a.md:secret',
+    '.env.',
+    '.env ',
+    'notes\\..\\..'
+  ])('refuses the segment %s', async rel => {
+    const files = make('win32')
+    const id = await grant(files)
 
-      expect(await files.run('plexus', { op: 'readText', folder: id, path: rel })).toMatchObject({
-        ok: false,
-        error: 'invalid-path'
-      })
-    }
-  )
+    expect(await files.run('plexus', { op: 'readText', folder: id, path: rel })).toMatchObject({
+      ok: false,
+      error: 'invalid-path'
+    })
+  })
 })
 
 describe('Windows second paths to this machine', () => {
@@ -166,7 +177,7 @@ describe('Windows second paths to this machine', () => {
     ['\\\\wsl.localhost\\Ubuntu\\home\\me', true],
     ['\\\\wsl.localhost\\Ubuntu\\root', true],
     ['\\\\wsl.localhost\\Ubuntu\\home\\me\\.hermes\\profiles', true],
-    ['\\\\WSL.LOCALHOST\\Debian\\HOME\\me\\.Hermes', true],
+    ['\\\\WSL.LOCALHOST\\Debian\\HOME\\me\\.Kouri Harness', true],
     // The distro's own process environments and its view of the Windows drives.
     ['\\\\wsl.localhost\\Ubuntu\\proc', true],
     ['\\\\wsl$\\Ubuntu\\proc\\1\\environ', true],
@@ -222,7 +233,10 @@ describe('kernel pseudo-filesystems wherever they are mounted', () => {
     }) as never)
 
     for (const op of ['readText', 'readDataUrl', 'stat'] as const) {
-      expect(await files.run('plexus', { op, folder: id, path: 'environ' })).toMatchObject({ ok: false, error: 'protected' })
+      expect(await files.run('plexus', { op, folder: id, path: 'environ' })).toMatchObject({
+        ok: false,
+        error: 'protected'
+      })
     }
 
     expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'environ', text: 'x' })).toMatchObject({
@@ -232,7 +246,7 @@ describe('kernel pseudo-filesystems wherever they are mounted', () => {
   })
 })
 
-describe('Hermes data reached by another spelling', () => {
+describe('Kouri Harness data reached by another spelling', () => {
   it('compares folders by filesystem identity', async () => {
     expect(await overlapsByIdentity(hermesHome, [hermesHome])).toBe(true)
     expect(await overlapsByIdentity(path.join(scratch, 'home'), [hermesHome])).toBe(true)
