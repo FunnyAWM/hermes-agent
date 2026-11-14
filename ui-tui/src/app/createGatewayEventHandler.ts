@@ -611,10 +611,18 @@ function applyDeferredPickOutcome(
     const info = getUiState().info
 
     if (info && typeof update.model === 'string' && update.model) {
-      patchUiState({ info: { ...info, model: update.model, ...(typeof update.provider === 'string' ? { provider: update.provider } : {}) } })
+      patchUiState({
+        info: {
+          ...info,
+          model: update.model,
+          ...(typeof update.provider === 'string' ? { provider: update.provider } : {})
+        }
+      })
     }
 
-    sys(t('slashCmd.session.model.deferredRefused', String(update.target_model ?? ''), String(update.reason ?? 'refused')))
+    sys(
+      t('slashCmd.session.model.deferredRefused', String(update.target_model ?? ''), String(update.reason ?? 'refused'))
+    )
 
     return
   }
@@ -624,17 +632,20 @@ function applyDeferredPickOutcome(
     // The confirmed resend is the same selection: its level commits with the model.
     const arg = `${pick.model ?? ''}${pick.provider ? ` --provider ${pick.provider}` : ''}${pick.reasoning ? ` --reasoning ${pick.reasoning}` : ''}`
 
-    openModelConfirmation(update.confirm_message as string | undefined, String(update.target_model ?? pick.model ?? ''), () =>
-      void mutateCanonicalSession(gw, sid, 'model', arg, undefined, update.confirm as string).then(
-        mutation => {
-          // Refused again (a queued turn or another pick moved the session first): say so once,
-          // never re-ask in a loop.
-          if (mutation?.result.status === 'confirmation_required') {
-            sys(t('slashCmd.session.model.confirmStale'))
-          }
-        },
-        (error: unknown) => sys(`error: ${error instanceof Error ? error.message : String(error)}`)
-      )
+    openModelConfirmation(
+      update.confirm_message as string | undefined,
+      String(update.target_model ?? pick.model ?? ''),
+      () =>
+        void mutateCanonicalSession(gw, sid, 'model', arg, undefined, update.confirm as string).then(
+          mutation => {
+            // Refused again (a queued turn or another pick moved the session first): say so once,
+            // never re-ask in a loop.
+            if (mutation?.result.status === 'confirmation_required') {
+              sys(t('slashCmd.session.model.confirmStale'))
+            }
+          },
+          (error: unknown) => sys(`error: ${error instanceof Error ? error.message : String(error)}`)
+        )
     )
   }
 }
@@ -1075,7 +1086,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
     // "too many re-renders" guard in embedded dashboard PTYs.
     ensureAgentsNudgeConfig()
 
-    // Arm "Hey Hermes" if this surface owns it (server gates on config).
+    // Arm "Hey Kouri Harness" if this surface owns it (server gates on config).
     // Fire-and-forget + idempotent server-side, so reconnects are harmless.
     // Skipped when the user explicitly ran `/wake off` this session — an
     // explicit opt-out must survive gateway reconnects (see wakeState.ts).
@@ -1421,7 +1432,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
 
         return
       case 'wake.detected': {
-        // "Hey Hermes": optionally open a fresh session (start_new_session),
+        // "Hey Kouri Harness": optionally open a fresh session (start_new_session),
         // then arm voice capture so the user can speak hands-free. Mirrors CLI.
         void (async () => {
           // Multi-profile routing: the TUI is a single-profile process, so a

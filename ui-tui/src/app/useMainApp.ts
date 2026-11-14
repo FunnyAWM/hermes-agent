@@ -130,7 +130,9 @@ function deferExitForClose(gw: GatewayClient, state: ExitClose, again: () => voi
   }
 
   state.flight = true
-  void Promise.race([state.close().catch(() => undefined), new Promise(resolve => setTimeout(resolve, 1500))]).then(again)
+  void Promise.race([state.close().catch(() => undefined), new Promise(resolve => setTimeout(resolve, 1500))]).then(
+    again
+  )
 
   return true
 }
@@ -381,7 +383,7 @@ export function useMainApp(gw: GatewayClient) {
   const lastUserMsgRef = useRef(lastUserMsg)
   const recoverSidRef = useRef<null | string>(null)
   const recoveryAtRef = useRef<number[]>([])
-  // "Hermes stopped and could not be restarted" is said once per outage; reset on gateway.ready.
+  // "Kouri Harness stopped and could not be restarted" is said once per outage; reset on gateway.ready.
   const gaveUpRef = useRef(false)
   const msgIdsRef = useRef(new WeakMap<Msg, string>())
   const msgIdSeqRef = useRef(0)
@@ -713,7 +715,9 @@ export function useMainApp(gw: GatewayClient) {
 
     // Offline (sid kept across a socket close): each poll would re-dial through
     // ensureAttachedWebSocket and collapse GatewayClient's backoff (B2-20).
-    if (ui.gatewayConnected === false) { return }
+    if (ui.gatewayConnected === false) {
+      return
+    }
 
     let stopped = false
     applyAgentSnapshot(ui.sid)
@@ -787,7 +791,7 @@ export function useMainApp(gw: GatewayClient) {
           tab: composeTabTitle(marker, ui.sessionTitle, '', ''),
           window: composeTabTitle(marker, ui.sessionTitle, model, tabCwd ? shortCwd(tabCwd, 24) : '')
         }
-      : 'Hermes'
+      : 'Kouri Harness'
   )
 
   useEffect(() => {
@@ -1254,7 +1258,14 @@ export function useMainApp(gw: GatewayClient) {
     done()
   }, [])
 
-  const approvalAnswers = useApprovalAnswers(overlay.approval, gw.isCanonical, composerActions.enqueue, respondWith, rpc, sys)
+  const approvalAnswers = useApprovalAnswers(
+    overlay.approval,
+    gw.isCanonical,
+    composerActions.enqueue,
+    respondWith,
+    rpc,
+    sys
+  )
 
   const answerSudo = useCallback(
     (pw: string) => {
