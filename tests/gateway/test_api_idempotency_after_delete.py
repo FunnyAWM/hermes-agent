@@ -33,7 +33,7 @@ async def _post(client, session_id, *, key='once', content='same body'):
     response = await client.post(
         '/v1/chat/completions', json=body,
         headers={'Authorization': 'Bearer ' + _API_KEY, 'Idempotency-Key': key,
-                 'X-Kouri Harness-Session-Id': session_id})
+                 'X-Hermes-Session-Id': session_id})
     return response.status, await response.json()
 
 

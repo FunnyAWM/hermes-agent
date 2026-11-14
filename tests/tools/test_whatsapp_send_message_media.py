@@ -87,7 +87,7 @@ def _session_with(responses, health=None, *, token="standalone-test-token-012345
 
     def _get(url, **kwargs):
         if url.endswith("/auth-proof"):
-            challenge = (kwargs.get("headers") or {})["X-Kouri Harness-Bridge-Challenge"]
+            challenge = (kwargs.get("headers") or {})["X-Hermes-Bridge-Challenge"]
             resp = _resp(200, {"authProof": _bridge_auth_proof(token, challenge)})
         else:
             calls.append((url, kwargs.get("json")))

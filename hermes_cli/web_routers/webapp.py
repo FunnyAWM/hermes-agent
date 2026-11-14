@@ -269,7 +269,7 @@ async def redeem_window_ticket(request: Request):
         raise HTTPException(403, "Webapp window handoff requires a same-origin request")
     # Keep the unauthenticated exchange body-free; never parse an arbitrary
     # JSON/multipart payload just to extract a fixed-size capability.
-    ticket = request.headers.get("X-Kouri Harness-Window-Ticket", "")
+    ticket = request.headers.get("X-Hermes-Window-Ticket", "")
     with _ticket_lock:
         tickets = getattr(request.app.state, "webapp_window_tickets", {})
         entry = tickets.get(ticket)
@@ -298,7 +298,7 @@ if (!/^[A-Za-z0-9_-]{43}$/.test(ticket)) {
   fail();
 } else {
   fetch(`${basePath}/webapp/window-session`, {
-    method: 'POST', credentials: 'same-origin', headers: {'X-Kouri Harness-Window-Ticket': ticket}
+    method: 'POST', credentials: 'same-origin', headers: {'X-Hermes-Window-Ticket': ticket}
   }).then(response => response.ok ? response.json() : Promise.reject()).then(({token}) => {
     if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error();
     try {
@@ -378,7 +378,7 @@ if (!/^[a-f0-9-]{36}$/.test(id)) {
     try {
       const response = await fetch(`${basePath}/webapp/window-session`, {
         method: 'POST', credentials: 'same-origin',
-        headers: {'X-Kouri Harness-Window-Ticket': ticket}, signal: controller.signal
+        headers: {'X-Hermes-Window-Ticket': ticket}, signal: controller.signal
       });
       if (!response.ok) throw new Error('Window authorization expired. Open a new window from the original tab.');
       const {token} = await response.json();

@@ -162,7 +162,7 @@ test.skipIf(process.platform === 'win32')(
           const port: number = (await waitForDashboardPort(child, 45_000)) as number
 
           const response: Response = await fetch(`http://127.0.0.1:${port}/api/health`, {
-            headers: { 'X-Kouri Harness-Session-Token': token }
+            headers: { 'X-Hermes-Session-Token': token }
           })
 
           assert.equal(response.status, 200, output)

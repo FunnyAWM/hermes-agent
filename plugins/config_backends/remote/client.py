@@ -92,7 +92,7 @@ def request(method: str, home: Path, profile: str, *, etag: Optional[str] = None
     url = f"{plane}/v1/config/self?{urllib.parse.urlencode({'profile': profile})}"
     headers = {
         "Authorization": f"Bearer {token or plane_token(home)}",
-        "X-Kouri Harness-Instance-Id": instance_id(),
+        "X-Hermes-Instance-Id": instance_id(),
         "Accept": "application/json",
     }
     data = None

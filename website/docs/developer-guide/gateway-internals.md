@@ -285,7 +285,7 @@ The authoritative daemon accepts a **fresh, one-use HTTP grant per request** fro
 its same-user private control socket. Send `session-ticket` with exactly
 `profile_id` (the canonical served primary home), `instance_id` (the ready daemon's
 boot ID), and `purpose: "native-http"`. The returned ticket expires after 30 seconds
-and carries only `http:owner`; send it in `X-Kouri Harness-Gateway-Ticket` from the native
+and carries only `http:owner`; send it in `X-Hermes-Gateway-Ticket` from the native
 main process. Never place it in a URL, cookie, public descriptor, renderer config,
 or log, and never obtain a dashboard token by scraping the public page.
 

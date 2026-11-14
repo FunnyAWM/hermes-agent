@@ -100,7 +100,7 @@ def _mock_health(json_data, raise_on=None, *, knows_token=True, reflects_bearer=
         if raise_on == "headers":
             raise TimeoutError
         if url.endswith("/auth-proof"):
-            challenge = headers.get("X-Kouri Harness-Bridge-Challenge", "")
+            challenge = headers.get("X-Hermes-Bridge-Challenge", "")
             token = _TEST_TOKEN if knows_token else headers.get("Authorization", "").removeprefix("Bearer ")
             payload = {"authProof": _bridge_auth_proof(token, challenge)} if token else {}
         else:

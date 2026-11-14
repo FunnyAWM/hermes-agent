@@ -59,7 +59,7 @@ API requests use the gateway's durable admission queue. Structured image content
 structured through execution; it is not interpreted as a gateway slash command.
 
 - `/v1/runs` and `/v1/responses` retain the conversation declared by
-  `X-Kouri Harness-Session-Key`. An explicit session or response chain takes precedence and
+  `X-Hermes-Session-Key`. An explicit session or response chain takes precedence and
   does not transfer its conversation identity to a different header.
 - A nonempty `/v1/runs` `conversation_history` is authoritative, even with an explicit
   `session_id`. Otherwise session continuation loads history when the turn executes,
@@ -108,7 +108,7 @@ The identity fields differ by endpoint:
   `conversation_history`, `model`, `provider`, `model_options` and `tools`, plus
   `truncation` when sent.
 - **Chat Completions:** the last user message, the earlier messages (unless
-  `X-Kouri Harness-Session-Id` is sent, in which case history comes from the session), the
+  `X-Hermes-Session-Id` is sent, in which case history comes from the session), the
   system prompt, and the turn settings such as the requested model, provider and
   `model_options`. `tools` and `tool_choice` are not part of it: a retry that changes
   only those replays the original answer instead of a conflict.
@@ -146,13 +146,13 @@ and are never dropped, and deleting a response removes its identity sooner. This
 current default, not a replay guarantee.
 :::
 
-An explicit `X-Kouri Harness-Session-Id` is never remapped. The deleted session's id stays
+An explicit `X-Hermes-Session-Id` is never remapped. The deleted session's id stays
 retired even after pruning. An exact keyed retry whose identity is still retained there
 replays, and a changed one is refused as a conflict. A request with no retained
 identity there, such as a fresh request or a retry whose identity was pruned, is refused
 with `not_found`.
 
-A Chat Completions request without `X-Kouri Harness-Session-Id` derives its session from the
+A Chat Completions request without `X-Hermes-Session-Id` derives its session from the
 system prompt and first user message. A deleted session's id is never reused, so a new
 conversation that opens like a deleted one gets a new session, and its later turns land
 on that same session, including after a restart. An exact keyed retry of a turn from the
@@ -500,7 +500,7 @@ that session's active transcript. Session turn leases serialize concurrent
 writers and refresh the transcript after a contended wait.
 
 **API sessions are their own sessions.** `session_id` (here) and the
-`X-Kouri Harness-Session-Id` header (on `/v1/chat/completions` and `/v1/responses`) may
+`X-Hermes-Session-Id` header (on `/v1/chat/completions` and `/v1/responses`) may
 name a session the API server created or one it may create; they cannot bind a
 session that another surface owns — a CLI, TUI, Desktop, ACP or messaging
 conversation. Such a request is refused with HTTP 409 and error code
@@ -571,7 +571,7 @@ its terminal status.
 #### Detached results and session history
 
 Background delegation requires a continuation that reads server-side session
-history: an explicit `X-Kouri Harness-Session-Id` on Chat Completions, a native
+history: an explicit `X-Hermes-Session-Id` on Chat Completions, a native
 `/api/sessions/{id}/chat` request, or a Runs request using session history.
 Header-less Chat Completions, Responses chains, and Runs requests with
 `previous_response_id` or caller-supplied history instead execute delegation
@@ -759,20 +759,20 @@ curl http://localhost:8642/v1/toolsets \
 
 `/v1/skills` returns the same metadata the skills hub uses internally. `/v1/toolsets` returns toolsets resolved for the `api_server` platform with the concrete `tools` list each one expands to. Both are advertised under `endpoints.*` in `/v1/capabilities`.
 
-## Long-term memory scoping (`X-Kouri Harness-Session-Key`)
+## Long-term memory scoping (`X-Hermes-Session-Key`)
 
-Multi-user frontends like Open WebUI need a stable per-channel identifier for long-term memory (Honcho, etc.) that is **independent** of the transcript-scoped `X-Kouri Harness-Session-Id` (which rotates on `/new`). Pass `X-Kouri Harness-Session-Key` on `/v1/chat/completions`, `/v1/responses`, or `/v1/runs` and Kouri Harness threads it through to `AIAgent(gateway_session_key=...)`, where the Honcho memory provider uses it to derive a stable scope.
+Multi-user frontends like Open WebUI need a stable per-channel identifier for long-term memory (Honcho, etc.) that is **independent** of the transcript-scoped `X-Hermes-Session-Id` (which rotates on `/new`). Pass `X-Hermes-Session-Key` on `/v1/chat/completions`, `/v1/responses`, or `/v1/runs` and Kouri Harness threads it through to `AIAgent(gateway_session_key=...)`, where the Honcho memory provider uses it to derive a stable scope.
 
 ```http
 POST /v1/chat/completions HTTP/1.1
 Authorization: Bearer ***
-X-Kouri Harness-Session-Id: transcript-alpha
-X-Kouri Harness-Session-Key: agent:main:webui:dm:user-42
+X-Hermes-Session-Id: transcript-alpha
+X-Hermes-Session-Key: agent:main:webui:dm:user-42
 ```
 
-Rules: max 256 chars, control characters (`\r`, `\n`, `\x00`) are rejected, and the value is echoed back on responses (JSON + SSE). `/v1/capabilities` advertises support via `"session_key_header": "X-Kouri Harness-Session-Key"`. Without the key, Honcho's `per-session` strategy produces a different scope per `session_id` — exactly the behavior Kouri Harness had before.
+Rules: max 256 chars, control characters (`\r`, `\n`, `\x00`) are rejected, and the value is echoed back on responses (JSON + SSE). `/v1/capabilities` advertises support via `"session_key_header": "X-Hermes-Session-Key"`. Without the key, Honcho's `per-session` strategy produces a different scope per `session_id` — exactly the behavior Kouri Harness had before.
 
-Automatic recall follows the **transcript**: the memory provider is initialised once per session and kept across requests, so a continued session (`X-Kouri Harness-Session-Id`, `previous_response_id`, or a declared `X-Kouri Harness-Session-Key` conversation) receives the recall the provider prepared after the previous turn, exactly like a Telegram or Discord chat does. A request without any continuation starts a fresh session and, like the first turn of any new CLI session, has nothing queued yet. Idle sessions release their provider after the same idle TTL as the gateway agent cache (`agent.agent_cache.idle_ttl_secs`, default one hour).
+Automatic recall follows the **transcript**: the memory provider is initialised once per session and kept across requests, so a continued session (`X-Hermes-Session-Id`, `previous_response_id`, or a declared `X-Hermes-Session-Key` conversation) receives the recall the provider prepared after the previous turn, exactly like a Telegram or Discord chat does. A request without any continuation starts a fresh session and, like the first turn of any new CLI session, has nothing queued yet. Idle sessions release their provider after the same idle TTL as the gateway agent cache (`agent.agent_cache.idle_ttl_secs`, default one hour).
 
 ## System Prompt Handling
 
@@ -880,7 +880,7 @@ API_SERVER_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 When CORS is enabled:
 - **Preflight responses** include `Access-Control-Max-Age: 600` (10 minute cache)
 - **SSE streaming responses** include CORS headers so browser EventSource clients work correctly
-- **`X-Kouri Harness-Session-Id`** is an allowed request header, so browsers on an allowlisted origin can request session continuation.
+- **`X-Hermes-Session-Id`** is an allowed request header, so browsers on an allowlisted origin can request session continuation.
 - **`Idempotency-Key`** is an allowed request header — clients can send it for deduplication (see [Idempotency keys](#idempotency-keys) for what a key covers and how long it is kept)
 
 Most documented frontends such as Open WebUI connect server-to-server and do not need CORS at all.

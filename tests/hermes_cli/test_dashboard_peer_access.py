@@ -54,8 +54,8 @@ class PeerPassStub(StubAuthProvider):
 
 
 # Response headers the api_server documents for its clients (replays, partial turns, memory scope).
-GATEWAY_SIGNALS = {"Idempotency-Replayed": "true", "X-Kouri Harness-Session-Key": "chan-1", "X-Kouri Harness-Completed": "false",
-                   "X-Kouri Harness-Partial": "true", "X-Kouri Harness-Error": "provider timeout"}
+GATEWAY_SIGNALS = {"Idempotency-Replayed": "true", "X-Hermes-Session-Key": "chan-1", "X-Hermes-Completed": "false",
+                   "X-Hermes-Partial": "true", "X-Hermes-Error": "provider timeout"}
 
 
 #: The agent's sessions: its canonical Bot Chat (every peer message lands there) and the owner's own chats.
@@ -82,14 +82,14 @@ def _gateway(seen: list) -> Starlette:
             if parts[2] not in SESSIONS:
                 return JSONResponse({"error": {"code": "session_not_found"}}, status_code=404)
             return JSONResponse({"object": "hermes.session", "session": {"id": parts[2], "title": SESSIONS[parts[2]]}},
-                                headers={"X-Kouri Harness-Session-Id": "s1", **GATEWAY_SIGNALS})
+                                headers={"X-Hermes-Session-Id": "s1", **GATEWAY_SIGNALS})
         if request.method == "GET" and len(parts) == 3 and parts[:2] == ["v1", "runs"]:
             if parts[2] not in RUNS:
                 return JSONResponse({"error": {"code": "run_not_found"}}, status_code=404)
             return JSONResponse({"object": "hermes.run", "run_id": parts[2], "status": "running",
                                  "session_id": RUNS[parts[2]]})
         return JSONResponse({"path": request.url.path}, status_code=202 if request.method == "POST" else 200,
-                            headers={"X-Kouri Harness-Session-Id": "s1", "Set-Cookie": "edge=1",
+                            headers={"X-Hermes-Session-Id": "s1", "Set-Cookie": "edge=1",
                                      "Access-Control-Allow-Origin": "*", **GATEWAY_SIGNALS})
 
     async def events(request: Request):
@@ -141,13 +141,13 @@ def _bearer(token: str) -> dict[str, str]:
 def test_a_pass_reaches_the_agent_api_with_the_agent_key_and_nothing_of_the_callers(peer):
     resp = peer.client.post("/api/peer/v1/runs?wait=0", content=b'{"input": "hi", "session_id": "bot-1"}', headers={
         **_bearer("pass-message"), "Content-Type": "application/json", "Idempotency-Key": "ticket-1",
-        "Cookie": "hermes_session_at=browser", "X-Kouri Harness-Peer-Principal": "someone-else",
+        "Cookie": "hermes_session_at=browser", "X-Hermes-Peer-Principal": "someone-else",
         "X-Forwarded-For": "198.51.100.7", "Origin": "https://attacker.example"})
 
     assert resp.status_code == 202 and resp.json() == {"path": "/v1/runs"}
     assert resp.headers["x-hermes-session-id"] == "s1"
     # The memory scope stays with key holders: a messaging pass never learns it either.
-    signals = {name: value for name, value in GATEWAY_SIGNALS.items() if name != "X-Kouri Harness-Session-Key"}
+    signals = {name: value for name, value in GATEWAY_SIGNALS.items() if name != "X-Hermes-Session-Key"}
     assert {name: resp.headers.get(name) for name in signals} == signals
     assert "x-hermes-session-key" not in resp.headers
     assert "set-cookie" not in resp.headers and "access-control-allow-origin" not in resp.headers
@@ -376,7 +376,7 @@ def test_dashboard_credentials_never_open_peer_paths(peer):
     session = _sign({"sub": "stub-user-1", "email": "stub@example.test", "name": "Stub User",
                      "org_id": "stub-org-1", "exp": 4102444800})
     for credentials in ({"Cookie": f"hermes_session_at={session}"},
-                        {"X-Kouri Harness-Session-Token": deployment_token}, _bearer(deployment_token)):
+                        {"X-Hermes-Session-Token": deployment_token}, _bearer(deployment_token)):
         assert peer.client.get("/api/auth/me", headers=credentials).status_code == 200, credentials
         resp = peer.client.get("/api/peer/health", headers=credentials)
         assert resp.status_code == 401, (credentials, resp.text)
@@ -429,11 +429,11 @@ def test_an_unknown_profile_gets_the_api_servers_unknown_profile_answer(peer):
 
 
 def test_only_a_control_pass_chooses_or_sees_the_memory_scope(peer):
-    """``X-Kouri Harness-Session-Key`` picks the api_server's memory scope, which the api_server keeps
+    """``X-Hermes-Session-Key`` picks the api_server's memory scope, which the api_server keeps
     for key holders. A control pass has key-holder parity; a messaging pass never sets it or gets
     it back."""
     for token, forwarded in (("pass-message", None), ("pass-control", "chan-1")):
-        resp = peer.client.post("/api/peer/v1/runs", headers={**_bearer(token), "X-Kouri Harness-Session-Key": "chan-1"},
+        resp = peer.client.post("/api/peer/v1/runs", headers={**_bearer(token), "X-Hermes-Session-Key": "chan-1"},
                                 json={"input": "hi", "session_id": "bot-1"})
         assert peer.seen[-1]["headers"].get("x-hermes-session-key") == forwarded, token
         assert resp.headers.get("x-hermes-session-key") == forwarded, token

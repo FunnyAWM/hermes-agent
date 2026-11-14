@@ -502,7 +502,7 @@ export function createLocalGatewayDials() {
         }
       }
 
-      return grant.header ? { ...headers, 'X-Kouri Harness-Gateway-Ticket': grant.ticket } : headers
+      return grant.header ? { ...headers, 'X-Hermes-Gateway-Ticket': grant.ticket } : headers
     }
   }
 }
@@ -715,7 +715,7 @@ export async function nativeGatewayHttpHeaders(
   const purpose = nativeGrantPurpose(url, method)
 
   return {
-    'X-Kouri Harness-Gateway-Ticket': await mintLocalGatewayTicket(
+    'X-Hermes-Gateway-Ticket': await mintLocalGatewayTicket(
       await routedTicketEndpoint(descriptor.gatewayEndpoint, nativeGrantRoute(url, body, method), launchHome, method),
       purpose
     )

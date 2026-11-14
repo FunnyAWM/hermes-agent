@@ -193,7 +193,7 @@ GET  /api/model/options          Provider-aware picker inventory
 GET  /health, /health/detailed
 ```
 
-Setup, headers (`X-Kouri Harness-Session-Id`, `X-Kouri Harness-Session-Key`), and frontend wiring: [API Server](../user-guide/features/api-server).
+Setup, headers (`X-Hermes-Session-Id`, `X-Hermes-Session-Key`), and frontend wiring: [API Server](../user-guide/features/api-server).
 
 The browser-extension controller protocol has been removed; to let Kouri Harness drive a browser you
 already run, use `browser.cdp_url` or `/browser connect` — see [Browser-extension control (removed)](../user-guide/features/api-server#browser-extension-control-removed).
@@ -208,7 +208,7 @@ If an external control plane needs Kouri Harness' curated provider rows, per-mod
 pricing, or capability hints, use one of the authenticated picker surfaces:
 
 - API server REST: `GET /api/model/options` with the API-server bearer key
-- Dashboard backend REST: `GET /api/model/options` with `X-Kouri Harness-Session-Token`
+- Dashboard backend REST: `GET /api/model/options` with `X-Hermes-Session-Token`
 - TUI gateway RPC: `model.options`
 
 Those surfaces share the same payload builder and the same custom-provider

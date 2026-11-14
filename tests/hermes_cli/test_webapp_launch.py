@@ -23,7 +23,7 @@ def test_launch_ticket_is_spent_only_over_the_server_users_own_connection(monkey
     monkeypatch.setattr(server.app.state, "webapp_window_tickets", {}, raising=False)
     monkeypatch.setattr(server, "_SESSION_TOKEN", "a" * 43)
     client = TestClient(server.app, base_url="http://127.0.0.1")
-    headers = {"Origin": "http://127.0.0.1", "X-Kouri Harness-Window-Ticket": webapp.mint_launch_ticket(server.app.state)}
+    headers = {"Origin": "http://127.0.0.1", "X-Hermes-Window-Ticket": webapp.mint_launch_ticket(server.app.state)}
 
     own_uid = os.getuid()  # windows-footgun: ok — platforms("linux") test
     monkeypatch.setattr(webapp, "_loopback_peer_uid", lambda client, server: own_uid + 1)
@@ -53,7 +53,7 @@ def test_macos_launch_handoff_fails_closed_without_consuming_child_window_author
     client = TestClient(server.app, base_url="http://127.0.0.1")
     try:
         launch = webapp.mint_launch_ticket(server.app.state)
-        headers = {"Origin": "http://127.0.0.1", "X-Kouri Harness-Window-Ticket": launch}
+        headers = {"Origin": "http://127.0.0.1", "X-Hermes-Window-Ticket": launch}
         for _ in range(2):
             denied = client.post("/webapp/window-session", headers=headers)
             assert denied.status_code == 403 and server._SESSION_TOKEN not in denied.text
@@ -63,7 +63,7 @@ def test_macos_launch_handoff_fails_closed_without_consuming_child_window_author
             server._SESSION_HEADER_NAME: server._SESSION_TOKEN,
         })
         assert issued.status_code == 200
-        headers["X-Kouri Harness-Window-Ticket"] = issued.json()["ticket"]
+        headers["X-Hermes-Window-Ticket"] = issued.json()["ticket"]
         assert client.post("/webapp/window-session", headers=headers).json() == {"token": server._SESSION_TOKEN}
         assert client.post("/webapp/window-session", headers=headers).status_code == 403
     finally:
@@ -94,7 +94,7 @@ def test_a_link_for_the_user_to_open_by_hand_spends_once_without_a_peer_check(mo
 
     def redeem(ticket):
         return client.post("/webapp/window-session", headers={"Origin": "http://127.0.0.1",
-                                                              "X-Kouri Harness-Window-Ticket": ticket})
+                                                              "X-Hermes-Window-Ticket": ticket})
     try:
         printed = webapp.mint_printed_launch_ticket(server.app.state)
         assert redeem(printed).json() == {"token": "a" * 43}
@@ -235,7 +235,7 @@ def _spend(client, link):
     from urllib.parse import parse_qs, urlsplit
 
     ticket = parse_qs(urlsplit(link["url"]).fragment)["ticket"][0]
-    return client.post("/webapp/window-session", headers={"Origin": "http://127.0.0.1", "X-Kouri Harness-Window-Ticket": ticket})
+    return client.post("/webapp/window-session", headers={"Origin": "http://127.0.0.1", "X-Hermes-Window-Ticket": ticket})
 
 
 @pytest.mark.platforms("linux")

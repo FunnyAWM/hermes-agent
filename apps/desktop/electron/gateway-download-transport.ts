@@ -20,7 +20,7 @@ export async function downloadViaTokenToFile(url, token, ctx, finalizeGatewayDow
         ? await nativeGatewayHttpHeaders(options.gatewayDescriptor, url)
         : options.bearer
           ? { Authorization: `Bearer ${options.bearer}` }
-          : { 'X-Kouri Harness-Session-Token': token }
+          : { 'X-Hermes-Session-Token': token }
 
       return new Promise<http.IncomingMessage>((resolve, reject) => {
         const client = parsed.protocol === 'https:' ? https : http

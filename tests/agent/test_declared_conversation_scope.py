@@ -6,7 +6,7 @@ OpenAI-wire transports, the OpenRouter/Nous sticky ``session_id``, and xAI's
 ``x-grok-conv-id`` — so the conversation never lands back on the routing
 bucket it warmed. Kouri Harness cannot infer the logical conversation from the id's
 syntax (#79017's failure class), but it does not have to: the host declares
-it through ``gateway_session_key`` (the ``X-Kouri Harness-Session-Key`` /
+it through ``gateway_session_key`` (the ``X-Hermes-Session-Key`` /
 ``build_session_key`` per-chat key).
 
 These tests pin the declaration contract and the two boundaries it must not
@@ -611,7 +611,7 @@ class TestConversationGenerationRotates:
 class TestPeerIdentityIsSourceQualified:
     """The generation and the carrier use the same identity tuple as recovery.
 
-    ``X-Kouri Harness-Session-Key`` accepts any authenticated caller-supplied string,
+    ``X-Hermes-Session-Key`` accepts any authenticated caller-supplied string,
     so an API conversation may legally carry the same key as a Telegram row in
     one database. Keying on the string alone let a ``/new`` on that unrelated
     row rotate this conversation's affinity identity, while

@@ -106,7 +106,7 @@ def whatsapp_bridge(monkeypatch):
 
         def get(self, url, *, timeout, headers=None):
             if url.endswith("/auth-proof"):
-                return BridgeResponse(proof=_bridge_auth_proof(token, headers["X-Kouri Harness-Bridge-Challenge"]))
+                return BridgeResponse(proof=_bridge_auth_proof(token, headers["X-Hermes-Bridge-Challenge"]))
             return BridgeResponse(health=True)
 
         def post(self, url, *, json, timeout, headers=None):

@@ -402,7 +402,7 @@ def probe_owner(record: HostRecord, *, timeout: float = PROBE_TIMEOUT_S) -> Opti
     import urllib.request
 
     token = read_token(record.role)
-    headers = {"X-Kouri Harness-Token": token, "Authorization": f"Bearer {token}"} if token else {}
+    headers = {"X-Hermes-Token": token, "Authorization": f"Bearer {token}"} if token else {}
     request = urllib.request.Request(
         f"http://{host}:{record.port}{HOST_IDENTITY_PATH}", headers=headers)
     try:

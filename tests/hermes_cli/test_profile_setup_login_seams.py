@@ -22,7 +22,7 @@ from hermes_cli.web_server import _SESSION_TOKEN, app
 from tests.waiting import wait_until
 
 client = TestClient(app)
-HEADERS = {"X-Kouri Harness-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
 NAME = "acme-device"
 
 _PLUGIN_SOURCE = '''

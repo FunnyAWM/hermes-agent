@@ -658,7 +658,7 @@ class PhotonAdapter(BasePlatformAdapter):
         return f"http://{self._sidecar_bind}:{self._sidecar_port}{path}"
 
     def _sidecar_headers(self) -> dict[str, str]:
-        return {"X-Kouri Harness-Sidecar-Token": self._sidecar_token}
+        return {"X-Hermes-Sidecar-Token": self._sidecar_token}
 
     # -- Connection lifecycle ------------------------------------------------------
 
@@ -1663,7 +1663,7 @@ async def _standalone_send(
         if not token:
             return send_error(error)
     base = f"http://{_DEFAULT_SIDECAR_BIND}:{port}"
-    headers = {"X-Kouri Harness-Sidecar-Token": token}
+    headers = {"X-Hermes-Sidecar-Token": token}
     last_message_id: Optional[str] = None
     try:
         async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:

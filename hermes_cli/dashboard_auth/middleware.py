@@ -178,7 +178,7 @@ _SESSION_TOKEN_PROVIDER = "session-token"
 
 
 def _session_token_header_session(request: Request):
-    """The Session for the deployment session token in ``X-Kouri Harness-Session-Token``, or ``None``.
+    """The Session for the deployment session token in ``X-Hermes-Session-Token``, or ``None``.
 
     The gate consults it only when no bearer was sent (a bearer wins). Only the registered
     session-token provider verifies the value (constant time), so no other provider's token opens

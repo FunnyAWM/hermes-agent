@@ -988,7 +988,7 @@ class PluginApiWebSocketGate:
 
 @contextmanager
 def _native_ws_scope(scope):
-    """Yield whether a plugin socket's native grant (``X-Kouri Harness-Gateway-Ticket``) was admitted,
+    """Yield whether a plugin socket's native grant (``X-Hermes-Gateway-Ticket``) was admitted,
     with that grant's home and secret scope bound for the rest of the connection; without the
     header, True and the ambient scope. The grant is redeemed here only: the route's credential
     check reads the principal stamped on the connection, and its scope dependency resolves the

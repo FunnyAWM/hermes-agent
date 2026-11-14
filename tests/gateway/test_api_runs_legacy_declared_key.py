@@ -1,5 +1,5 @@
 """#139835 (LC-13): an API session written by an earlier release stored the client's declared
-``X-Kouri Harness-Session-Key`` in ``sessions.session_key``; the caller that declares that same key is
+``X-Hermes-Session-Key`` in ``sessions.session_key``; the caller that declares that same key is
 adopted onto the canonical route, never 409'd forever. A different key still conflicts."""
 import json
 import os
@@ -40,7 +40,7 @@ async def probe():
     async def post(client, name, body, key):
         headers = {'Authorization': 'Bearer legacy-probe-secret', 'Idempotency-Key': name}
         if key:
-            headers['X-Kouri Harness-Session-Key'] = key
+            headers['X-Hermes-Session-Key'] = key
         async with client.post(f'http://127.0.0.1:{port}/v1/runs', json=body, headers=headers) as response:
             text = await response.text()
             out[name] = [response.status, json.loads(text) if response.content_type == 'application/json' else text]

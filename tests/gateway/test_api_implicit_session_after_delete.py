@@ -3,7 +3,7 @@
 The header-less session id is derived from the system prompt + first user message, and a deleted
 session's id stays retired for good. A new conversation with the same opening moves to the next
 generation of that opening instead of being refused forever; its later turns keep landing there.
-An explicit X-Kouri Harness-Session-Id and a spent Idempotency-Key are never moved.
+An explicit X-Hermes-Session-Id and a spent Idempotency-Key are never moved.
 """
 import json
 
@@ -36,12 +36,12 @@ def _app(api):
 async def _post(client, messages, *, session_id=None, key=None):
     headers = {'Authorization': 'Bearer ' + _API_KEY}
     if session_id:
-        headers['X-Kouri Harness-Session-Id'] = session_id
+        headers['X-Hermes-Session-Id'] = session_id
     if key:
         headers['Idempotency-Key'] = key
     response = await client.post('/v1/chat/completions', json={'model': 'hermes-agent', 'messages': messages},
                                  headers=headers)
-    return response.status, await response.json(), response.headers.get('X-Kouri Harness-Session-Id')
+    return response.status, await response.json(), response.headers.get('X-Hermes-Session-Id')
 
 
 async def _delete(client, session_id):

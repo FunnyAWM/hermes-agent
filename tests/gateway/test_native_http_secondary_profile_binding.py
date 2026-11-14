@@ -61,12 +61,12 @@ def test_secondary_native_ticket_implicit_selectors_touch_only_the_secondary_hom
             with httpx.Client(base_url=descriptor['api_origin'], trust_env=False, timeout=30) as client:
                 for params in ({}, {'profile': ''}, {'profile': 'current'}):
                     response = client.get('/api/config', params=params,
-                                          headers={'X-Kouri Harness-Gateway-Ticket': ticket()})
+                                          headers={'X-Hermes-Gateway-Ticket': ticket()})
                     assert response.status_code == 200, (params, response.text)
                     assert 'beta-model' in response.text and 'launch-model' not in response.text, (params, response.text)
                 for body in ({}, {'profile': 'current'}):
                     updated = client.put('/api/config', json={**body, 'config': {'display': {'skin': 'ares'}}},
-                                         headers={'X-Kouri Harness-Gateway-Ticket': ticket()})
+                                         headers={'X-Hermes-Gateway-Ticket': ticket()})
                     assert updated.status_code == 200, (body, updated.text)
             import hermes_yaml as yaml
             assert yaml.safe_load((beta / 'config.yaml').read_text())['display']['skin'] == 'ares'

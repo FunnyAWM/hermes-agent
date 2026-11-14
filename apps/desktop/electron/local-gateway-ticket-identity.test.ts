@@ -125,7 +125,7 @@ test.skipIf(process.platform === 'win32')(
 
     try {
       expect(await nativeGatewayHttpHeaders(descriptor, `${ORIGIN}/api/sessions?profile=work`)).toEqual({
-        'X-Kouri Harness-Gateway-Ticket': 'grant-1'
+        'X-Hermes-Gateway-Ticket': 'grant-1'
       })
       await expect(mintLocalGatewayTicket(endpointFor(path.join(links, 'home')), 'native-http')).rejects.toThrow(
         'Noncanonical gateway profile'

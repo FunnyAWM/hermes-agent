@@ -469,12 +469,12 @@ class TestDelivery:
         assert payload["extra"]["completed"] is True
         assert payload["extra"]["model"] == "test-model"
 
-        assert req["headers"]["X-Kouri Harness-Event"] == "on_session_end"
-        assert req["headers"]["X-Kouri Harness-Delivery"]
+        assert req["headers"]["X-Hermes-Event"] == "on_session_end"
+        assert req["headers"]["X-Hermes-Delivery"]
         expected = hmac.new(
             secret.encode(), req["body"], hashlib.sha256
         ).hexdigest()
-        assert req["headers"]["X-Kouri Harness-Signature-256"] == f"sha256={expected}"
+        assert req["headers"]["X-Hermes-Signature-256"] == f"sha256={expected}"
 
     def test_unsigned_delivery_has_no_signature_header(self, http_server):
         cfg = _cfg({"url": _url(http_server), "events": ["on_session_end"]})
@@ -486,7 +486,7 @@ class TestDelivery:
         assert outbound_webhooks.flush()
 
         assert len(http_server.captured) == 1
-        assert "X-Kouri Harness-Signature-256" not in http_server.captured[0]["headers"]
+        assert "X-Hermes-Signature-256" not in http_server.captured[0]["headers"]
 
     def test_matcher_filters_tool_events(self, http_server):
         cfg = _cfg(
@@ -553,7 +553,7 @@ class TestDelivery:
         assert http_server.captured[0]["path"] == "/hook"
 
     def test_delivery_id_matches_header_and_body(self, http_server):
-        """The X-Kouri Harness-Delivery header and the signed body's delivery_id
+        """The X-Hermes-Delivery header and the signed body's delivery_id
         must be the same value, or receiver-side dedupe breaks."""
         cfg = _cfg(
             {"url": _url(http_server), "events": ["on_session_end"],
@@ -568,7 +568,7 @@ class TestDelivery:
 
         req = http_server.captured[0]
         payload = json.loads(req["body"])
-        assert payload["delivery_id"] == req["headers"]["X-Kouri Harness-Delivery"]
+        assert payload["delivery_id"] == req["headers"]["X-Hermes-Delivery"]
 
     def test_connection_error_does_not_raise(self):
         target = outbound_webhooks.WebhookTarget(

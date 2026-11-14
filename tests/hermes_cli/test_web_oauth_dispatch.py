@@ -35,7 +35,7 @@ import hermes_cli.web_routers.oauth as _rt_oauth
 import hermes_cli.web_server_oauth as _web_server_oauth
 
 client = TestClient(app)
-HEADERS = {"X-Kouri Harness-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
 
 
 def _make_profile_home(tmp_path, monkeypatch, profile="coder"):

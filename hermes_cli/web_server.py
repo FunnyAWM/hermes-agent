@@ -239,7 +239,7 @@ app.include_router(_memory_oauth_router)
 # web_server_session_token sibling; it dies with the process and is injected
 # into the SPA HTML so only the web UI can use it.
 _SESSION_TOKEN = resolve_session_token()
-_SESSION_HEADER_NAME = "X-Kouri Harness-Session-Token"
+_SESSION_HEADER_NAME = "X-Hermes-Session-Token"
 _SSH_OWNER_NONCE: Optional[str] = None
 _SSH_RUNTIME_PURELIB: Optional[tuple[str, int, int]] = None
 _SSH_RUNTIME_MARKER: Optional[str] = None

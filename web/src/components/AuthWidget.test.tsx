@@ -111,7 +111,7 @@ describe('AuthWidget integration (real getAuthMe)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/auth/me')
-    expect((init!.headers as Headers).get('X-Kouri Harness-Session-Token')).toBe('loopback-token')
+    expect((init!.headers as Headers).get('X-Hermes-Session-Token')).toBe('loopback-token')
   })
 
   it('renders user info when /api/auth/me returns a non-loopback identity', async () => {

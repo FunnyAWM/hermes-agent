@@ -147,8 +147,8 @@ test.skipIf(process.platform === 'win32').each([0o700, 0o750, 0o701])(
       const descriptor = { gatewayEndpoint: endpoint, baseUrl: endpoint.api_origin }
       const a = await nativeGatewayHttpHeaders(descriptor, endpoint.api_origin + '/api/config')
       const b = await nativeGatewayHttpHeaders(descriptor, endpoint.api_origin + '/api/config')
-      expect(a).toEqual({ 'X-Kouri Harness-Gateway-Ticket': 'grant-1' })
-      expect(b).toEqual({ 'X-Kouri Harness-Gateway-Ticket': 'grant-2' })
+      expect(a).toEqual({ 'X-Hermes-Gateway-Ticket': 'grant-1' })
+      expect(b).toEqual({ 'X-Hermes-Gateway-Ticket': 'grant-2' })
       expect(requests.map(r => r.params)).toEqual(
         [1, 2].map(() => ({ profile_id: home, instance_id: 'owner', purpose: 'native-http' }))
       )

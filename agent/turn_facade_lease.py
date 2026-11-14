@@ -316,7 +316,7 @@ def admit_durable_turn_lease(
     ):
         return admission
     # A session id without a row still takes the lease: client-addressed ids (API server
-    # X-Kouri Harness-Session-Id, /v1/runs session_id, fingerprint-derived chat ids) are not
+    # X-Hermes-Session-Id, /v1/runs session_id, fingerprint-derived chat ids) are not
     # process-unique, and the first turn creates the row mid-turn, so a second writer would
     # otherwise find the row, take an unheld lease and interleave its turn into this one.
     # pidns stamp: see hermes_state_pidns.

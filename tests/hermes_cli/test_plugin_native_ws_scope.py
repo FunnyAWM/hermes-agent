@@ -101,7 +101,7 @@ def _grant(home):
 
 
 def _headers(grant):
-    return {"X-Kouri Harness-Gateway-Ticket": grant}
+    return {"X-Hermes-Gateway-Ticket": grant}
 
 
 def _refused(client, path, grant):

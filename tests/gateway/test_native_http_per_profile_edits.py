@@ -76,7 +76,7 @@ def test_per_profile_grants_edit_old_local_rows_of_their_own_profile(tmp_path):
                                                        'instance_id': descriptor['instance_id']})['ticket']
 
             def grant(profile):
-                return {'X-Kouri Harness-Gateway-Ticket': ticket(profile)}
+                return {'X-Hermes-Gateway-Ticket': ticket(profile)}
 
             with httpx.Client(base_url=descriptor['api_origin'], trust_env=False, timeout=30) as client:
                 def pin(sid, profile, minted_for):

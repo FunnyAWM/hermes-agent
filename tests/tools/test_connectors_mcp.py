@@ -431,7 +431,7 @@ def _clear_late_attempts():
 
 def test_late_attempt_is_never_adopted_by_another_profile(tmp_path):
     """Two multiplexed profiles can carry the same session key (the api_server's
-    X-Kouri Harness-Session-Key header is client-chosen, and live.py keys _open by
+    X-Hermes-Session-Key header is client-chosen, and live.py keys _open by
     (profile, session) for exactly this reason). A parked grant must not leak."""
     from tools.connectors import mcp
 

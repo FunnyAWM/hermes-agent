@@ -12,7 +12,7 @@ export interface BrowserBootstrap {
   token: string
 }
 
-const SESSION_HEADER = 'X-Kouri Harness-Session-Token'
+const SESSION_HEADER = 'X-Hermes-Session-Token'
 const DEFAULT_TIMEOUT_MS = 30_000
 const REAUTH_EVENT = 'hermes:browser-reauth-required'
 

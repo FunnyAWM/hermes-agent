@@ -500,7 +500,7 @@ async def _authenticated_bridge_health(session, base_url: str, token: str, timeo
 
     import aiohttp
     challenge = secrets.token_urlsafe(24)
-    async with session.get(f"{base_url}/auth-proof", headers={"X-Kouri Harness-Bridge-Challenge": challenge}, timeout=timeout) as resp:
+    async with session.get(f"{base_url}/auth-proof", headers={"X-Hermes-Bridge-Challenge": challenge}, timeout=timeout) as resp:
         if resp.status != 200:
             return False, None
         try:

@@ -56,7 +56,7 @@ def test_registry_grant_renames_and_deletes_only_its_own_served_profile(tmp_path
                 return str(home.resolve() if profile == 'default' else (home / 'profiles' / profile).resolve())
 
             def grant(profile, purpose):
-                return {'X-Kouri Harness-Gateway-Ticket': control(home, 'session-ticket', {
+                return {'X-Hermes-Gateway-Ticket': control(home, 'session-ticket', {
                     'profile_id': home_of(profile), 'purpose': purpose,
                     'instance_id': control(home, 'identify')['instance_id']})['ticket']}
 

@@ -105,7 +105,7 @@ def test_sidecar_patch_failure_still_reaches_health_endpoint(tmp_path: Path) -> 
     request = urllib.request.Request(
         f"http://127.0.0.1:{port}/healthz",
         data=b"{}",
-        headers={"X-Kouri Harness-Sidecar-Token": "test-token"},
+        headers={"X-Hermes-Sidecar-Token": "test-token"},
         method="POST",
     )
     try:

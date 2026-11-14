@@ -258,7 +258,7 @@ def notify_serve_backend(name: str, home: Path) -> Optional[dict[str, Any]]:
             f"http://{format_url_host(hr.dial_host(record))}:{record.port}"
             "/api/dashboard/agent-plugins/activate",
             data=json.dumps({"name": name, "home": str(home)}).encode("utf-8"), method="POST",
-            headers={"Content-Type": "application/json", "X-Kouri Harness-Session-Token": token})
+            headers={"Content-Type": "application/json", "X-Hermes-Session-Token": token})
         with urllib.request.urlopen(request, timeout=60) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception:

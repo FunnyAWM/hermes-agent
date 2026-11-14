@@ -135,7 +135,7 @@ async def test_exact_streamed_retry_replays_the_already_pending_approval(api, ow
     decisions = []
     owner.runner._handle_message = _canonical_approval_turn(owner, decisions)
     api._api_key = "pending-retry-key-long-enough"
-    headers = {"Authorization": "Bearer " + api._api_key, "X-Kouri Harness-Session-Id": "retry-sse",
+    headers = {"Authorization": "Bearer " + api._api_key, "X-Hermes-Session-Id": "retry-sse",
                "Idempotency-Key": "retry-once"}
     body = {"model": "hermes-agent", "stream": True, "messages": [{"role": "user", "content": "hi"}]}
     app = _create_app(api)
