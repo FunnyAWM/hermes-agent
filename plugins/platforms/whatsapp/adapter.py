@@ -373,7 +373,7 @@ def _cache_dirs() -> tuple:
 
 
 def _is_allowed_bridge_path(url: str) -> bool:
-    """Absolute bridge path resolves (symlinks included) inside a Hermes cache dir — a rogue bridge could hand back /etc/passwd."""
+    """Absolute bridge path resolves (symlinks included) inside a Kouri Harness cache dir — a rogue bridge could hand back /etc/passwd."""
     try:
         resolved = Path(url).resolve()
     except (OSError, ValueError):
@@ -500,7 +500,7 @@ async def _authenticated_bridge_health(session, base_url: str, token: str, timeo
 
     import aiohttp
     challenge = secrets.token_urlsafe(24)
-    async with session.get(f"{base_url}/auth-proof", headers={"X-Hermes-Bridge-Challenge": challenge}, timeout=timeout) as resp:
+    async with session.get(f"{base_url}/auth-proof", headers={"X-Kouri Harness-Bridge-Challenge": challenge}, timeout=timeout) as resp:
         if resp.status != 200:
             return False, None
         try:
@@ -577,7 +577,7 @@ def ensure_aiohttp() -> Optional[tuple[str, bool]]:
         ensure_import("sms")
     except (RuntimeError, OSError, ValueError) as exc:  # InstallError/DownloadError; anything else escapes as transient
         # Only policy or a foreign interpreter is final. A busy dependency lock, a failed download and "installed;
-        # restart Hermes to activate it" stay retryable: as final errors they exit the gateway 78 and keep it down.
+        # restart Kouri Harness to activate it" stay retryable: as final errors they exit the gateway 78 and keep it down.
         return str(exc) or type(exc).__name__, installable
     try:
         _import_aiohttp()
@@ -814,7 +814,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
     def _bridge_env(self) -> dict:
         """Subprocess env: the adapter's EFFECTIVE profile policy + profile-resolved WHATSAPP_* values + cache dirs."""
         # The bridge is a networked Node process with third-party deps: it starts from the scrubbed
-        # child env, never Hermes' credentials. Under a multiplexed secondary the launch env carries the
+        # child env, never Kouri Harness' credentials. Under a multiplexed secondary the launch env carries the
         # DEFAULT profile's WHATSAPP_* values, so every bridge-consumed key is re-resolved from this
         # profile (dropped on a scoped miss), never inherited from the launch env.
         from tools.environments.local import hermes_subprocess_env
@@ -1047,7 +1047,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             self._set_fatal_error(
                 "whatsapp_bridge_unresponsive",
                 f"Port {self._bridge_port} is held by a process that did not answer /health in time, so "
-                f"Hermes cannot tell whose WhatsApp bridge it is; nothing on port {self._bridge_port} was "
+                f"Kouri Harness cannot tell whose WhatsApp bridge it is; nothing on port {self._bridge_port} was "
                 "stopped. Stop that process, or give this profile its own port via "
                 "platforms.whatsapp.extra.bridge_port.",
                 retryable=True,
@@ -1328,7 +1328,7 @@ class WhatsAppAdapter(WhatsAppBehaviorMixin, BasePlatformAdapter):
             await asyncio.sleep(1)  # Poll interval
 
     def _log_delivery_status(self, data: dict[str, Any]) -> None:
-        """One gateway.log line per delivery/read status change of a message Hermes sent (Baileys
+        """One gateway.log line per delivery/read status change of a message Kouri Harness sent (Baileys
         ``messages.update`` for DMs, ``message-receipt.update`` per recipient in groups)."""
         logger.info(
             "[%s] WhatsApp delivery status: message=%s chat=%s status=%s%s at=%s%s", self.name,
@@ -1555,7 +1555,7 @@ async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_f
                 if not (health.get("capabilities") or {}).get("outboundMentions"):
                     return {"error": (
                         "WhatsApp bridge does not support native mentions; "
-                        "restart it from the same Hermes version.")}
+                        "restart it from the same Kouri Harness version.")}
 
             async def _post(path, payload, total, error_label=None):
                 """``(messageId, None)`` on 200, else ``(None, error_dict)`` (body read only when labelled)."""
@@ -1671,7 +1671,7 @@ def register(ctx) -> None:
         standalone_send=StandaloneSendPolicy(label="WhatsApp", media=True, captionable=True,
                                              forward_force_document=True, mentions=True, text_direct=True),
         name="whatsapp", label="WhatsApp", adapter_factory=WhatsAppAdapter, check_fn=check_whatsapp_requirements,
-        dashboard_description="Use Hermes through the bundled WhatsApp bridge with QR-based auth.",
+        dashboard_description="Use Kouri Harness through the bundled WhatsApp bridge with QR-based auth.",
         docs_url="https://github.com/tulir/whatsmeow",
         dashboard_env_vars=(
             "WHATSAPP_ENABLED", "WHATSAPP_MODE", "WHATSAPP_DM_POLICY", "WHATSAPP_ALLOWED_USERS",

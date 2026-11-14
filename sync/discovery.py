@@ -28,7 +28,7 @@ from typing import Any
 #: passes the bare ``_kourichat-sync._tcp`` to NSD, which expands it to the DNS-SD type
 #: below on the wire; ``zeroconf`` wants it spelled out (it rejects a type that does not
 #: end in ``.local.``, which would silently disable both register and browse).
-SERVICE_NAME = "KouriChat Next"
+SERVICE_NAME = "Kouri Harness"
 SERVICE_TYPE = "_kourichat-sync._tcp.local."
 
 #: How long a browse may take before the subnet probe takes over the remaining budget.

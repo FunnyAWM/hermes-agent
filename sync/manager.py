@@ -119,7 +119,7 @@ class SyncManager:
         self._state_store = SyncStateStore(self._root / _META_DIR)
         self._server: SyncServer | None = None
         self._discovery = LinkDiscovery()
-        # Hermes-layer hooks (chat-transcript bridge): export before a cycle lands the
+        # Kouri Harness-layer hooks (chat-transcript bridge): export before a cycle lands the
         # local log, import after records arrive. The sync package stays storage-agnostic.
         self._pre_sync = pre_sync
         self._post_sync = post_sync

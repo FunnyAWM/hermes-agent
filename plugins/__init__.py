@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Kouri Harness plugins package

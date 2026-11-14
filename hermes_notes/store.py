@@ -43,7 +43,7 @@ class NoteEntry:
 
 
 class NotesStore:
-    """Read and validate notes beneath one Hermes home."""
+    """Read and validate notes beneath one Kouri Harness home."""
 
     def __init__(self, home: Path, *, soft_limit: int = DEFAULT_SOFT_LIMIT,
                  hard_limit: int | None = DEFAULT_HARD_LIMIT) -> None:

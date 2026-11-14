@@ -58,7 +58,7 @@ history, and the session list is not a sync target. The manager takes both as
 ## Discovery, QR and exit sync
 
 - `sync/discovery.py` mirrors the Android NSD records (`_kourichat-sync._tcp.` / service
-  name `KouriChat Next`) via the OPTIONAL `zeroconf` dependency: the master registers
+  name `Kouri Harness`) via the OPTIONAL `zeroconf` dependency: the master registers
   with `start_server` (auto-started by `create_chain`, and by a master-role `sync_now`
   when it is not serving), and a secondary rediscovers on EVERY cycle — the saved
   `master_endpoint` is a fallback, not the truth, because DHCP/Wi-Fi-roam/VPN moves the
@@ -99,7 +99,7 @@ history, and the session list is not a sync target. The manager takes both as
   `manager.py` (lifecycle, negotiation wiring, HM-600x mapping, `sync_on_exit`),
   `errors.py`, `scheduler.py` (periodic loop for `hermes sync watch` and long-lived hosts).
 
-## Hermes seams (outside this package)
+## Kouri Harness seams (outside this package)
 
 - CLI: `hermes_cli/sync_cmd.py` (`hermes sync ...`) — settings come from the
   `kourichat_link` section of config.yaml (`sync_cmd.update_settings` is the write path
