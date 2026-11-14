@@ -379,7 +379,7 @@ function lostRewindReply(transcript = THREE_EXCHANGES) {
     if (loseReply) {
       loseReply = false
 
-      throw new Error('Hermes gateway connection lost')
+      throw new Error('Kouri Harness gateway connection lost')
     }
 
     return receipt
@@ -466,7 +466,7 @@ describe('a repeat after a lost rewind reply on a canonical session', () => {
     )
 
     await handle!.submitText('/undo')
-    expect(renderedText(handle!)).toContain('Hermes gateway connection lost')
+    expect(renderedText(handle!)).toContain('Kouri Harness gateway connection lost')
 
     await handle!.submitText('/undo')
 
@@ -616,7 +616,12 @@ describe('/steer', () => {
   it('seals the live reply at the steer notice, keeping its running tool live', async () => {
     const requestGateway = gateway(method => (method === 'session.steer' ? { status: 'queued' } : undefined))
     const tool = { type: 'tool-call', toolCallId: 't1', toolName: 'terminal', args: {}, argsText: '{}', timestamp: 2 }
-    const live = { id: 'stream-1', role: 'assistant', pending: true, parts: [{ type: 'text', text: 'before', timestamp: 1 }, tool] }
+    const live = {
+      id: 'stream-1',
+      role: 'assistant',
+      pending: true,
+      parts: [{ type: 'text', text: 'before', timestamp: 1 }, tool]
+    }
     let handle: HarnessHandle | null = null
     await actRender(
       <Harness

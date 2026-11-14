@@ -12,7 +12,9 @@ function queryPath(route: string, values: Record<string, boolean | null | string
   const query = new URLSearchParams()
 
   for (const [key, value] of Object.entries(values)) {
-    if (value !== null && value !== undefined) {query.set(key, String(value))}
+    if (value !== null && value !== undefined) {
+      query.set(key, String(value))
+    }
   }
 
   return `${route}?${query.toString()}`
@@ -65,7 +67,7 @@ export function createBrowserFilesBridge({
     const target = new URL(url, window.location.href)
 
     // Cross-origin anchors ignore download and navigate the current tab.
-    // Fetch without Hermes credentials; CORS denial must not fall back to navigation.
+    // Fetch without Kouri Harness credentials; CORS denial must not fall back to navigation.
     if (target.origin !== window.location.origin && !['blob:', 'data:'].includes(target.protocol)) {
       const image = await fetchBrowserImage(target)
 
@@ -97,8 +99,7 @@ export function createBrowserFilesBridge({
         })
       ).href
     },
-    readDir: (path: string) =>
-      fsGet<Awaited<ReturnType<Window['hermesDesktop']['readDir']>>>('list', path),
+    readDir: (path: string) => fsGet<Awaited<ReturnType<Window['hermesDesktop']['readDir']>>>('list', path),
     readFileDataUrl: readDataUrl,
     readFileDataUrlForAttach: readDataUrl,
     readFileText: (path: string) =>

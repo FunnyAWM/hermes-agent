@@ -34,7 +34,7 @@ export const SIDEBAR_NAV: SidebarNavItem[] = [
     route: MESSAGING_ROUTE,
     keybindActionId: 'nav.messaging'
   },
-  // Artifacts and Scheduled jobs are outputs of running Hermes the developer
+  // Artifacts and Scheduled jobs are outputs of running Kouri Harness the developer
   // way; Capabilities and Messaging are how anyone sets it up.
   {
     id: 'artifacts',

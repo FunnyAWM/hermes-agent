@@ -126,7 +126,7 @@ export function useCapabilityScope({
 
     return (profilesData?.profiles ?? []).map(p => ({
       key: p.name,
-      label: p.is_default ? 'Hermes (default)' : p.name,
+      label: p.is_default ? 'Kouri Harness (default)' : p.name,
       value: p.name
     }))
   }, [multiConnection, profilesData, rosterData])
@@ -197,12 +197,7 @@ export function CapabilityScopeSelector({
   }
 
   return (
-    <div
-      className={cn(
-        'flex min-w-0 items-center gap-2',
-        compact && 'flex-1'
-      )}
-    >
+    <div className={cn('flex min-w-0 items-center gap-2', compact && 'flex-1')}>
       {!compact && (
         <span className="text-[0.7rem] font-medium text-(--ui-text-tertiary)">{t.skills.configuringProfile}</span>
       )}

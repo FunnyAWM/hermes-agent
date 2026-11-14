@@ -40,13 +40,20 @@ const CONTEXT_REF_RE = /@(file|folder|url|image|tool|terminal):(?:"[^"\n]+"|'[^'
 function persistedImageRefs(text: string) {
   const suffix = /\n\n((?:\[Image attached(?: at)?: [^\n]+\]\n)+)((?:\[screenshot\](?:\n|$))+)$/.exec(text)
 
-  if (!suffix) { return extractImageRefs(text) }
+  if (!suffix) {
+    return extractImageRefs(text)
+  }
   const paths = [...suffix[1].matchAll(/^\[Image attached(?: at)?: (.+)\]$/gm)].map(match => match[1])
 
-  if (paths.length !== suffix[2].split('[screenshot]').length - 1) { return extractImageRefs(text) }
+  if (paths.length !== suffix[2].split('[screenshot]').length - 1) {
+    return extractImageRefs(text)
+  }
   const extracted = extractImageRefs(text.slice(0, suffix.index))
 
-  return { cleanedText: extracted.cleanedText, refs: [...extracted.refs, ...paths.map(path => `@image:${formatRefValue(path)}`)] }
+  return {
+    cleanedText: extracted.cleanedText,
+    refs: [...extracted.refs, ...paths.map(path => `@image:${formatRefValue(path)}`)]
+  }
 }
 
 // Gateway routing note for Discord turns (gateway/run_inbound.py::discord_triggering_note).
@@ -181,7 +188,7 @@ const NOTICE_DISPLAY_KINDS = [
   'process_complete',
   'auto_continue',
   'personality_switch',
-  // Hermes closing a failed turn, not the model speaking.
+  // Kouri Harness closing a failed turn, not the model speaking.
   'failed_turn',
   // A safety-refused turn retained for display: the user's own message, shown
   // greyed with a notice. Rendered through the system path, never a user bubble.
@@ -254,9 +261,7 @@ function contentRefusedNotice(metadata: SessionMessage['display_metadata']): str
 // The spreadable contentRefused field for a hydrated row: present only on a
 // retained safety-refused turn, carrying its notice when the backend supplied
 // one. Extracted so toChatMessages keeps its complexity within the ratchet.
-function contentRefusedField(
-  message: SessionMessage
-): { contentRefused: { notice?: string } } | Record<string, never> {
+function contentRefusedField(message: SessionMessage): { contentRefused: { notice?: string } } | Record<string, never> {
   if (message.display_kind !== CONTENT_REFUSED_DISPLAY_KIND) {
     return {}
   }
@@ -553,7 +558,8 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     // optimistic composer already uses) and render them via the dedicated
     // attachments row below the bubble instead. The leading `@file:` block
     // (attached files, large pastes) moves there too, for the same parity.
-    const imageRefExtraction = displayRole === 'user' && rawDisplayContent ? persistedImageRefs(rawDisplayContent) : null
+    const imageRefExtraction =
+      displayRole === 'user' && rawDisplayContent ? persistedImageRefs(rawDisplayContent) : null
     const fileRefExtraction = imageRefExtraction ? splitLeadingAttachmentRefs(imageRefExtraction.cleanedText) : null
     const displayContent = fileRefExtraction ? fileRefExtraction.text : rawDisplayContent
     const liftedRefs = [...(fileRefExtraction?.refs ?? []), ...(imageRefExtraction?.refs ?? [])]
@@ -639,7 +645,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     let pendingAbsorbedRows = 0
 
     // A machine notice stored as an assistant row (the failed-turn boundary) is
-    // Hermes speaking: it must not join the tool-call reply it follows.
+    // Kouri Harness speaking: it must not join the tool-call reply it follows.
     if (displayRole === 'assistant') {
       if (pendingToolParts.length) {
         if (!appendPartsToActiveAssistant(pendingToolParts, message.timestamp ?? pendingToolTimestamp)) {

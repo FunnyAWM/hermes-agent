@@ -56,12 +56,7 @@ import { handleServerRequest as dispatchServerRequest } from './gateway-event/se
 import { bindReceiptUserRows } from './receipt-user-rows'
 import { currentResponseParts, mergeCurrentResponseText } from './response-parts'
 import { admitSegmentDelta, admitSegmentSeal, type SegmentCursor, type SegmentStamp } from './segment-identity'
-import {
-  completionErrorText,
-  delegateTaskPayloads,
-  MAX_STREAM_FLUSH_GAP_MS,
-  STREAM_DELTA_FLUSH_MS
-} from './utils'
+import { completionErrorText, delegateTaskPayloads, MAX_STREAM_FLUSH_GAP_MS, STREAM_DELTA_FLUSH_MS } from './utils'
 
 interface MessageStreamOptions {
   activeGatewayProfile?: string
@@ -1190,7 +1185,7 @@ export function useMessageStream({
         const streamId = state.streamId ?? `assistant-error-${Date.now()}`
         const groupId = state.pendingBranchGroup ?? undefined
         const prev = state.messages
-        const error = errorMessage.trim() || 'Hermes reported an error'
+        const error = errorMessage.trim() || 'Kouri Harness reported an error'
         // The `error` event carries no descriptor; the dispatcher may recover
         // one from the text (SESSION_NOT_OWNED, disk_full) so the card gates
         // its buttons like a classified turn.

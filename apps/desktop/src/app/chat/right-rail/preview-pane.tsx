@@ -218,7 +218,7 @@ function isModuleMimeError(message: string): boolean {
  */
 const PREVIEW_PRINT_GUARD_SCRIPT =
   '(function(){if(window.__hermesPrintGuard)return;window.__hermesPrintGuard=true;' +
-  'window.print=function(){console.warn("[Hermes] Printing is disabled in the in-app preview. ' +
+  'window.print=function(){console.warn("[Kouri Harness] Printing is disabled in the in-app preview. ' +
   'Open the page in your browser to print.");};})()'
 
 function PreviewLoadError({
@@ -331,7 +331,7 @@ export function PreviewPane({
   // the live address through this mirror instead of a stale closure.
   const targetUrlRef = useRef(target.url)
   targetUrlRef.current = target.url
-  const ownerSessionIdRef = useRef(sessionId)  // tab owner, read by the guest effect to resolve its partition
+  const ownerSessionIdRef = useRef(sessionId) // tab owner, read by the guest effect to resolve its partition
   ownerSessionIdRef.current = sessionId
   const [devtoolsOpen, setDevtoolsOpen] = useState(false)
   const [history, setHistory] = useState({ back: false, forward: false })
@@ -717,7 +717,7 @@ export function PreviewPane({
 
     // Auto-open the preview console so the user can see progress events
     // streaming back from the background agent. Without this, clicking
-    // "Ask Hermes to restart the server" looked like it did nothing —
+    // "Ask Kouri Harness to restart the server" looked like it did nothing —
     // the work was happening, but in a collapsed pane.
     consoleState.setOpen(true)
 

@@ -1,7 +1,7 @@
 /**
  * The Browser bar's key button: fill a saved login into THIS tab's page.
  *
- * Lists vault logins (Hermes vault + every unlocked password manager + any
+ * Lists vault logins (Kouri Harness vault + every unlocked password manager + any
  * other login source the backend lists) whose saved origins match the page,
  * offers an unlock for each locked manager, and on a pick asks the backend to
  * fill it (`vault.preview.fill`). The renderer never holds the password: it
@@ -30,7 +30,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SETTINGS_ROUTE } from '@/app/routes'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +58,11 @@ import { currentSessionId } from '@/store/preview-ownership'
 import { $activeGatewayProfile } from '@/store/profile'
 import { requestRoute } from '@/store/recovery-requests'
 import { knownSessionOwner, ownerLookupSessionRows } from '@/store/session'
-import { profileScopeForSessionOwner, requestForSessionProfile, type SessionOwnerScope } from '@/store/session-request-router'
+import {
+  profileScopeForSessionOwner,
+  requestForSessionProfile,
+  type SessionOwnerScope
+} from '@/store/session-request-router'
 
 import { forgetPreviewVaultBinding, openUserPreviewVaultBinding } from './preview-vault'
 
@@ -180,20 +191,25 @@ export function PreviewVaultButton({ tabId, url }: PreviewVaultButtonProps) {
     }
   }, [activeConnectionId, activeProfile, tabId])
 
-  const rpc = useCallback(
-    <T,>(owner: SessionOwnerScope, method: string, params: Record<string, unknown> = {}) => {
-      // Fallback dispatcher for a bare/unknown owner — unreachable in practice
-      // because resolveTabVaultOwner always yields a concrete owner, but the
-      // router requires it. Scoped to the view the owner was derived from.
-      const ambient = <R,>(m: string, p?: Record<string, unknown>) =>
-        requestGatewayForAgent<R>($activeConnectionId.get(), $activeGatewayProfile.get() || 'default', m, p, undefined, undefined, {
+  const rpc = useCallback(<T,>(owner: SessionOwnerScope, method: string, params: Record<string, unknown> = {}) => {
+    // Fallback dispatcher for a bare/unknown owner — unreachable in practice
+    // because resolveTabVaultOwner always yields a concrete owner, but the
+    // router requires it. Scoped to the view the owner was derived from.
+    const ambient = <R,>(m: string, p?: Record<string, unknown>) =>
+      requestGatewayForAgent<R>(
+        $activeConnectionId.get(),
+        $activeGatewayProfile.get() || 'default',
+        m,
+        p,
+        undefined,
+        undefined,
+        {
           spawnPriority: 'foreground'
-        })
+        }
+      )
 
-      return requestForSessionProfile<T>(owner, ambient, method, params)
-    },
-    []
-  )
+    return requestForSessionProfile<T>(owner, ambient, method, params)
+  }, [])
 
   const load = useCallback(async () => {
     setLogins(null)

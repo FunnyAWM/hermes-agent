@@ -685,7 +685,12 @@ function groupChatSyncEnvelope(
   return envelope
 }
 
-function mirroredGroupLocalName(roomId: string | null, name: string | undefined, byId: Map<string, string>, rooms: Record<string, GroupChat>) {
+function mirroredGroupLocalName(
+  roomId: string | null,
+  name: string | undefined,
+  byId: Map<string, string>,
+  rooms: Record<string, GroupChat>
+) {
   return roomId && byId.has(roomId) ? byId.get(roomId) : name && rooms[name] ? name : null
 }
 
@@ -695,8 +700,19 @@ const disbandedDuringRead = (roomId: string | null, name: string, started: numbe
 function fenceGroupChatRead(snapshot: GroupChatSyncSnapshot | null, started: number): GroupChatSyncSnapshot {
   const remote = normalizeGroupChatSyncSnapshot(snapshot)
 
-  return { ...remote, rooms: Object.fromEntries(Object.entries(remote.rooms).filter(([key, room]) =>
-    !disbandedDuringRead(room.roomId || (key.startsWith('id:') ? key.slice(3) : null), room.name || key.slice(5), started))) }
+  return {
+    ...remote,
+    rooms: Object.fromEntries(
+      Object.entries(remote.rooms).filter(
+        ([key, room]) =>
+          !disbandedDuringRead(
+            room.roomId || (key.startsWith('id:') ? key.slice(3) : null),
+            room.name || key.slice(5),
+            started
+          )
+      )
+    )
+  }
 }
 
 /** Merge the gateway's bounded display projection into Desktop's richer room
@@ -711,7 +727,12 @@ export function mergeRemoteGroupChatSnapshotIntoRooms(
     deletedRooms = [],
     tombstones = {},
     readStarted = disbandVersion
-  }: { deletedRooms?: string[]; preserveRooms?: string[]; tombstones?: Record<string, number>; readStarted?: number } = {}
+  }: {
+    deletedRooms?: string[]
+    preserveRooms?: string[]
+    tombstones?: Record<string, number>
+    readStarted?: number
+  } = {}
 ) {
   const remoteNorm = normalizeGroupChatSyncSnapshot(remote)
 
@@ -767,8 +788,10 @@ export function mergeRemoteGroupChatSnapshotIntoRooms(
 
     const displayName = String(projected.name || localName || (key.startsWith('name:') ? key.slice(5) : key))
 
-    if (disbandedDuringRead(projectedRoomId, displayName, readStarted) ||
-      [displayName, localName].some(name => name && locallyDeleted.has(name))) {
+    if (
+      disbandedDuringRead(projectedRoomId, displayName, readStarted) ||
+      [displayName, localName].some(name => name && locallyDeleted.has(name))
+    ) {
       // Mid-rename guard: the remote copy may still be under the OLD display
       // name while the local record was already re-keyed (same roomId, new
       // name). That old name sits in deletedRooms, but the local record is
@@ -787,7 +810,12 @@ export function mergeRemoteGroupChatSnapshotIntoRooms(
 
     const identity = { ...projected, roomId: projectedRoomId }
 
-    if (gatewayGroupIdentityConflicts(existing, identity) || gatewayGroupIdentityConflicts(rooms[displayName] || {}, identity)) {continue}
+    if (
+      gatewayGroupIdentityConflicts(existing, identity) ||
+      gatewayGroupIdentityConflicts(rooms[displayName] || {}, identity)
+    ) {
+      continue
+    }
     const remoteRevision = Math.max(0, Number(projected.revision || 0))
     const localRevision = Math.max(0, Number(existing.syncRevision || 0))
 
@@ -1122,7 +1150,7 @@ function groupChatSyncPayloadEqual(
 /** Every default-profile gateway route this Desktop can currently reach.
  *  The projection fans out to ALL of them, so any single gateway can die or
  *  be removed without losing the shared room state, and gateway-only
- *  clients (Hermes Go, headless backends) see rooms regardless of which
+ *  clients (Kouri Harness Go, headless backends) see rooms regardless of which
  *  gateway a Desktop was foregrounding when the room was used. */
 async function groupChatSyncTargetConnections() {
   const targets = new Set<string>()
@@ -1177,11 +1205,15 @@ async function flushGroupChatServerSync(connectionId?: string) {
     const local = groupChatSyncSnapshot($groupChats.get(), groupChatTombstones)
     const writeRevision = remoteState.revision + 1
 
-    const snapshot = mergeGroupChatSyncSnapshots(fenceGroupChatRead(remoteState.snapshot, remoteState.readStarted), local, {
-      changedRooms: job.changedRooms,
-      deletedRooms: job.deletedRooms,
-      writeRevision
-    })
+    const snapshot = mergeGroupChatSyncSnapshots(
+      fenceGroupChatRead(remoteState.snapshot, remoteState.readStarted),
+      local,
+      {
+        changedRooms: job.changedRooms,
+        deletedRooms: job.deletedRooms,
+        writeRevision
+      }
+    )
 
     // Reconnect/startup reconciliation often discovers that the gateway
     // already holds the exact merged projection. Avoid advancing a revision
@@ -1471,10 +1503,10 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  a Bot Mode title or a core profile display_name (e.g. default renamed to
  *  "Lucy") labels the speaker everywhere this helper feeds — the "X is
  *  thinking…" working line, the activity feed, and transcript lines — so a
- *  renamed bot never shows up as its raw profile id or a stale "Hermes"
- *  (community report, Aug 21 2026: renamed default still read "Hermes is
+ *  renamed bot never shows up as its raw profile id or a stale "Kouri Harness"
+ *  (community report, Aug 21 2026: renamed default still read "Kouri Harness is
  *  thinking…" in group rooms). The untitled primary profile is literally
- *  named "default" — render it as Hermes (matching displayName and the
+ *  named "default" — render it as Kouri Harness (matching displayName and the
  *  @hermes handle) so the main agent never loses its name in rooms.
  *
  *  Accepts either a member key (`connectionId::profile`, what the activity
@@ -1484,7 +1516,7 @@ export const GROUP_CHAT_MAX_MEMBERS = 6
  *  same pipeline the Bots tab renders — and a raw name resolves the same
  *  way when exactly one roster row carries it. Same-named members that
  *  resolve to the same label get their connection label appended, so two
- *  failing `default`s are never one anonymous "Hermes" — judged against the
+ *  failing `default`s are never one anonymous "Kouri Harness" — judged against the
  *  ROOM's seats when the caller names the room (#94869: a room whose only
  *  `reviewer` is local reads plain "Reviewer" however many other connections
  *  expose one), against the whole roster otherwise. A key with no roster row
@@ -1522,7 +1554,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
     // Exact key only: the bare `profile` key is a single-source record and
     // names whichever machine wrote it, never this connection's bot.
     const title = String(meta?.[trimmed]?.title || '').trim()
-    const label = title || (profile.toLowerCase() === 'default' ? 'Hermes' : profile)
+    const label = title || (profile.toLowerCase() === 'default' ? 'Kouri Harness' : profile)
 
     // Another connection still exposes this name: keep them tellable apart.
     return rows.some(bot => bot.name === profile) ? `${label} · ${connection}` : label
@@ -1540,7 +1572,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
   // Legacy rungs for names the roster cannot place: a bare-keyed Bot Mode
   // title (single-source rosters only — once rows are connection-scoped the
   // bare key cannot say which machine it named), then the local row's
-  // display_name, then default → Hermes.
+  // display_name, then default → Kouri Harness.
   const scoped = rows.some(bot => bot.sourceScoped || bot.remoteSource)
   const title = scoped ? '' : String(meta?.[trimmed]?.title || '').trim()
 
@@ -1555,7 +1587,7 @@ export function groupSpeakerLabel(name?: null | string, group?: null | string) {
     return renamed
   }
 
-  return isDefault ? 'Hermes' : trimmed
+  return isDefault ? 'Kouri Harness' : trimmed
 }
 
 /** Trim a room log + its watermarks to the retained window, keeping

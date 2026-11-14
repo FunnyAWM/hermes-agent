@@ -539,9 +539,10 @@ const previewRead: Handler = ({ request, sessionId }) => {
   // A browser host has no pop-out and no readable surface to forward to, so
   // asking would only wait out the pop-out timeout before the same answer.
   void (async () => {
-    const result = hasLivePreviewSurface(owner) || !hostHas('webviewPreview')
-      ? await readActivePreview(opts, owner)
-      : ((await requestPopoutPreviewRead(opts, owner)) ?? (await readActivePreview(opts, owner)))
+    const result =
+      hasLivePreviewSurface(owner) || !hostHas('webviewPreview')
+        ? await readActivePreview(opts, owner)
+        : ((await requestPopoutPreviewRead(opts, owner)) ?? (await readActivePreview(opts, owner)))
 
     answerValue(request, result)
   })()
@@ -741,7 +742,7 @@ const previewAct: Handler = ({ deps, isActiveSession, request, sessionId }) => {
  *  agent relays it instead of retrying a call that can never succeed. */
 const BROWSER_WINDOW_READ_REFUSAL = {
   error:
-    'read_window_below needs the Hermes desktop app: this session is in a browser tab, which cannot see the OS windows around it.',
+    'read_window_below needs the Kouri Harness desktop app: this session is in a browser tab, which cannot see the OS windows around it.',
   platform: 'browser'
 }
 

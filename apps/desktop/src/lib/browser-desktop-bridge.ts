@@ -26,7 +26,7 @@ import { tagRegistrySessionResponse } from '../../electron/profile-session-routi
 
 /**
  * Install a capability-limited Desktop bridge when the real renderer is served
- * directly by Hermes' authenticated web server.
+ * directly by Kouri Harness' authenticated web server.
  *
  * Electron remains authoritative everywhere it exists: no injected dashboard
  * token means this is a normal Vite/Electron renderer, and an existing preload
@@ -60,7 +60,9 @@ export function installBrowserDesktopBridge(): boolean {
   // This machine's saved gateway connections (the list native Desktop keeps): each other gateway's
   // requests ride `/api/relay/<id>` on this origin (browser-saved-connections.ts). A host that does
   // not serve the list (the standalone dashboard) reaches only its own origin.
-  const relays: BrowserSavedConnections | null = savedConnectionsServed() ? createBrowserSavedConnections({ api, bootstrap }) : null
+  const relays: BrowserSavedConnections | null = savedConnectionsServed()
+    ? createBrowserSavedConnections({ api, bootstrap })
+    : null
   const bootstrapFor = (connectionId?: null | string) => relays?.bootstrapFor(connectionId) ?? bootstrap
   const activeConnectionId = () => $connection.get()?.connectionId ?? LOCAL_CONNECTION_ID
 

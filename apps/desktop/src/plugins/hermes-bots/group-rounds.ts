@@ -44,7 +44,7 @@ import type { Attachment, GroupMember, GroupMessage } from './types'
 // actually speaks is its own turn's choice — replying with exactly "(pass)"
 // (or nothing, or failing) is silence. Hard caps end every turn; a round in
 // which everyone passed means the conversation settled. Each member runs its
-// turn in its OWN persistent per-group Hermes session and is fed only the
+// turn in its OWN persistent per-group Kouri Harness session and is fed only the
 // room messages that are NEW since it last saw the room.
 
 /** Deterministic @mention parse. Handles @name, @"two words" via display
@@ -643,8 +643,15 @@ async function harvestGroupRoundMembers(context: GroupRoundMemberContext): Promi
  *  epoch and discards queued continuations.
  *  Watermarks are per thread+member (`${thread}::${memberKey}`), so parallel
  *  topics never eat each other's deltas. */
-export async function runGroupChatRounds(group: string, members: GroupMember[], thread: string, failedMembers = new Set<string>()) {
-  if (group.startsWith('canonical:')) {throw new Error('This group chat runs on its gateway')}
+export async function runGroupChatRounds(
+  group: string,
+  members: GroupMember[],
+  thread: string,
+  failedMembers = new Set<string>()
+) {
+  if (group.startsWith('canonical:')) {
+    throw new Error('This group chat runs on its gateway')
+  }
 
   const binding = followGroupChat(group, name => {
     group = name
@@ -880,7 +887,9 @@ export function sendToGroupChat(
   thread?: null | string,
   images?: Attachment[]
 ): null | string {
-  if (group.startsWith('canonical:')) {throw new Error('This group chat runs on its gateway')}
+  if (group.startsWith('canonical:')) {
+    throw new Error('This group chat runs on its gateway')
+  }
   const trimmed = String(text || '').trim()
 
   if (rejectGroupSlashCommand(trimmed)) {

@@ -118,7 +118,7 @@ describe('AboutSettings', (): void => {
     expect(checkBackendUpdates).toHaveBeenCalledTimes(2)
   })
 
-  it('credits the upstream Hermes Agent project and its license', (): void => {
+  it('credits the upstream Kouri Harness project and its license', (): void => {
     render(<AboutSettings />)
     const attribution = en.settings.about.attribution
 
