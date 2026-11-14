@@ -1,4 +1,4 @@
-"""Windows: every spelling of a protected Hermes path is denied, not just the plain one (#154282).
+"""Windows: every spelling of a protected Kouri Harness path is denied, not just the plain one (#154282).
 
 ``\\\\?\\C:\\...`` and the local machine's administrative share (``\\\\localhost\\C$\\...``,
 ``\\\\127.0.0.1\\C$\\...``, ``\\\\<this computer>\\C$\\...``) open the same file as ``C:\\...``; the

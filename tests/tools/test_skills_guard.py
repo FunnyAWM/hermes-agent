@@ -468,7 +468,7 @@ class TestScanSkill:
         assert result.verdict != "safe"
 
     def test_loading_hermes_dotenv_is_high(self, tmp_path):
-        """A skill that tells the agent to load the Hermes .env inside execute_code hands the
+        """A skill that tells the agent to load the Kouri Harness .env inside execute_code hands the
         script every key of the profile: high, so a community install is a caution."""
         skill_dir = tmp_path / "dotenv-skill"
         skill_dir.mkdir()
@@ -481,10 +481,10 @@ class TestScanSkill:
             "from dotenv import dotenv_values\nfrom hermes_constants import get_hermes_home\n"
             'keys = dotenv_values(get_hermes_home() / ".env")\n'
             'load_dotenv("./project.env")\n'
-            # Not the Hermes .env: a .hermes name that is not a path segment, or a lower-case variable.
+            # Not the Kouri Harness .env: a .hermes name that is not a path segment, or a lower-case variable.
             'load_dotenv(".hermes-project.env")\nload_dotenv("myapp.hermes.env")\n'
             'load_dotenv(hermes_home_env_path)\n'
-            # A Hermes name after the call's closing paren is not one of its arguments.
+            # A Kouri Harness name after the call's closing paren is not one of its arguments.
             'load_dotenv("./project.env")  # independent of HERMES_HOME\n'
             'load_dotenv("./project.env"); home = get_hermes_home()\n'
             # A paren inside a string argument does not end the call's arguments early.
@@ -498,7 +498,7 @@ class TestScanSkill:
         assert should_allow_install(result)[0] is False
 
     def test_model_provider_key_read_is_high_other_secrets_stay_medium(self, tmp_path):
-        """Skill children never receive a Hermes model-provider key, so a skill reading one is high;
+        """Skill children never receive a Kouri Harness model-provider key, so a skill reading one is high;
         reading the skill's own third-party key stays the informational medium (#60709)."""
         skill_dir = tmp_path / "key-skill"
         skill_dir.mkdir()

@@ -1,4 +1,4 @@
-"""Pairing launches of bridge.js (dashboard and `hermes whatsapp`) never inherit Hermes' credentials (#38079)."""
+"""Pairing launches of bridge.js (dashboard and `hermes whatsapp`) never inherit Kouri Harness' credentials (#38079)."""
 
 from types import SimpleNamespace
 

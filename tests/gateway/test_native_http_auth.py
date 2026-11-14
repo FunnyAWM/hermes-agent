@@ -73,7 +73,7 @@ def ticket(home, descriptor, purpose='native-http', **overrides):
 
 
 def headers(token):
-    return {'X-Hermes-Gateway-Ticket': token}
+    return {'X-Kouri Harness-Gateway-Ticket': token}
 
 
 async def reject_ws(origin, token):
@@ -103,8 +103,8 @@ def test_native_http_grants_are_single_use_and_bound_to_daemon(tmp_path):
             assert client.get('/api/config', headers={**headers(ticket(home, descriptor)),
                                                      'Origin': origin}).status_code == 401
         assert client.get('/api/config', headers=[
-            ('X-Hermes-Gateway-Ticket', ticket(home, descriptor)),
-            ('X-Hermes-Gateway-Ticket', ticket(home, descriptor)),
+            ('X-Kouri Harness-Gateway-Ticket', ticket(home, descriptor)),
+            ('X-Kouri Harness-Gateway-Ticket', ticket(home, descriptor)),
         ]).status_code == 401
         for purpose in ('interactive', 'exposure', 'worker-adoption'):
             assert client.get('/api/config', headers=headers(ticket(home, descriptor, purpose))).status_code == 401
@@ -150,7 +150,7 @@ def test_native_http_grants_are_single_use_and_bound_to_daemon(tmp_path):
         assert yaml.safe_load((home / 'config.yaml').read_text())['display']['skin'] == 'ares'
         query_ticket = ticket(home, descriptor)
         assert client.get('/api/config', params={'ticket': query_ticket}).status_code == 401
-        assert client.get('/api/config', headers={'Cookie': 'X-Hermes-Gateway-Ticket=' + query_ticket}).status_code == 401
+        assert client.get('/api/config', headers={'Cookie': 'X-Kouri Harness-Gateway-Ticket=' + query_ticket}).status_code == 401
         # Expiry is TicketStore.redeem's ``expires <= monotonic()`` rule, which the native-HTTP gate
         # maps to 401 like every other redeem refusal: covered at the exact 30 s boundary with a
         # patched clock in test_runtime_bootstrap, not by a 31 s wall-clock wait in the default lane.

@@ -15,7 +15,7 @@
 //     so ShipIt's detached relaunch of the NEW bundle survives our exit.
 //
 // Usage (Playwright resolves from the checkout's tests-js):
-//   node mac-bundled-update-driver.mjs --app-bin <.app/Contents/MacOS/Hermes> \
+//   node mac-bundled-update-driver.mjs --app-bin <.app/Contents/MacOS/Kouri Harness> \
 //     --shots <dir> --close-timeout-ms 420000
 
 import fs from 'node:fs';

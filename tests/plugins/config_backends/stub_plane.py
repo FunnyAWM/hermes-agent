@@ -160,13 +160,13 @@ class StubPlane:
                     plane.requests.append({
                         "method": method, "profile": profile, "body": body,
                         "auth": self.headers.get("Authorization"),
-                        "instance": self.headers.get("X-Hermes-Instance-Id"),
+                        "instance": self.headers.get("X-Kouri Harness-Instance-Id"),
                         "if_none_match": self.headers.get("If-None-Match")})
                     if plane.fail_status is not None:
                         return self._send(plane.fail_status, {"error": "unavailable", "message": "stub outage"})
                     if self.headers.get("Authorization") not in (f"Bearer {TOKEN}", f"Bearer {NOUS_TOKEN}"):
                         return self._send(401, {"error": "unauthorized", "message": "bad token"})
-                    if self.headers.get("X-Hermes-Instance-Id") != INSTANCE:
+                    if self.headers.get("X-Kouri Harness-Instance-Id") != INSTANCE:
                         return self._send(403, {"error": "config_agent_unknown", "message": "unknown instance"})
                     if method == "GET":
                         eff = plane.effective(profile)

@@ -120,7 +120,7 @@ def daemon(_isolate_hermes_home, monkeypatch):
         yield SimpleNamespace(
             client=client, launch=launch, beta=beta, hosted=hosted, calls=calls,
             owner={web_server._SESSION_HEADER_NAME: web_server._SESSION_TOKEN},
-            beta_ticket=lambda: {"X-Hermes-Gateway-Ticket": store.mint(
+            beta_ticket=lambda: {"X-Kouri Harness-Gateway-Ticket": store.mint(
                 profile_id=str(beta), subject="desktop", purpose="native-http")})
     finally:
         web_server.app.router.routes[:] = routes

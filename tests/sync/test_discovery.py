@@ -19,7 +19,7 @@ def test_service_type_is_spelled_for_zeroconf():
     # Android passes the bare `_kourichat-sync._tcp` to NSD, which expands it to exactly
     # this on the wire; both ends must therefore agree on the `.local.` suffix.
     assert discovery.SERVICE_TYPE == "_kourichat-sync._tcp.local."
-    assert discovery.SERVICE_NAME == "KouriChat Next"
+    assert discovery.SERVICE_NAME == "Kouri Harness"
 
 
 def test_service_info_accepts_the_constants():

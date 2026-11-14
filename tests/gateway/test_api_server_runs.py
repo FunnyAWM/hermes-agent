@@ -1835,12 +1835,12 @@ class TestRunIdempotency:
                 first_headers = {
                     "Authorization": "Bearer sk-secret",
                     "Idempotency-Key": "memory-scope",
-                    "X-Hermes-Session-Key": "memory-a",
+                    "X-Kouri Harness-Session-Key": "memory-a",
                 }
                 second_headers = {
                     "Authorization": "Bearer sk-secret",
                     "Idempotency-Key": "memory-scope",
-                    "X-Hermes-Session-Key": "memory-b",
+                    "X-Kouri Harness-Session-Key": "memory-b",
                 }
                 first = await cli.post(
                     "/v1/runs", json={"input": "same"}, headers=first_headers
@@ -1869,7 +1869,7 @@ class TestRunIdempotency:
                 headers = {
                     "Authorization": "Bearer sk-secret",
                     "Idempotency-Key": "lost-acceptance",
-                    "X-Hermes-Session-Key": "memory-a",
+                    "X-Kouri Harness-Session-Key": "memory-a",
                 }
                 first = await cli.post(
                     "/v1/runs", json={"input": "same"}, headers=headers
@@ -1887,7 +1887,7 @@ class TestRunIdempotency:
                 assert replay.status == 202
                 assert replay_body["run_id"] == first_body["run_id"]
                 assert replay_body["replayed"] is True
-                assert replay.headers["X-Hermes-Session-Key"] == "memory-a"
+                assert replay.headers["X-Kouri Harness-Session-Key"] == "memory-a"
 
     @pytest.mark.asyncio
     async def test_direct_status_hydrates_after_adapter_restart(

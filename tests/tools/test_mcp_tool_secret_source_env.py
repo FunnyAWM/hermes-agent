@@ -1,4 +1,4 @@
-"""Stdio MCP child env: a secret source must not forward a credential Hermes itself consumes."""
+"""Stdio MCP child env: a secret source must not forward a credential Kouri Harness itself consumes."""
 
 import os
 from pathlib import Path
@@ -57,7 +57,7 @@ def test_secret_source_vars_resolve_through_active_profile_scope(monkeypatch):
 
 
 def test_secret_source_never_forwards_hermes_credentials(monkeypatch):
-    """Where a Hermes-managed credential is stored (``.env`` or a secret source) must not change
+    """Where a Kouri Harness-managed credential is stored (``.env`` or a secret source) must not change
     whether a stdio child receives it; a server that needs one declares it in its own ``env``."""
     from hermes_cli import env_loader
     from tools.mcp_tool_config import _build_safe_env
@@ -101,7 +101,7 @@ def test_secret_source_never_forwards_profile_platform_plugin_secret(monkeypatch
 def test_secret_source_never_forwards_config_declared_provider_keys(monkeypatch):
     """A name the profile's config.yaml points a provider credential at (``key_env`` /
     ``api_key_env`` on the main model, a custom/named provider, an auxiliary task, a fallback
-    route) is a Hermes credential under that name, so a vault copy of it is withheld too."""
+    route) is a Kouri Harness credential under that name, so a vault copy of it is withheld too."""
     from hermes_cli import env_loader
     from tools.mcp_tool_config import _build_safe_env
 
@@ -128,7 +128,7 @@ def test_secret_source_never_forwards_config_declared_provider_keys(monkeypatch)
 
 def test_secret_source_never_forwards_config_env_ref_credentials(monkeypatch):
     """A credential field written as a whole-value ``${VAR}`` / ``${env:VAR}`` ref
-    (``delegation.api_key: ${DELEGATION_KEY}``) makes VAR a Hermes credential, so its vault copy
+    (``delegation.api_key: ${DELEGATION_KEY}``) makes VAR a Kouri Harness credential, so its vault copy
     is withheld even though the merged config already holds the expanded value. An
     ``mcp_servers.*.env`` ref is the server's declared env and is still forwarded."""
     from hermes_cli import env_loader
@@ -155,7 +155,7 @@ def test_secret_source_never_forwards_config_env_ref_credentials(monkeypatch):
 
 def test_secret_source_never_forwards_model_api_alias_ref(monkeypatch):
     """``model.api`` is read as the main model's API key (an alias of ``model.api_key``), so a
-    ``${VAR}`` there makes VAR a Hermes credential whose vault copy is withheld."""
+    ``${VAR}`` there makes VAR a Kouri Harness credential whose vault copy is withheld."""
     from hermes_cli import env_loader
     from tools.mcp_tool_config import _build_safe_env
 
@@ -171,7 +171,7 @@ def test_secret_source_never_forwards_model_api_alias_ref(monkeypatch):
 
 def test_secret_source_never_forwards_managed_config_credential_refs(monkeypatch, tmp_path):
     """The managed-scope config.yaml is expanded and merged over the profile's, so a credential
-    ``${VAR}`` it declares is a Hermes credential exactly like one in the profile file; its own
+    ``${VAR}`` it declares is a Kouri Harness credential exactly like one in the profile file; its own
     ``mcp_servers.*.env`` refs stay the server's declared env."""
     from hermes_cli import env_loader, managed_scope
     from tools.mcp_tool_config import _build_safe_env
@@ -201,7 +201,7 @@ def test_secret_source_never_forwards_managed_config_credential_refs(monkeypatch
                                       "${env:LAB_FRAGMENT}${ALPACA_API_KEY}"])
 def test_secret_source_never_forwards_embedded_credential_ref(monkeypatch, template):
     """The loader expands every ``${VAR}`` inside a credential string, not only a whole-value one,
-    so a name embedded in one is a Hermes credential too; a third-party name stays forwarded."""
+    so a name embedded in one is a Kouri Harness credential too; a third-party name stays forwarded."""
     from hermes_cli import env_loader
     from tools.mcp_tool_config import _build_safe_env
 
@@ -273,7 +273,7 @@ def test_unreadable_backups_dir_does_not_stop_stdio_env_while_config_is_broken(m
 
 
 def test_secret_source_mcp_server_env_pointer_does_not_block_vendor_token(monkeypatch):
-    """An MCP server env entry is not a Hermes credential declaration, even if its
+    """An MCP server env entry is not a Kouri Harness credential declaration, even if its
     arbitrary name matches the *_key_env pointer convention elsewhere in config."""
     from hermes_cli import env_loader
     from tools.mcp_tool_config import _build_safe_env

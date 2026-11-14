@@ -50,7 +50,7 @@ async def probe(peer):
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=35)) as client:
             url = f'http://127.0.0.1:{api_port}/v1/chat/completions'
-            headers = {'Authorization': 'Bearer api-probe-owned-secret', 'X-Hermes-Session-Id': 'api-shared'}
+            headers = {'Authorization': 'Bearer api-probe-owned-secret', 'X-Kouri Harness-Session-Id': 'api-shared'}
             body = {'messages': [{'role': 'system', 'content': 'API_STABLE_SYSTEM'}, {'role': 'user', 'content': 'MESSAGING_WARM'}]}
             async with client.post(url, json=body) as denied:
                 assert denied.status == 401

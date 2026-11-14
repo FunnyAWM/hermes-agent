@@ -64,7 +64,7 @@ def test_html_cannot_authorize_privileged_sibling_routes(monkeypatch, tmp_path, 
     client = TestClient(server.app, base_url="http://testclient")
     if operation == "file":
         response = client.get("/api/fs/read-text", params={"path": str(tmp_path / "index.html")},
-                              headers={"X-Hermes-Session-Token": exposed})
+                              headers={"X-Kouri Harness-Session-Token": exposed})
         assert response.status_code == 401
     else:
         query = {"token": exposed}

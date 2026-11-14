@@ -24,7 +24,7 @@ from hermes_cli.web_routers import uploads
 from hermes_constants import WEBAPP_ATTACHMENT_MAX_BYTES, mark_named_profile_deleted
 
 
-_SESSION_HEADER = "X-Hermes-Session-Token"
+_SESSION_HEADER = "X-Kouri Harness-Session-Token"
 _BARRIER_TIMEOUT_SECONDS = 30
 
 

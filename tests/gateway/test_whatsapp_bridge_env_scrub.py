@@ -1,4 +1,4 @@
-"""The Node bridge (networked, third-party npm deps) never inherits Hermes' credentials (#38079)."""
+"""The Node bridge (networked, third-party npm deps) never inherits Kouri Harness' credentials (#38079)."""
 
 import pytest
 

@@ -40,7 +40,7 @@ def test_used_api_and_native_delete_restart_exact_retry(tmp_path):
     url = f'http://127.0.0.1:{port}/v1'
     headers = {'Authorization': 'Bearer ordinary-daemon-owned-secret'}
     body = {'messages': [{'role': 'user', 'content': 'API_USED_ONCE'}]}
-    identity = {'X-Hermes-Session-Id': 'used-api', 'Idempotency-Key': 'once'}
+    identity = {'X-Kouri Harness-Session-Id': 'used-api', 'Idempotency-Key': 'once'}
     receipts = {}
 
     async def api_request():

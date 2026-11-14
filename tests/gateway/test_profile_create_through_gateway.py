@@ -92,7 +92,7 @@ def test_cli_creates_through_a_live_gateway_local_and_by_url(tmp_path, monkeypat
 
         # Named, from this terminal's ``work``: this gateway doesn't serve a ``work``, so the request is
         # refused before any create, never run in the gateway's launch profile.
-        (terminal_home / "config.yaml").write_text("{}\n")  # a real Hermes root, so `-p work` resolves
+        (terminal_home / "config.yaml").write_text("{}\n")  # a real Kouri Harness root, so `-p work` resolves
         (terminal_home / "profiles" / "work").mkdir(parents=True)
         (terminal_home / "profiles" / "work" / "config.yaml").write_text("{}\n")
         absent = _create_on_profile(terminal_home, user, "work", "nosuch", env={"HERMES_TUI_GATEWAY_URL": url})
@@ -160,7 +160,7 @@ def test_a_url_terminal_on_work_clones_the_gateways_work_not_its_launch_profile(
         (home / "SOUL.md").write_text("the launch profile's soul\n")
         terminal_home = tmp_path / "terminal-home"
         (terminal_home / "profiles" / "work").mkdir(parents=True)
-        (terminal_home / "config.yaml").write_text("{}\n")  # a real Hermes root, so `-p work` resolves
+        (terminal_home / "config.yaml").write_text("{}\n")  # a real Kouri Harness root, so `-p work` resolves
         (terminal_home / "profiles" / "work" / "config.yaml").write_text("{}\n")
         url = descriptor["api_origin"].replace("http:", "ws:") + "/api/ws?token=url-terminal-owner"
         clone = _create_on_profile(terminal_home, user, "work", "urlclone", "--clone",

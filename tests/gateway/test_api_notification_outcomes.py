@@ -110,7 +110,7 @@ async def test_http_diagnostic_projection_keeps_source_and_terminal_flags(tmp_pa
     with patch.object(adapter, "_create_agent", side_effect=create):
         async with TestClient(TestServer(app)) as client:
             response = await client.post("/v1/chat/completions", headers={
-                "Authorization": "Bearer test-local-key", "X-Hermes-Session-Id": "session"}, json={
+                "Authorization": "Bearer test-local-key", "X-Kouri Harness-Session-Id": "session"}, json={
                 "messages": [{"role": "user", "content": "background diagnostic"}],
                 "stream": stream, "hermes_notification_category": "diagnostic"})
             wire = await response.text()
@@ -152,7 +152,7 @@ async def test_http_unhandled_diagnostic_error_is_quiet_but_failed(tmp_path, mon
     with patch.object(adapter, "_create_agent", side_effect=RuntimeError("private constructor failure")):
         async with TestClient(TestServer(app)) as client:
             response = await client.post("/v1/chat/completions", headers={
-                "Authorization": "Bearer test-local-key", "X-Hermes-Session-Id": "session"}, json={
+                "Authorization": "Bearer test-local-key", "X-Kouri Harness-Session-Id": "session"}, json={
                 "messages": [{"role": "user", "content": "background diagnostic"}],
                 "stream": stream, "hermes_notification_category": "diagnostic"})
             wire = await response.text()
@@ -192,7 +192,7 @@ async def test_http_idempotency_does_not_replay_opposite_presentation(tmp_path, 
                         "hermes_notification_category": category}
                 for repeat in range(2):
                     response = await client.post("/v1/chat/completions", headers={
-                        "Authorization": "Bearer test-local-key", "X-Hermes-Session-Id": "session",
+                        "Authorization": "Bearer test-local-key", "X-Kouri Harness-Session-Id": "session",
                         "Idempotency-Key": "same-key"}, json=body)
                     wire = await response.json()
                     assert response.status == 200, wire

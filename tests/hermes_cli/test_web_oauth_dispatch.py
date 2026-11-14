@@ -6,7 +6,7 @@ dispatcher ``start_oauth_login`` hardcoded ``_start_anthropic_pkce()``
 for any pkce-flagged provider. So clicking "Login" next to MiniMax in
 the dashboard's Keys tab silently launched the Anthropic/Claude OAuth
 flow. The Anthropic dashboard flow was later removed entirely because
-Hermes must not mint subscription OAuth tokens from an unattended HTTP
+Kouri Harness must not mint subscription OAuth tokens from an unattended HTTP
 endpoint; only the approved external CLI path remains.
 
 The fix:
@@ -35,7 +35,7 @@ import hermes_cli.web_routers.oauth as _rt_oauth
 import hermes_cli.web_server_oauth as _web_server_oauth
 
 client = TestClient(app)
-HEADERS = {"X-Hermes-Session-Token": _SESSION_TOKEN}
+HEADERS = {"X-Kouri Harness-Session-Token": _SESSION_TOKEN}
 
 
 def _make_profile_home(tmp_path, monkeypatch, profile="coder"):

@@ -147,15 +147,15 @@ async def test_hermes_handle_reaches_the_default_profile_only_when_no_hermes_pro
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("multiplex,legacy_hermes,answers", [
-    (True, True, {"Hermes": "hermes", "HERMES": "hermes", "Worker": "worker", "Default": "default"}),
-    (True, False, {"Hermes": "default", "Worker": "worker"}),
-    (False, True, {"Hermes": _NOT_SERVED}),
-    (False, False, {"Hermes": None}),
+    (True, True, {"Kouri Harness": "hermes", "HERMES": "hermes", "Worker": "worker", "Default": "default"}),
+    (True, False, {"Kouri Harness": "default", "Worker": "worker"}),
+    (False, True, {"Kouri Harness": _NOT_SERVED}),
+    (False, False, {"Kouri Harness": None}),
 ])
 async def test_profile_prefix_names_the_same_profile_in_any_case(tmp_path, monkeypatch, multiplex, legacy_hermes, answers):
-    """Profile ids are lowercase (``normalize_profile_name``), so ``/p/Hermes/`` is ``/p/hermes/``:
+    """Profile ids are lowercase (``normalize_profile_name``), so ``/p/Kouri Harness/`` is ``/p/hermes/``:
     a real 'hermes' profile keeps it, and only without one does it alias the default. An
-    exact-case comparison answered it with the unknown-profile 404, so box/Hermes reached no
+    exact-case comparison answered it with the unknown-profile 404, so box/Kouri Harness reached no
     agent (and older peer clients, which rerouted on that 404, sent it to the default profile)."""
     root = tmp_path / "root"
     for home in [root, root / "profiles" / "worker"] + ([root / "profiles" / "hermes"] if legacy_hermes else []):

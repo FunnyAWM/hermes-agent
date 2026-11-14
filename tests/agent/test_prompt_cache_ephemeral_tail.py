@@ -8,7 +8,7 @@ that the request still carries the same bytes.
 
 from agent.prompt_caching import apply_anthropic_cache_control, strip_anthropic_cache_control
 
-STATIC = "You are Hermes.\n"
+STATIC = "You are Kouri Harness.\n"
 SESSION = STATIC + "## Skills\n- alpha: does a thing\n"
 SYSTEM = SESSION + "\n\nYou are a focused subagent.\nCONTEXT:\ntask-specific text"
 

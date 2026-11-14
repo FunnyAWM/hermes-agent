@@ -207,10 +207,10 @@ assert_desktop_artifact() {
   local found=""
   local cand
   for cand in \
-    "$release_dir/linux-unpacked/Hermes" \
+    "$release_dir/linux-unpacked/Kouri Harness" \
     "$release_dir/linux-unpacked/hermes" \
-    "$release_dir/mac-arm64/Hermes.app" \
-    "$release_dir/mac/Hermes.app"; do
+    "$release_dir/mac-arm64/Kouri Harness.app" \
+    "$release_dir/mac/Kouri Harness.app"; do
     if [ -x "$cand" ] || [ -d "$cand" ]; then
       found="$cand"
       break

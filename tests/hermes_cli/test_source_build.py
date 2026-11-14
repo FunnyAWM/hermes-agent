@@ -255,7 +255,7 @@ def test_preparation_reuses_only_the_exact_completed_workspace_union(source_chec
     assert first[0]["leaked"] is False
     # Updates and builds keep pnpm's default download retries; only a launch lowers them.
     assert "retries" not in first[0]
-    # pnpm's store lives under the Hermes root, never the user's XDG data dir.
+    # pnpm's store lives under the Kouri Harness root, never the user's XDG data dir.
     assert first[0]["store"] == str(Path(os.environ["HERMES_HOME"]) / "cache/pnpm/store")
     assert (Path(os.environ["HERMES_HOME"]) / "cache/pnpm/store").is_dir()
     assert (root / "ui-tui/node_modules/fixture-dep").exists()
@@ -433,7 +433,7 @@ def test_packaged_desktop_is_reused_only_while_it_names_head(tmp_path, monkeypat
     subprocess.run([*git[:3], "init", "-q"], check=True)
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "one"], check=True)
     desktop_dir = root / "apps/desktop"
-    exe = desktop_dir / "release/app/Hermes"
+    exe = desktop_dir / "release/app/Kouri Harness"
     monkeypatch.setattr(main_desktop, "_desktop_packaged_executable", lambda _d: exe)
     resources = main_desktop._packaged_resources_dir(desktop_dir)
     (resources / "app.asar.unpacked/dist").mkdir(parents=True)

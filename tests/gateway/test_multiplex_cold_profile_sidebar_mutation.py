@@ -94,7 +94,7 @@ def desktop_ensure(env, root, profile):
 def native_headers(endpoint):
     from hermes_cli.gateway_client import _session_ticket
     ticket = _session_ticket(Path(endpoint['profile_id']), SimpleNamespace(**endpoint), purpose='native-http')
-    return {'X-Hermes-Gateway-Ticket': ticket}
+    return {'X-Kouri Harness-Gateway-Ticket': ticket}
 
 
 async def create_via_ws(endpoint, request_id, hold=None):

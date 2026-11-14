@@ -302,7 +302,7 @@ class TestNewerStamp:
         results = migrate_config(interactive=False, quiet=True)
         assert config_path.read_bytes() == before
         assert "failed_step" not in results, "no step may even start on a newer file"
-        assert any("newer Hermes" in w for w in results["warnings"])
+        assert any("newer Kouri Harness" in w for w in results["warnings"])
 
     def test_a_legacy_disabled_server_stays_off_without_v46(self, tmp_path, monkeypatch):
         """v46 does not run on a newer file, so its `disabled: true` stays on disk; the runtime

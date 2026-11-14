@@ -49,7 +49,7 @@ def test_the_published_root_takes_its_parents_permissions_before_the_commit(tmp_
 @pytest.mark.platforms("windows")
 def test_a_refused_permission_reset_tells_the_user_how_to_repair_it(tmp_path, monkeypatch, capsys):
     """The reset is best effort, so a refusal still publishes the plugin, now with the staging DACL a
-    non-elevated Hermes may not read: the user is told, with the command that repairs it."""
+    non-elevated Kouri Harness may not read: the user is told, with the command that repairs it."""
     from pm import publication
 
     plugin, target, project = _staged_plugin(tmp_path, monkeypatch)

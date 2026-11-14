@@ -123,10 +123,10 @@ def test_hermes_handle_reaches_the_profile_the_peer_serves(
     assert {hit.split("/")[2] for hit in _ProfilePeer.hits if not hit.endswith("/health")} == {expected}
 
 
-@pytest.mark.parametrize("target", ["box/Hermes", "box/HERMES"])
+@pytest.mark.parametrize("target", ["box/Kouri Harness", "box/HERMES"])
 def test_mixed_case_hermes_target_reaches_the_peers_real_hermes_profile(monkeypatch, capsys, target):
-    """Profile ids are lowercase, so ``box/Hermes`` is ``box/hermes``. A peer comparing prefixes
-    exactly (every peer before the case fix) answers ``/p/Hermes`` with its unknown-profile 404,
+    """Profile ids are lowercase, so ``box/Kouri Harness`` is ``box/hermes``. A peer comparing prefixes
+    exactly (every peer before the case fix) answers ``/p/Kouri Harness`` with its unknown-profile 404,
     which the @hermes fallback read as "no hermes here" and rerouted the DM to the default."""
     _ProfilePeer.served, _ProfilePeer.probe_status, _ProfilePeer.hits = {"default", "hermes"}, 200, []
     _ProfilePeer.refusal = {"error": "Unknown or unconfigured profile"}

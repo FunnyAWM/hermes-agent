@@ -1,12 +1,12 @@
 """Host-declared conversation scope on the affinity-key path (issue #96811).
 
 A host that mints one physical ``session_id`` per RESPONSE re-keys every
-conversation-affinity hint Hermes sends — ``prompt_cache_key`` on both
+conversation-affinity hint Kouri Harness sends — ``prompt_cache_key`` on both
 OpenAI-wire transports, the OpenRouter/Nous sticky ``session_id``, and xAI's
 ``x-grok-conv-id`` — so the conversation never lands back on the routing
-bucket it warmed. Hermes cannot infer the logical conversation from the id's
+bucket it warmed. Kouri Harness cannot infer the logical conversation from the id's
 syntax (#79017's failure class), but it does not have to: the host declares
-it through ``gateway_session_key`` (the ``X-Hermes-Session-Key`` /
+it through ``gateway_session_key`` (the ``X-Kouri Harness-Session-Key`` /
 ``build_session_key`` per-chat key).
 
 These tests pin the declaration contract and the two boundaries it must not
@@ -102,7 +102,7 @@ class TestDeclaredConversationScope:
     def test_scope_never_carries_the_raw_key(self, db):
         """The scope leaves the process verbatim (sticky id, x-grok-conv-id).
 
-        A session id is a Hermes-internal token; a session KEY embeds the
+        A session id is a Kouri Harness-internal token; a session KEY embeds the
         platform, chat and user identifiers, so it is hashed first.
         """
         db.create_session(RUN_1, source="api_server")
@@ -611,7 +611,7 @@ class TestConversationGenerationRotates:
 class TestPeerIdentityIsSourceQualified:
     """The generation and the carrier use the same identity tuple as recovery.
 
-    ``X-Hermes-Session-Key`` accepts any authenticated caller-supplied string,
+    ``X-Kouri Harness-Session-Key`` accepts any authenticated caller-supplied string,
     so an API conversation may legally carry the same key as a Telegram row in
     one database. Keying on the string alone let a ``/new`` on that unrelated
     row rotate this conversation's affinity identity, while

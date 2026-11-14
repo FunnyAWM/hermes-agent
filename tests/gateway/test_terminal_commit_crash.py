@@ -37,7 +37,7 @@ def test_terminal_commit_before_publication_survives_kill(tmp_path):
     url = f'http://127.0.0.1:{port}/v1'
     headers = {'Authorization': 'Bearer ordinary-daemon-owned-secret'}
     body = {'messages': [{'role': 'user', 'content': 'BLOCK_STARTED'}]}
-    identity = {'X-Hermes-Session-Id': 'used', 'Idempotency-Key': 'once'}
+    identity = {'X-Kouri Harness-Session-Id': 'used', 'Idempotency-Key': 'once'}
     pids = []
 
     def snapshot():
@@ -49,7 +49,7 @@ def test_terminal_commit_before_publication_survives_kill(tmp_path):
     async def first(proc):
         async with aiohttp.ClientSession(headers=headers) as client:
             async with client.post(url + '/chat/completions', json={'messages': [{'role': 'user', 'content': 'WARM'}]},
-                                   headers={'X-Hermes-Session-Id': 'used'}) as response:
+                                   headers={'X-Kouri Harness-Session-Id': 'used'}) as response:
                 assert response.status == 200, await response.text()
             async def request():
                 async with client.post(url + '/chat/completions', json=body, headers=identity) as response:

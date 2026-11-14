@@ -45,7 +45,7 @@ def test_ordinary_daemon_api_ws_fifo_retry(tmp_path):
     async def exercise(desc):
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=40)) as client:
             url = f'http://127.0.0.1:{api_port}/v1/chat/completions'
-            headers = {'Authorization': 'Bearer ordinary-daemon-owned-secret', 'X-Hermes-Session-Id': 'api-daemon'}
+            headers = {'Authorization': 'Bearer ordinary-daemon-owned-secret', 'X-Kouri Harness-Session-Id': 'api-daemon'}
             def body(text, stream=False):
                 return {'messages': [{'role': 'system', 'content': 'DAEMON_API_SYSTEM'}, {'role': 'user', 'content': text}], 'stream': stream}
             async with client.post(url, json=body('UNAUTHORIZED')) as response:

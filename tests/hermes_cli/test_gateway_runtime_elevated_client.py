@@ -1,7 +1,7 @@
 """An elevated (UAC) client never starts an elevated gateway.
 
 The unmanaged start inherits the client's token. A Desktop or terminal run as administrator, with no
-Scheduled Task registered, started a gateway every normal Hermes window then refused as
+Scheduled Task registered, started a gateway every normal Kouri Harness window then refused as
 ``gateway_elevated``, until someone stopped it from an admin prompt. A registered task starts under
 its own principal, not the client's token, so that path stays open. The remedy names only a normal
 window: a task registered through the UAC hand-off can itself start the gateway elevated (#152218).

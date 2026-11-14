@@ -125,7 +125,7 @@ def test_recovery_is_request_only(tmp_path, monkeypatch, after_tool, parts, stre
             "parameters": {"type": "object", "properties": {}},
         }}]
         agent.valid_tool_names = {"lookup"}
-        # Only the leaf tool is substituted; Hermes owns request assembly,
+        # Only the leaf tool is substituted; Kouri Harness owns request assembly,
         # the real SDK/HTTP transport, execution bookkeeping and SQLite writes.
         monkeypatch.setattr("model_tools.handle_function_call", lambda *a, **kw: "42")
         prompt = "Look up the answer."

@@ -204,8 +204,8 @@ def test_download_page_keys_and_public_urls():
     commit = "a" * 40
     assert commit_page_key_for(commit) == f"releases/commit/{commit}/index.html"
     assert commit_prefix_for(commit) == f"releases/commit/{commit}/"
-    assert public_url_for("https://cdn.example.com/", "releases/tag/v1/Hermes-1-x64.msix") == (
-        "https://cdn.example.com/releases/tag/v1/Hermes-1-x64.msix"
+    assert public_url_for("https://cdn.example.com/", "releases/tag/v1/Kouri Harness-1-x64.msix") == (
+        "https://cdn.example.com/releases/tag/v1/Kouri Harness-1-x64.msix"
     )
     # Segment-wise encoding: spaces and non-ASCII survive a link.
     assert public_url_for("https://cdn.example.com", "a b/\u00fc.msix") == (
@@ -612,7 +612,7 @@ def test_put_page_object_carries_html_type_and_no_store(r2_server):
     octet-stream download."""
     import tempfile
 
-    page = "<!DOCTYPE html>\n<html lang=\"en\"><body><h1>Hermes stable builds</h1></body></html>\n"
+    page = "<!DOCTYPE html>\n<html lang=\"en\"><body><h1>Kouri Harness stable builds</h1></body></html>\n"
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="\n", delete=False) as handle:
         handle.write(page)
         path = handle.name

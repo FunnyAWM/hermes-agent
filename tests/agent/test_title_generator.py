@@ -257,7 +257,7 @@ class TestGenerateTitle:
         "好的，这个可以做。不过我现在看不到 hermesbubble 的代码（这条对话里没带仓库/文件），所以先把改造方案列出来…",
         "可以，直接在这说。先判断一个关键点：登录页本身能打开吗？",
         "我是 ChatGPT，由 OpenAI 开发。当前对话里没有提供可披露的具体模型版本号…",
-        "先确认一下：你说的 **Hermes** 是哪个项目/镜像？（很多 App 都叫 Hermes…",
+        "先确认一下：你说的 **Kouri Harness** 是哪个项目/镜像？（很多 App 都叫 Kouri Harness…",
         # Japanese takes the same path: kana carries no inter-word spaces. Korean keeps spaces, so it
         # already trips the word guard; it is here to pin that the character budget changes nothing there.
         "まず、どのリポジトリの話か教えてもらえますか。この会話にはコードが含まれていないので、確認が必要です。",

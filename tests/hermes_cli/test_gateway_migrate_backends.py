@@ -194,7 +194,7 @@ def test_s6_docker_desktop_and_detached_shapes(host, no_writes, monkeypatch):
     host.proc(4309, ["tini", "--"], ppid=4000)
     host.proc(4320, _argv("serve", "--isolated", "--ssh-session-token-file", "/tmp/t", "--port", "0"))
     host.proc(4330, _argv("serve", "--host", "127.0.0.1", "--port", "0"), ppid=4329)
-    host.proc(4329, ["/Applications/Hermes"], ppid=1)
+    host.proc(4329, ["/Applications/Kouri Harness"], ppid=1)
     host.proc(4340, _argv("serve", "--host", "100.64.0.2", "--port", "9119"), ppid=1)
     host.proc(4350, ["vim", "notes about hermes serve"], ppid=1)  # not a backend
 

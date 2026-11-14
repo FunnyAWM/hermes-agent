@@ -1,7 +1,7 @@
 """Frozen native plugin for the plugin-surface conformance suite.
 
 Written the way the plugin guide tells an external author to write one: ``register(ctx)`` plus the
-documented ABCs, importing only names on the published plugin API. Keep it frozen. When Hermes grows
+documented ABCs, importing only names on the published plugin API. Keep it frozen. When Kouri Harness grows
 a field, a parameter or a provider method, this file must keep loading and working unchanged; a
 change here is a change to what existing plugins are promised.
 

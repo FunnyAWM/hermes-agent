@@ -149,7 +149,7 @@ class TestCreateJob:
             with patch(f"{_MOD}._CRON_AVAILABLE", True), patch(f"{_MOD}._cron_create", mock_create):
                 resp = await cli.post("/api/jobs", json={
                     "name": "nightly", "schedule": "0 3 * * *", "prompt": "summarise the day"},
-                    headers={"X-Hermes-Peer-Principal": "usr_abc"})
+                    headers={"X-Kouri Harness-Peer-Principal": "usr_abc"})
                 assert resp.status == 200
                 assert mock_create.call_args[1]["origin"]["peer_principal"] == "usr_abc"
 

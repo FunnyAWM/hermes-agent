@@ -1,7 +1,7 @@
 """Provider fallback (``fallback_providers``) through REAL ``hermes -z`` processes.
 
 Two loopback fakes stand in for two vendors: the primary and the fallback. Everything
-between the CLI and those sockets is real Hermes: config loading, credential resolution,
+between the CLI and those sockets is real Kouri Harness: config loading, credential resolution,
 the retry ladder, fallback activation and the fallback client.
 
 Proven here:
@@ -187,7 +187,7 @@ def test_primary_credential_resolution_failure_falls_back(tmp_path, portal_kind:
             "HTTPS_PROXY": dead, "HTTP_PROXY": dead, "NO_PROXY": "127.0.0.1,localhost",
             "HERMES_NOUS_TIMEOUT_SECONDS": "5",
         }
-        cfg = {"model": {"provider": "nous", "default": "Hermes-4-70B", "context_length": 128000},
+        cfg = {"model": {"provider": "nous", "default": "Kouri Harness-4-70B", "context_length": 128000},
                "fallback_providers": _fallback_entry(fallback)}
         h = Home(tmp_path).write(cfg, {"OPENAI_API_KEY": "sk-fake"}, auth=_expired_nous_auth())
         run = bounded_turn(h, PROMPT, TURN_BUDGET, env=env)

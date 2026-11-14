@@ -57,7 +57,7 @@ def test_loopback_only_host_yields_no_urls(interfaces):
 def test_wildcard_bind_lists_urls_and_pairing_hint(addresses):
     addresses(["192.168.1.5"])
     lines = lan_addresses.lan_banner_lines("0.0.0.0", 9119)
-    assert lines[0] == "  Hermes Web UI (LAN) → http://192.168.1.5:9119"
+    assert lines[0] == "  Kouri Harness Web UI (LAN) → http://192.168.1.5:9119"
     assert any("hermes device-pair generate" in line for line in lines)
 
 

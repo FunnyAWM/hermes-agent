@@ -51,7 +51,7 @@ def test_owner_backfill_runs_on_the_live_owner(tmp_path):
 
             def headers(profile_home):
                 # The Desktop mints each profile's own native grant (the profile its body names).
-                return {'X-Hermes-Gateway-Ticket': control(home, 'session-ticket', {
+                return {'X-Kouri Harness-Gateway-Ticket': control(home, 'session-ticket', {
                     'profile_id': str(profile_home.resolve()), 'instance_id': descriptor['instance_id'],
                     'purpose': 'native-http'})['ticket']}
             with httpx.Client(base_url=descriptor['api_origin'], trust_env=False, timeout=30) as client:
