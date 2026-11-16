@@ -121,7 +121,7 @@ function channelRecord(channel: 'stable' | 'canary', sequence: number): FixtureR
       appNamePascal: 'Kouri Harness',
       artifactNamePascal: 'Kouri Harness',
       appId: 'chat.nous.hermes',
-      msixAppIdWithOrg: 'NousResearch.Kouri Harness',
+      msixAppIdWithOrg: 'NousResearch.Hermes',
       cliName: 'hermes',
       windowsExecutableName: 'hermes'
     },
@@ -147,7 +147,7 @@ function buildManifest(
     appNamePascal: 'Kouri Harness',
     artifactNamePascal: 'Kouri Harness',
     appId: 'chat.nous.hermes',
-    msixAppIdWithOrg: 'NousResearch.Kouri Harness',
+    msixAppIdWithOrg: 'NousResearch.Hermes',
     cliName: 'hermes',
     windowsExecutableName: 'hermes'
   }

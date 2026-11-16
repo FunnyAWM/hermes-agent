@@ -98,14 +98,14 @@ def _bare_custom_provider_def(current_base_url: str) -> Optional[ProviderDef]:
 # --- Non-agentic model warning
 
 _HERMES_MODEL_WARNING = (
-    "Nous Research Kouri Harness 3 & 4 models are NOT agentic and are not designed "
+    "Nous Research Hermes 3 & 4 models are NOT agentic and are not designed "
     "for use with Kouri Harness. They lack the tool-calling capabilities "
     "required for agent workflows. Consider using an agentic model instead "
     "(Claude, GPT, Gemini, DeepSeek, etc.).")
 
-# Match only the real Nous Research Kouri Harness 3 / 4 chat families; a bare substring check
+# Match only the real Nous Research Hermes 3 / 4 chat families; a bare substring check
 # false-positived on tool-capable local Modelfiles like ``hermes-brain:qwen3-14b-ctx16k``.
-#   match:    NousResearch/Kouri Harness-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
+#   match:    NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
 #   no match: hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
 _NOUS_HERMES_NON_AGENTIC_RE = re.compile(r"(?:^|[/:])hermes[-_ ]?[34](?:[-_.:]|$)", re.IGNORECASE)
 
@@ -125,12 +125,12 @@ def format_model_for_display(model_name: str) -> str:
 
 
 def is_nous_hermes_non_agentic(model_name: str) -> bool:
-    """True if *model_name* is a real Nous Kouri Harness 3/4 chat model (single owner; cli.py uses it too)."""
+    """True if *model_name* is a real Nous Hermes 3/4 chat model (single owner; cli.py uses it too)."""
     return bool(model_name and _NOUS_HERMES_NON_AGENTIC_RE.search(model_name))
 
 
 def _check_hermes_model_warning(model_name: str) -> str:
-    """Warning string if *model_name* is a Nous Kouri Harness 3/4 chat model, else ""."""
+    """Warning string if *model_name* is a Nous Hermes 3/4 chat model, else ""."""
     return _HERMES_MODEL_WARNING if is_nous_hermes_non_agentic(model_name) else ""
 
 

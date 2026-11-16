@@ -57,7 +57,7 @@ describe('FreeTierSignInDialog', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     pollOAuthSession.mockResolvedValueOnce({ session_id: 'session-1', status: 'pending' }).mockResolvedValue({
       account_email: 'someone@example.com',
-      model: 'Kouri Harness-4-405B',
+      model: 'Hermes-4-405B',
       reason: null,
       session_id: 'session-1',
       status: 'approved'
@@ -88,7 +88,7 @@ describe('FreeTierSignInDialog', () => {
     await waitFor(() => expect(screen.getByText('Signed in as')).toBeTruthy())
     expect(screen.getByText('someone@example.com')).toBeTruthy()
     expect(screen.getByText('Your account now carries inference and tools.')).toBeTruthy()
-    expect(screen.getByText('Kouri Harness-4-405B')).toBeTruthy()
+    expect(screen.getByText('Hermes-4-405B')).toBeTruthy()
   })
 
   describe('result screen', () => {

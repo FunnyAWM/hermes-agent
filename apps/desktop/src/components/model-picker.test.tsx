@@ -45,7 +45,7 @@ const OPTIONS: ModelOptionsResult = {
     {
       slug: 'nous',
       name: 'Nous',
-      models: ['Kouri Harness-4.5'],
+      models: ['Hermes-4.5'],
       authenticated: true
     }
   ]
@@ -133,7 +133,7 @@ describe('ModelPickerDialog download rows', () => {
     })
     renderPicker()
 
-    expect(await screen.findByText('Kouri Harness-4.5')).toBeTruthy()
+    expect(await screen.findByText('Hermes-4.5')).toBeTruthy()
     expect(screen.getByText('Qwen3.8 Flash Next (UD-Q4_K_XL)')).toBeTruthy()
     expect(screen.getByText('41%')).toBeTruthy()
   })

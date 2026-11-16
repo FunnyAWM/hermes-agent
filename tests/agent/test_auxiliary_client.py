@@ -453,7 +453,7 @@ class TestNousTagsScoping:
         import agent.auxiliary_client as aux
 
         with aux.scoped_runtime_main({
-            "provider": "nous", "model": "Kouri Harness-4",
+            "provider": "nous", "model": "Hermes-4",
             "base_url": "https://inference-api.nousresearch.com/v1", "api_key": "nous-key",
         }):
             kwargs = aux._build_call_kwargs(
