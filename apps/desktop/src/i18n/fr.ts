@@ -1422,7 +1422,9 @@ export const frOverrides = {
         provider: 'Fournisseur de mémoire'
       },
       context: {
-        engine: 'Moteur de contexte'
+        engine: 'Moteur de contexte',
+        sessionWindowTurns: 'Fenêtre de session (tours)',
+        frozenWindowTurns: 'Fenêtre figée (tours)'
       },
       compression: {
         enabled: 'Auto-compression',
@@ -1514,7 +1516,11 @@ export const frOverrides = {
         userProfileEnabled: 'Maintenir un profil compact des préférences utilisateur.'
       },
       context: {
-        engine: 'Stratégie pour gérer les longues conversations proches de la limite de contexte.'
+        engine: 'Stratégie pour gérer les longues conversations proches de la limite de contexte.',
+        sessionWindowTurns:
+          "Chaque requête n'envoie que les N derniers tours utilisateur (0 = tout l'historique). S'applique à toutes les conversations de cette configuration.",
+        frozenWindowTurns:
+          "Lorsque la fenêtre de session est pleine, les M derniers tours sont figés en préfixe de cache fixe, puis seuls les nouveaux tours s'ajoutent jusqu'au prochain remplissage (0 = désactivé ; doit être inférieur à la fenêtre de session)."
       },
       compression: {
         enabled: 'Résumer le contexte ancien quand les conversations grossissent.',

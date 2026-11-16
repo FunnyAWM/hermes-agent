@@ -110,7 +110,11 @@ export function settingsSubpages(view: SettingsView): readonly SettingsSubpage[]
 /** Shared by search serialization and saved links that predate subpages. */
 export function settingsSubpageForTarget(view: SettingsView, field?: string, setting?: string): string | undefined {
   if (setting) {
-    return settingDefinition(view, setting)?.subpage
+    // Curated config fields have no manifest row; route them by their full key.
+    return (
+      settingDefinition(view, setting)?.subpage ??
+      (view.startsWith('config:') ? configSubpageForField(view.slice('config:'.length), setting) : undefined)
+    )
   }
 
   if (view.startsWith('config:') && field) {

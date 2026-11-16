@@ -1416,7 +1416,9 @@ export const esOverrides = {
         provider: 'Proveedor de memoria'
       },
       context: {
-        engine: 'Motor de contexto'
+        engine: 'Motor de contexto',
+        sessionWindowTurns: 'Ventana de sesión (turnos)',
+        frozenWindowTurns: 'Ventana congelada (turnos)'
       },
       compression: {
         enabled: 'Compresión automática',
@@ -1511,7 +1513,11 @@ export const esOverrides = {
         userProfileEnabled: 'Mantiene un perfil compacto de preferencias del usuario.'
       },
       context: {
-        engine: 'Estrategia para gestionar conversaciones largas cerca del límite de contexto.'
+        engine: 'Estrategia para gestionar conversaciones largas cerca del límite de contexto.',
+        sessionWindowTurns:
+          'Cada solicitud envía solo los últimos N turnos del usuario (0 = todo el historial). Se aplica a todas las conversaciones de esta configuración.',
+        frozenWindowTurns:
+          'Cuando la ventana de la sesión se llena, los últimos M turnos se congelan como prefijo de caché fijo y luego solo se añaden turnos nuevos hasta que se vuelva a llenar (0 = desactivado; debe ser menor que la ventana de sesión).'
       },
       compression: {
         enabled: 'Resume contexto antiguo cuando las conversaciones crecen.',

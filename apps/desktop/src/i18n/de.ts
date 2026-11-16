@@ -1413,7 +1413,9 @@ export const deOverrides = {
         provider: 'Gedächtnis-Anbieter'
       },
       context: {
-        engine: 'Kontext-Engine'
+        engine: 'Kontext-Engine',
+        sessionWindowTurns: 'Sitzungsfenster (Runden)',
+        frozenWindowTurns: 'Eingefrorenes Fenster (Runden)'
       },
       compression: {
         enabled: 'Auto-Kompression',
@@ -1504,7 +1506,11 @@ export const deOverrides = {
         userProfileEnabled: 'Ein kompaktes Profil der Benutzerpräferenzen pflegen.'
       },
       context: {
-        engine: 'Strategie zur Verwaltung langer Gespräche nahe der Kontextgrenze.'
+        engine: 'Strategie zur Verwaltung langer Gespräche nahe der Kontextgrenze.',
+        sessionWindowTurns:
+          'Jede Anfrage sendet nur die letzten N Nutzerrunden (0 = gesamter Verlauf). Gilt für alle Gespräche dieser Konfiguration.',
+        frozenWindowTurns:
+          'Wenn das Sitzungsfenster voll ist, werden die letzten M Runden als fester Cache-Präfix eingefroren; danach kommen nur neue Runden hinzu, bis das Fenster erneut voll ist (0 = aus; muss kleiner als das Sitzungsfenster sein).'
       },
       compression: {
         enabled: 'Älteren Kontext zusammenfassen, wenn Gespräche groß werden.',

@@ -707,7 +707,9 @@ export const zhHantSettings = {
         provider: '記憶提供方'
       },
       context: {
-        engine: '上下文引擎'
+        engine: '上下文引擎',
+        sessionWindowTurns: '會話滑動視窗（輪）',
+        frozenWindowTurns: '凍結視窗（輪）'
       },
       compression: {
         enabled: '自動壓縮',
@@ -793,7 +795,10 @@ export const zhHantSettings = {
         userProfileEnabled: '維護一份精簡的使用者偏好設定檔。'
       },
       context: {
-        engine: '長對話接近上下文上限時的管理策略。'
+        engine: '長對話接近上下文上限時的管理策略。',
+        sessionWindowTurns: '每次請求只傳送最近 N 輪使用者訊息（0 = 傳送全部歷史）。對本設定下的所有對話生效。',
+        frozenWindowTurns:
+          '會話視窗滿時，把最近 M 輪凍結為固定的快取前綴，之後只追加新輪，直到再次填滿視窗（0 = 關閉；須小於會話視窗）。'
       },
       compression: {
         enabled: '對話變大時摘要較早的上下文。',

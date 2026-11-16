@@ -916,7 +916,9 @@ export const jaOverrides = {
         provider: 'メモリプロバイダー'
       },
       context: {
-        engine: 'コンテキストエンジン'
+        engine: 'コンテキストエンジン',
+        sessionWindowTurns: 'セッションウィンドウ（ターン）',
+        frozenWindowTurns: '固定ウィンドウ（ターン）'
       },
       compression: {
         enabled: '自動圧縮',
@@ -1000,7 +1002,11 @@ export const jaOverrides = {
         userProfileEnabled: 'ユーザーの好みをまとめた簡潔なプロファイルを維持します。'
       },
       context: {
-        engine: '長い会話がコンテキスト上限に近づいたときの管理戦略です。'
+        engine: '長い会話がコンテキスト上限に近づいたときの管理戦略です。',
+        sessionWindowTurns:
+          '各リクエストでは直近 N ターンのユーザーメッセージのみを送信します（0 = 全履歴）。この構成のすべての会話に適用されます。',
+        frozenWindowTurns:
+          'セッションウィンドウが満杯になると、直近 M ターンを固定のキャッシュプレフィックスとして凍結し、以降は新しいターンのみを追加します（再度満杯になると再凍結）。0 = オフ。セッションウィンドウより小さい値が必要です。'
       },
       compression: {
         enabled: '会話が大きくなったとき、古いコンテキストを要約します。',
