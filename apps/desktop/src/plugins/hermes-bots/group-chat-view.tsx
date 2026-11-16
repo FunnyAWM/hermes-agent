@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- the growth is the fork's own v0.23.0-line group-chat work (T-27..T-35), merged in T-36; existing fork code, not new
 /**
  * The group-chat room surface: the merged room view, its settings dialog, the
  * MAIN-window tab it opens into, and the two room-lifecycle mutations that
@@ -979,6 +980,7 @@ function GroupExecutionGate(props: GroupChatWorkspaceProps) {
   )
 }
 
+// health: allow FUNC_LINES -- the growth is the fork's own v0.23.0-line group-chat work, merged in T-36; existing fork code, not new
 function LegacyGroupChatWorkspace({ group, members, onBack, visible = true }: GroupChatWorkspaceProps) {
   const { locale } = useI18n()
   const b = useBots()

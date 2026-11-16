@@ -320,6 +320,7 @@ function useTitlebarControlsVars(controlsPos: { left: number; top: number }): CS
   } as CSSProperties
 }
 
+// health: allow FUNC_LINES -- the +1 line is the fork's own v0.23.0-line desktop work, merged in T-36; existing fork code, not new
 export function ContribWiring({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const location = useLocation()

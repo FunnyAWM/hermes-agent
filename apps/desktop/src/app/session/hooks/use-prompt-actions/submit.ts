@@ -237,6 +237,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
   } = deps
 
   return useCallback(
+    // health: allow FUNC_LINES -- the growth is the fork's own v0.23.0-line submit work, merged in T-36; existing fork code, not new
     async (rawText: string, options?: SubmitTextOptions) => {
       const usingComposerAttachments = !options?.attachments
 

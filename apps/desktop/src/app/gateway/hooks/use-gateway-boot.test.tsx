@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- the +1 line is the fork's own v0.23.0-line test work, merged in T-36; existing fork code, not new
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 

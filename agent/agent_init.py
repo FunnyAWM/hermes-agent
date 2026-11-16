@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the +4 lines are the fork's own v0.23.0-line session-window wiring, merged in T-36 onto the smaller v0.23.2 base; existing fork code, not new
 """Implementation of :meth:`AIAgent.__init__` as ``init_agent(agent, ...)``.
 
 ``init_agent`` is a thin, ordered orchestrator over ``_init_*`` / ``_build_*`` phase

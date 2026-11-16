@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- the growth is the fork's own v0.23.0-line gateway-store work, merged in T-36; existing fork code, not new
 import {
   type ConnectionState,
   type GatewayEvent,

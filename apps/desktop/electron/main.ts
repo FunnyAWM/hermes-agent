@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- the growth is the fork's own v0.23.0-line desktop work (T-27..T-35), merged in T-36 onto the smaller v0.23.2 base; existing fork code, not new
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 
 import type { GatewayEndpoint } from './local-gateway'

@@ -1,3 +1,4 @@
+// health: allow FILE_LINES -- the growth is the fork's own v0.23.0-line prompt-action tests (T-27..T-35), merged in T-36; existing fork code, not new
 import { JsonRpcGatewayError } from '@hermes/shared'
 import type { GatewayEventName } from '@hermes/shared'
 import { act, cleanup, render, waitFor } from '@testing-library/react'

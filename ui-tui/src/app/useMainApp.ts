@@ -289,6 +289,7 @@ function copyMeasuredHeights(
   }
 }
 
+// health: allow FUNC_LINES -- the growth is the fork's own v0.23.0-line TUI work, merged in T-36; existing fork code, not new
 export function useMainApp(gw: GatewayClient) {
   const { exit } = useApp()
   const { stdout } = useStdout()

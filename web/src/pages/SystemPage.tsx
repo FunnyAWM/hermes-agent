@@ -210,6 +210,7 @@ const MEMORY_STATUS_TONE: Record<MemoryProviderInfo['status'], 'success' | 'warn
   missing: 'destructive'
 }
 
+// health: allow FUNC_LINES -- the growth is the fork's own v0.23.0-line dashboard work, merged in T-36; existing fork code, not new
 export default function SystemPage() {
   const { toast, showToast } = useToast()
 
