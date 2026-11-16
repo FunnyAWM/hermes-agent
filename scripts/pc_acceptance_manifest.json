@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated": "2026-11-06",
+  "generated": "2026-11-16",
   "notes": "PC acceptance manifest; commands are argv arrays and run only with --run.",
   "tasks": [
     {
@@ -324,6 +324,309 @@
       "evidence": [
         "evidence/t03.md",
         "evidence/t04.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-19",
+      "title": "headless 发行变体（不自带运行时）",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/t15-headless.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t15-headless.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-20",
+      "title": "完整版 bundled 发行包（裁决不做）",
+      "status": "blocked",
+      "command": null,
+      "evidence": [
+        "evidence/t15-headless.md"
+      ],
+      "blocked_reason": "2026-11-06 使用者裁决不做：发行改为 headless 变体（T-19/T-26），完整版无发行计划",
+      "handoff": "evidence/handoff/T-20.md"
+    },
+    {
+      "id": "T-21",
+      "title": "桌面单一 default 机器人",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/agent/test_system_prompt_root.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t21.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-22",
+      "title": "品牌与产物身份 KouriChat Next",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/branding.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/branding.md",
+        "evidence/t15-headless.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-23",
+      "title": "托盘驻留与网关生命周期",
+      "status": "completed",
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "--project",
+        "electron",
+        "electron/gateway-quit.test.ts",
+        "electron/quit-guard.test.ts",
+        "electron/minimize-to-tray.test.ts"
+      ],
+      "evidence": [
+        "evidence/t23-gateway-lifecycle.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-24",
+      "title": "补丁列导出（已被 T-25 / T-36 取代）",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/t25-v0.23.0-port.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t25-v0.23.0-port.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-25",
+      "title": "上游基座迁到 v0.23.0",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'evidence/t25-v0.23.0-port.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t25-v0.23.0-port.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-26",
+      "title": "无头包交付口径与环境说明",
+      "status": "completed",
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-c",
+        "import pathlib,sys; sys.exit(0 if pathlib.Path(r'INSTALL.md').is_file() else 1)"
+      ],
+      "evidence": [
+        "evidence/t15-headless.md",
+        "INSTALL.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-27",
+      "title": "KouriChat Link PC 侧设备链",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/sync",
+        "tests/hermes_cli/test_kourichat_link_router.py",
+        "tests/hermes_cli/test_sync_sessions_bridge.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t27-link.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-28",
+      "title": "笔记清单软上限与生命周期",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/hermes_notes/",
+        "tests/agent/test_notes_prompt.py",
+        "tests/tools/test_note_archive.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t28.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-29",
+      "title": "笔记整理轮次 memory.organize_turns",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/agent/test_notes_organizer.py",
+        "tests/hermes_notes/",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t29.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-30",
+      "title": "Auto Review 审批模式",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/tools/test_auto_review.py",
+        "tests/tools/test_auto_review_executor.py",
+        "tests/tools/test_approval_mode_auto.py",
+        "tests/tools/test_approval_mode_parity.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t30.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-31",
+      "title": "Auto Review 配置与沙箱档位扩展",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/tools/test_local_command_sandbox.py",
+        "tests/hermes_cli/test_terminal_sandbox_config.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t31.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-32",
+      "title": "会话删除后的缓存失效",
+      "status": "completed",
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "src/app/session/hooks/use-session-list-actions.test.tsx",
+        "src/components/session-picker.test.tsx"
+      ],
+      "evidence": [
+        "evidence/t32.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-33",
+      "title": "跨窗口删除同步",
+      "status": "completed",
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "src/store/session-sync.test.ts",
+        "src/app/contrib/hooks/use-desktop-integrations.test.tsx"
+      ],
+      "evidence": [
+        "evidence/t33.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-34",
+      "title": "输入框 Auto Review 开关",
+      "status": "completed",
+      "command": [
+        "npx",
+        "vitest",
+        "run",
+        "src/app/chat/composer/sandbox-pill.test.tsx",
+        "src/app/chat/use-chat-bar-state.test.tsx"
+      ],
+      "evidence": [
+        "evidence/t34.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-35",
+      "title": "审批卡 justification 透传",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/tools/test_request_tool_approval.py",
+        "tests/tools/test_approval.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t35.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-36",
+      "title": "上游 v0.23.2 基座合入",
+      "status": "completed",
+      "command": [
+        "python",
+        "scripts/check"
+      ],
+      "evidence": [
+        "evidence/t36.md"
+      ],
+      "blocked_reason": null,
+      "handoff": null
+    },
+    {
+      "id": "T-37",
+      "title": "会话滑动窗口与冻结窗口",
+      "status": "completed",
+      "command": [
+        "scripts/run_tests.sh",
+        "tests/agent/test_session_window.py",
+        "-q"
+      ],
+      "evidence": [
+        "evidence/t37.md"
       ],
       "blocked_reason": null,
       "handoff": null
