@@ -45,12 +45,12 @@ tag 清单，「`2bd378e` = 上游 v0.23.0 Release」按使用者核对记录。
 | 冲突 | 下列本地私有路径保留本地版；内核补丁按 `PRD.md` §5.4 登记表逐条 rebase，不允许「取其一」 |
 | 失败 | 停在当前基座继续开发，不阻塞 |
 
-**版本号（2026-10-28 定）**：`上游版本-fork.<N>`，当前桌面 `apps/desktop/package.json` = `0.23.2-fork.1`，
-Python `pyproject.toml` = `0.23.2+fork1`（PEP 440 本地版本写法，同义不同串）。
-换上游基座时 N 归 1，同一基座上重新出包则 N+1。这是**同步后必做的一步**，不是一次性动作：
-两处 `version` 都随上游每次发版变化，合并后必须按新 tag 重写，否则安装包会带着上游的号出去。
+**版本号（2026-11-16 改，独立版本线）**：当前桌面 `apps/desktop/package.json` = `0.3.25-lungo`，
+Python `pyproject.toml` = `0.3.25+lungo`（PEP 440 本地版本写法，同义不同串）。
+原「上游版本-fork.<N>」方案（2026-10-28 定）停用：版本号不再随上游发版变化，
+两处 `version` 只在 fork 自己发版时重写。
 
-⚠️ 两条边界：`-fork.N` 在 SemVer 里是 pre-release，排序低于其基座；且本仓 `hermes_cli/update_channel.py:67`
+⚠️ 两条边界：`-lungo` 在 SemVer 里是 pre-release，排序低于 `0.3.25`；且本仓 `hermes_cli/update_channel.py:67`
 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`——这个版本串**不得**传给 `scripts/releases/*` 或更新通道的校验器。
 细节见 `PRD.md` §5.4。
 
