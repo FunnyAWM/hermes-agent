@@ -1,9 +1,11 @@
 # Kouri Harness Headless · 环境与安装说明
 
 **适用对象**：`apps/desktop/release-headless/` 下的两个包——安装版
-`HermesHeadless-0.23.0-fork.1-win-x64-setup.exe` 与免安装版
-`HermesHeadless-0.23.0-fork.1-win-x64-portable.exe`。基座是上游 **v0.23.0**
-（`2bd378ed1b`）。
+`HermesHeadless-0.23.2-fork.1-win-x64-setup.exe` 与免安装版
+`HermesHeadless-0.23.2-fork.1-win-x64-portable.exe`。基座是上游 **v0.23.2**
+（合入记录见 [evidence/t36.md](evidence/t36.md)）。
+版本号已切换为独立版本线 `0.3.25-lungo`（2026-11-16）；上列包名是切换前的构建，
+下次发行起包名随新版本号。
 
 **这个包是什么**：`headless` 指**包里不携带运行时**，不是无界面程序。它照常打开桌面窗口，
 Agent 跑在你机器上已有的 Kouri Harness 源码树 + venv 上。好处是包小（约 140 MB）、升级源码不动包；
@@ -190,7 +192,7 @@ set UV_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 | 项 | 版本 |
 | --- | --- |
-| 基座 | 上游 `v0.23.0`（`2bd378ed1b`），fork 版本 `0.23.0-fork.1` |
+| 基座 | 上游 `v0.23.2`（合入记录见 [evidence/t36.md](evidence/t36.md)），fork 版本 `0.3.25-lungo`（独立版本线；本表构建发生在切换前，包名为 `0.23.2-fork.1`） |
 | Electron | 44.9.3 |
 | Python（构建用 venv） | 3.14.2 |
 | uv | 0.13.7 |

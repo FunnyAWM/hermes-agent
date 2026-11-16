@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.20（草稿，待评审） |
-| 日期 | 2026-11-06 |
+| 文档版本 | v0.25（草稿，待评审） |
+| 日期 | 2026-11-16 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
 | 读者 | 执行团队：Android 客户端、同步与存储、测试 |
@@ -142,21 +142,22 @@
 | 改造 | 以 fork 为基座。定制优先落在配置、插件、客户端三层；确实做不到时才允许打补丁，且必须登记进下表 |
 | 升级失败 | 停在已固定的版本继续用，不阻塞手机端 |
 
-**版本号为什么带 `-fork.N`**：裸 `0.22.5` 会与上游撞车，同一台机器上分不清谁是谁；带后缀才能一眼看出「基于哪个上游、打了第几版补丁」。
+**版本号（2026-11-16 起）**：fork 采用**独立版本线**，当前为 `0.3.25-lungo`，不跟随上游版本号；
+上游基座另行记录（见下）。裸 `0.3.25` 会与其他 fork / 衍生发行撞车且分不清谁是谁，带后缀才能一眼认出本发行。
 
 代价有两条，都必须知道：
 
-- **它是 pre-release，排序低于 `0.22.5`。** SemVer 里 `0.22.5-fork.1 < 0.22.5`，所以判断「谁更新」不能只做一次版本比较，要看「上游基座 + fork 号」两段。
-- **本仓自己的版本语法不认它。** `hermes_cli/update_channel.py:67` 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`，`scripts/releases/semver.py` 只额外接受 canary 的 `+canary.<stamp>`。`-fork.N` 不属于这两类，**不得喂进那两套校验器**——我们不跑上游 release 流水线，也不开自动更新（§5.5），所以它只出现在安装包与包元数据里，进不去那些路径。
+- **它是 pre-release，排序低于 `0.3.25`。** SemVer 里 `0.3.25-lungo < 0.3.25`，判断「谁更新」不能只做一次版本比较。
+- **本仓自己的版本语法不认它。** `hermes_cli/update_channel.py:67` 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`，`scripts/releases/semver.py` 只额外接受 canary 的 `+canary.<stamp>`。`-lungo` 不属于这两类，**不得喂进那两套校验器**——我们不跑上游 release 流水线，也不开自动更新（§5.5），所以它只出现在安装包与包元数据里，进不去那些路径。
 
 **同一个 release，两套拼写**（不能不区分）：
 
 | 位置 | 写法 | 为什么 |
 |---|---|---|
-| 桌面端 `apps/desktop/package.json` | `0.23.0-fork.1`（SemVer） | electron-builder / npm 认 pre-release；`-` 在文件名里也安全 |
-| Python `pyproject.toml` | `0.23.0+fork1`（PEP 440 本地版本） | PEP 440 不认 `-fork.1`（`-` 后只接受数字表示 post），只能写成 `+fork1` |
+| 桌面端 `apps/desktop/package.json` | `0.3.25-lungo`（SemVer） | electron-builder / npm 认 pre-release；`-` 在文件名里也安全 |
+| Python `pyproject.toml` | `0.3.25+lungo`（PEP 440 本地版本） | PEP 440 不认 `-lungo`（`-` 后只接受 alpha/beta/rc/dev/post），只能写成 `+lungo` |
 
-两者不是同一个字符串，**不要试图让它们相等**；它们的含义相同：上游 0.23.0 之上的第 1 版 fork。
+两者不是同一个字符串，**不要试图让它们相等**；它们的含义相同：fork 当前版本 `0.3.25-lungo`（独立版本线，不随上游发版变化）。
 
 **受控补丁登记表**。往内核里加一处改动，就必须在这里加一行；表里没有的改动视为违规改造。
 
@@ -180,7 +181,8 @@
 | `hermes_cli/web_routers/memory_docs.py`、`hermes_cli/web_server.py`、`apps/desktop/src/app/memory/*`、`apps/desktop/src/api/memory.ts`、`apps/desktop/src/app/contrib/surfaces.tsx`、`apps/desktop/src/app/chat/sidebar/{index,nav-items}.tsx`、`apps/desktop/src/i18n/{en,types,zh,zh-hant}*` | 桌面记忆页（侧栏「新建会话」与「技能与工具」之间）：列出 `SOUL.md` / `AGENTS.md` / `memories/{USER,MEMORY}.md` 与 `notes/` 的目录树，任何一项都可直接编辑并原子保存（`POST /api/memory/doc`，白名单 = 四份上下文文件 + `notes/**.md`）；`notes/docs/` 是导入原文，保持只读 | 记 07、T-27、§5.3 | 中：新增一个读写路由（上游无此页面）与一个桌面页面；上游改 `web_server` 路由注册、侧栏导航项或 i18n 结构时按行 rebase；写路径白名单与越界拒绝由 `tests/hermes_cli/test_memory_docs_router.py` 兜底 |
 | `hermes_notes/store.py`、`hermes_notes/lifecycle.py`、`hermes_notes/settings.py`（后两者新增）、`tools/file_tools.py`、`tools/file_tools_write_guards.py`、`tools/memory_tool_store.py`、`agent/{system_prompt,turn_context}.py` | 清单软上限 128（默认）+ 可选硬上限（默认不设），取代固定 64 截断；front matter 增 `expires` / `lastUsed` 严格解析（对齐 Android `NoteFrontMatter`，重复或非法值按未知处理）；超软上限时过期笔记先归档 `.versions/` 再删；`notes/docs/` 读取回写 `lastUsed` + `lastUsedBy: desktop`（同步来的 Android 轮次号不可比，只信任本机写入）、连续 N 轮未引用列候选经用户确认后删；模型写入 `memories/{MEMORY,USER}.md` 与 `notes/**.md` 覆盖前归档 `.versions/`（`SOUL.md` 与普通工程文件不归档）；`memory.*` 设置由 `hermes_notes/settings.py` 惰性读取（`config_defaults.py` 与 `agent_init.py` 已贴 FILE_LINES 上限，不再增长） | 记 04 / 05、§7.3 / §7.4、T-28 | 中：扫描模块加生命周期维护与写前归档；上游改 `hermes_notes`、`file_tools` 或设置读取处时按行 rebase；两端字段口径只能同时改 |
 | `agent/notes_organizer.py`（新增模块）、`agent/turn_context.py`、`hermes_notes/settings.py`、`tools/file_tools_write_guards.py` | 整理轮次 `memory.organize_turns`（默认 0 关闭）：每 X 轮用户消息另起独立整理请求，只做 `notes/` 维护（合并同类、修正描述、清理过期），不写 `MEMORY.md` / `USER.md` / `SOUL.md`——fork 的写工具白名单仅 `read_file/search_files/write_file/patch`，且以 ContextVar 限定只能落 `notes/<category>/*.md`；不引入 `.memory_incomplete` 标记（每次全量重建计划、失败下一轮自然重试，无需待办状态）；与 `background_review` 并存（事实提取仍归它），各自独占一轮避免并发辅助请求；线程经 `spawn_context_thread` 出生以继承 profile 作用域 | 记 06、T-29 | 中：新增独立模块与一个触发挂钩；上游改轮次收尾、工具白名单或设置读取处时按行 rebase；提示词注入只走 user 消息 / 工具结果，不动会话内冻结前缀 |
-| `tools/auto_review.py`（新增）、`tools/approval.py`、`tools/approval_context.py`、`agent/tool_executor.py`、`agent/terminal_approval_batch.py`、`hermes_cli/{approval_mode,commands,config_defaults,web_server_config,approvals_test}.py`、`gateway/session_tui_config.py`、`tui_gateway/{server,methods_config_set}.py`、`apps/desktop/src/{store/approval-mode.ts,app/shell/approval-mode-menu.tsx,app/settings/constants.ts,types/hermes.ts,i18n/*}` | 新增第四种审批模式 `approvals.mode: auto`：每个工具调用执行前用辅助 LLM 输出严格 JSON 风险判定（low+allow / medium+allow\|deny / high+deny），allow 直接执行、deny 转人工、high 硬拒绝、非法或失败 fail-closed；配置 `approvals.auto_review.{policy,history_messages,max_arg_chars,skip_tools}`，模型路由 `auxiliary.auto_review`。插件层做不到：`approvals.mode` 是安全设置，不能由可卸载/可禁用的用户插件承载，且必须与 `/approvals`、cron/unattended fail-closed、子 agent 继承同源 | 用户指令 2026-11-12（复刻 deepseek-harness Auto Review）；需求编号待补 | 中：执行器统一授权点是上游热点，按行 rebase；审批模式清单分散在 CLI/TUI/Web/Desktop，上游新增模式时需同步；`_run_approval_gate` 的 bypass 刻意不含 auto，避免 deny 转人工时被自身放行 |
+| `tools/auto_review.py`（新增）、`tools/approval.py`、`tools/approval_context.py`、`agent/tool_executor.py`、`agent/terminal_approval_batch.py`、`hermes_cli/{approval_mode,commands,config_defaults,web_server_config,approvals_test}.py`、`gateway/session_tui_config.py`、`tui_gateway/{server,methods_config_set}.py`、`apps/desktop/src/{store/approval-mode.ts,app/shell/approval-mode-menu.tsx,app/settings/constants.ts,types/hermes.ts,i18n/*}` | 新增第四种审批模式 `approvals.mode: auto`：每个工具调用执行前用辅助 LLM 输出严格 JSON 风险判定（low+allow / medium+allow\|deny / high+deny），allow 直接执行、deny 转人工、high 硬拒绝、非法或失败 fail-closed；配置 `approvals.auto_review.{policy,history_messages,max_arg_chars,skip_tools}`，模型路由 `auxiliary.auto_review`。插件层做不到：`approvals.mode` 是安全设置，不能由可卸载/可禁用的用户插件承载，且必须与 `/approvals`、cron/unattended fail-closed、子 agent 继承同源 | 用户指令 2026-11-12（复刻 deepseek-harness Auto Review）；T-30 / T-31 | 中：执行器统一授权点是上游热点，按行 rebase；审批模式清单分散在 CLI/TUI/Web/Desktop，上游新增模式时需同步；`_run_approval_gate` 的 bypass 刻意不含 auto，避免 deny 转人工时被自身放行 |
+| `agent/session_window.py`（新增）、`agent/{agent_init,turn_context}.py`、`hermes_cli/web_server_config.py`、`apps/desktop/src/app/settings/{constants.ts,config-subpages.ts}`、`apps/desktop/src/i18n/*` | 会话滑动窗口与冻结窗口（移植 Android 设 08）：`context.session_window_turns` 只把最近 X 轮用户消息发给模型，`context.frozen_window_turns` 在满 X 轮时把最近 Y 轮冻成请求前缀、之后只追加直至再次满窗（Y 非法时只保留滑动窗口）；裁剪只作用于 `build_api_messages` 的发送副本，压缩预估同步按裁剪后计；两个键是 schema 虚拟字段（默认 0 关闭）并落在 Desktop「对话 → 机器人」 | 聊 09、T-37 | 低：只切 `canonical_messages` 尾部起点且不越过本轮用户消息；上游改 `build_api_messages` 装配顺序或 `turn_context` 预估时按行 rebase |
 | `tools/environments/local_command_sandbox.py`、`apps/desktop/src/app/settings/{sandbox-profiles-panel.tsx,config-subpages.ts,constants.ts}`、`apps/desktop/src/app/chat/{use-chat-bar-state.ts,composer/controls.tsx,composer/sandbox-pill.tsx}`、`apps/desktop/src/i18n/*` | 沙箱档位扩展到 sandctl 完整策略面：档位可带 `backend`（L1/L2/L3 或具体后端名）与 `policy` 片段（fs/net/syscall/proc/secrets；列表与基线授权取并集，`read-only` 忽略 `policy.fs`）；Desktop 的 custom 档位卡片暴露网络、Syscall、隔离等级、资源上限与密钥处理，输入框模型左侧新增档位下拉（写入 `terminal.sandbox.profile`，下一条命令生效） | 用户指令 2026-11-13；T-31 | 中：策略生成是安全边界，任何放宽字段在 GUI 都要二次确认；上游改 `terminal.sandbox` 结构或 composer 控制行时按行 rebase；`test_local_command_sandbox.py` 兜住并集/只读守卫 |
 | `apps/desktop/src/app/chat/{use-chat-bar-state.ts,composer/types.ts,composer/sandbox-pill.tsx}`、`apps/desktop/src/i18n/*` | 输入框档位下拉新增 Auto Review 开关（与沙箱档位独立并存）：勾选写入 `approvals.mode: auto`，取消时恢复切换前的审批模式；换档不改变 `terminal.sandbox.profile`；写入走当前 profile 的网关路由，失败回滚并提示 | 用户指令 2026-11-13；T-34 | 低：复用既有审批模式 store 与 `config.set`；上游改 composer 控制行或审批模式清单时按行 rebase |
 | `tools/auto_review.py`、`tools/approval.py`、`tui_gateway/server.py`、`gateway/{session_pending_controls,session_ancillary,session_managed_worker}.py`、`gateway/platforms/api_server.py`、`apps/desktop/src/{store/prompts.ts,app/session/hooks/use-message-stream/gateway-event/server-requests.ts,components/assistant-ui/tool/approval.tsx,i18n/*}` | 审批卡展示待执行命令 + justification：Auto Review 转人工时把审查理由作为一等字段透传（`_run_approval_gate` / `_pending_result` / `request_tool_approval`），`REVIEW_POLICY` 要求理由使用最近一条用户消息的语言、直接对用户说话；所有网关出口经 `redact_approval_display` 脱敏后下发；桌面卡片在命令块之后渲染理由块，空则不渲染 | 用户指令 2026-11-13；T-35 | 低：字段沿既有审批 payload 加可选键，缺省不影响旧客户端；上游改审批 payload 字段白名单或卡片布局时按行 rebase；理由落库仅在 pending 队列存在期内 |
@@ -266,6 +268,7 @@
 | 聊 06 | 模型切换 | 可在设置里改接口地址、密钥、模型名；会话中途切换时，新模型从下一条消息开始生效 | 必做 |
 | 聊 07 | 上下文用量提示 | 显示当前会话大致占用了多少上下文，接近上限时提示「即将整理记忆」 | 可选 |
 | 聊 08 | 分支对话、多模型对比、语音输入 | 不做。分支会让「记忆是唯一状态」这个模型变复杂，收益不足以抵消 | 不做 |
+| 聊 09 | 会话滑动窗口与冻结窗口 | **2026-11-13 新增（用户指令，移植 Android 设 08）**：设置 → 对话 → 机器人新增两项。`context.session_window_turns`（X，0/缺省 = 全量）每次请求只发送最近 X 轮用户消息；`context.frozen_window_turns`（Y，0 = 关闭，须 1 ≤ Y < X）在会话满 X 轮时把最近 Y 轮冻结为请求前缀，后续只追加，直到再次满 X 轮重冻，让服务端前缀缓存持续命中。只裁剪发送副本：落盘会话、界面历史与压缩摘要不受影响；上下文估算按裁剪后内容计。配置变更对新会话生效 | 必做 |
 
 ### 6.3 文件
 
@@ -569,6 +572,7 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | 聊 02 | 生成中点停止 | 立即停止；已生成内容保留；可继续追问 |
 | 聊 04 | 分别填错密钥、填不存在的模型名、断网 | 三种情况给出不同提示，且都说明下一步动作 |
 | 聊 05 | 输入一半内容后强杀 App，重开 | 草稿仍在 |
+| 聊 09（2026-11-13） | 设置 → 对话 → 机器人：会话滑动窗口填 6、冻结窗口填 2，连续对话 11 轮；随后把冻结窗口清 0 再聊 3 轮 | 第 6 轮请求只带最近 2 轮；第 7–10 轮在上次前缀之后追加；第 11 轮前缀重新冻结为最近 2 轮；冻结清 0 后每轮只保留最近 6 轮且无固定前缀；落盘会话与界面历史始终完整 |
 | 文 01 / 04 | 从文件选择器选一份文字版 PDF 提问 | 抽取成功，回答基于 PDF 内容 |
 | 文 03 | 从聊天软件长按文件 → 分享 → 选本 App | 直接进入提问界面，文件已被引用 |
 | 文 08 | 选一份扫描件 PDF | 正常抽取或明确提示识别质量有限，不出现「编造内容」 |
@@ -664,7 +668,7 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | R1 | 超长整理的提示词质量 | 直接决定长期记忆是结论还是流水账 | 未解决。建议用真实对话回放评估，不靠主观感觉 |
 | R2 | 两端记忆语义一致 | 「同一份记忆、两个答案」 | 部分缓解。固定样本与十题判据已建立、PC 读取已验证；尚待 Android 联调比较原始回答，见 §9.3、`evidence/t10.md` |
 | R3 | 上游记忆格式漂移 | 桌面升级改了格式，手机不会自动跟上 | 部分缓解。手机端只依赖「Markdown + 字符上限」这两个最稳定的性质，其余不依赖。桌面侧已有 `UPSTREAM_UPGRADE_CHECKLIST.md` §3 + `scripts/check_upstream_memory.py`，升级时机器可查 |
-| R4 | 清单规模增长 | 常驻 token 成本随笔记数量上升 | 已定 64 条（2026-10-28，暂定）；桌面已按此实现（超限截断并在清单尾明示）。仍需按真实笔记量校准 |
+| R4 | 清单规模增长 | 常驻 token 成本随笔记数量上升 | 已改为**软上限 128（默认）+ 可选硬上限（默认不设）**（v0.23）：软上限不截断清单，只触发维护（过期清理、合并引导）；设了硬上限才按 `updated` 倒序截断并明示条数。仍需按真实笔记量校准 |
 | R5 | 助记词全部丢失 | 数据永久不可读，无法恢复 | 无技术解。用流程对冲：纸质离线备份，与设备分开存放，不拍照、不进云笔记 |
 | R6 | 手机端无法运行本地模型 | 白皮书的「三档外传」在手机上只有两档可用（普通云接口 / 零留存云接口），物理离线档只能靠桌面 | 需在白皮书 §3 补一句限定，避免承诺超出能力 |
 | R7 | 历史路线旧形态误导实施 | 旧 HTML Ver 1.4 含内置运行时、proot 与零补丁假设，照旧施工会突破 Android 边界或与已批准 fork 策略冲突 | 已对齐（T-14）。采用 [仓库路线 v1.6](./IMPLEMENTATION_ROADMAP.md)，旧 HTML 只作历史；A3 既有例外见 §0 / §5.4，逐项核对见 [evidence/t14.md](./evidence/t14.md) |
@@ -735,3 +739,5 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.21 | 2026-11-09 | §7.5 增补第 8 项「记忆写入提醒」：引入 Android T-88 验证过的写入触发文案，作为常量置于提示词最末，并按可写工具门控；同时把 `memory` 工具描述里「任务中学到的东西放进 skill」改为「长期事实进 `notes/`、可复用流程进 skill」，消除提示词与工具描述互相打脸 |
 | v0.22 | 2026-11-09 | 记忆页从「只读查看器」改为可编辑：`/api/memory/docs` 增加 `editable` 标记，新增 `POST /api/memory/doc`（四份上下文文件 + `notes/**.md`，`notes/docs/` 保持只读，路径白名单 + 原子写 + 大小上限）；桌面页把笔记平铺列表改为 `notes/` 目录树，右侧改为按文件编辑（保存 / 撤销 / Ctrl+S / 未保存标记 / 切文件保留草稿）。编辑在下次会话或压缩后进入提示词（桌面提示词会话内冻结，见 §5.3）。§5.4 登记该路由与页面，§7.4 超限提示改为「桌面记忆页不展示」 |
 | v0.23 | 2026-11-10 | **移植 Android 笔记清单上限与生命周期、整理轮次（用户指示）**：§7.4 清单上限由固定 64 硬截断改为软 128 + 可选硬上限（默认不设），软上限只触发维护不截断；§7.3 front matter 增 `expires` / `lastUsed` 严格解析（对齐 Android `NoteFrontMatter`）；记 04 补生命周期（超软上限清理到期笔记先归档再删、docs 未引用候选经确认删除、工具覆盖前归档 `.versions/`）；记 06 补整理轮次 `memory.organize_turns`（默认 0 关闭，独立整理请求只做 notes 维护，不写 `MEMORY.md` / `USER.md`，`.memory_incomplete` 标记补做，与 `background_review` 并存）。两端 `MEMORY.md` 语义各自维持现状，不统一。§5.4 登记两条补丁，§9.1 增两条验收，`TODO.md` T-28 / T-29 |
+| v0.24 | 2026-11-13 | **新增会话滑动窗口与冻结窗口（用户指令，移植 Android 设 08）**：聊 09 新增 `context.session_window_turns` / `context.frozen_window_turns`，只裁剪发送副本、落盘历史不变；冻结前缀按 X/Y 周期重冻以维持前缀缓存。Desktop 设置 → 对话 → 机器人新增一页；§5.4 登记补丁，§9.1 增一条验收，`TODO.md` T-37 |
+| v0.25 | 2026-11-16 | 文档回写：§5.4 版本方案改为独立版本线 `0.3.25-lungo` / `0.3.25+lungo`（2026-11-16 用户指令，停用「上游版本-fork.<N>」；上游基座仍为 v0.23.2，见 T-36）；§11 R4 改为 v0.23 已定口径（软上限 128 + 可选硬上限，软上限不截断）；§5.4 Auto Review 行的需求编号补为「用户指令 2026-11-12 / T-30、T-31」；T-37 登记完成并附证据 |

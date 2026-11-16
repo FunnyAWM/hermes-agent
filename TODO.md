@@ -86,6 +86,8 @@ PC 端一部分活是「验证它确实生效」，而不是「实现它」—�
 | T-35 | 用户指令 2026-11-13（审批对话框要含命令与 justification，理由用用户语言） | 审批链路新增一等字段 `justification`：Auto Review 判 deny / 失败转人工时同时给出待执行调用（`command`）与审查理由；`REVIEW_POLICY` 要求理由用最近一条 USER 消息的语言、直接对用户说话且只描述具体效果；理由经 `redact_approval_display` 脱敏后才进网关 payload、待审批队列与 pending 重放；桌面审批卡在命令块之后新增理由块（`data-slot="tool-approval-justification"`），9 语言文案与 `_keys.desktop.json` 同步 | 已完成 | — | `pytest -q tests/tools/test_auto_review.py tests/tools/test_auto_review_executor.py tests/tools/test_request_tool_approval.py tests/tools/test_approval.py tests/tools/test_approval_mode_parity.py`（221 通过 / 2 跳过）+ `vitest run --project ui src/components/assistant-ui/tool/approval.test.tsx src/i18n/overlay-completeness.test.ts`（20 通过）+ `vitest run --project electron scripts/i18n-keys.test.mjs`（2 通过）+ `tsc -p apps/desktop --noEmit` 0 错误 + `python scripts/check --only health` ok → [evidence/t35.md](./evidence/t35.md) |
 | T-36 | 用户指令 2026-11-13（从 patch/v0.23.0 合并到 patch/v0.23.2 并适配新版本） | 上游 v0.23.2 基座合入 fork 88 个提交：12 个冲突逐条裁决（approval 双参数、native 目录项 + filename_match_key、deps-first + find_local、start_server 包装器、AGENTS 结构）；新版本不兼容项修正：npm→pnpm（build.ps1 / 离线工具脚本 / INSTALL / builder 注释）、版本号 0.23.2+fork1 与 0.23.2-fork.1、tool_executor 越过 2 000 行棘轮（Auto Review 闸门移入 sibling）、AGENTS 链路压回 30k、prompt_surface 渲染补 USERPROFILE | 已完成 | — | `python scripts/check`（17 checks ok，health 0 blocking）+ `tsc -p apps/desktop --noEmit` 0 错误 + 审批/沙箱 297 通过 + 同步/记忆/笔记 157 通过 + desktop 7 files / 44 tests + file_operations 23 个失败经基座 worktree 对照确认为 Windows 环境既有 → [evidence/t36.md](./evidence/t36.md) |
 
+| T-37 | 聊 09（PRD v0.24）、PRD §5.4 | 会话滑动窗口与冻结窗口（移植 Android 设 08）：`context.session_window_turns` 只把最近 X 轮用户消息发给模型，`context.frozen_window_turns` 在满 X 轮时把最近 Y 轮冻成请求前缀、之后只追加直至再次满窗（Y 非法时只保留滑动窗口）；裁剪只作用于 `build_api_messages` 的发送副本，落盘会话、界面历史与压缩摘要不变，上下文估算按裁剪后内容计；两个键是 schema 虚拟字段（默认 0 关闭）并落在 Desktop「对话 → 机器人」，de/es/fr/ja/ru/zh-hant 文案同步（selection 深链补按字段名路由，否则 `setting=context.session_window_turns` 落回首个子页） | 已完成 | — | `scripts/run_tests.sh tests/agent/test_session_window.py`（12 项，含冻结窗口 wire 级用例）+ `npx vitest run src/app/settings src/i18n/overlay-completeness.test.ts` + `npx tsc --noEmit -p apps/desktop/tsconfig.json` + `python scripts/check`（16 checks ok；health 单独跑 0 blocking，基线漂移见 evidence） → [evidence/t37.md](./evidence/t37.md) |
+
 **已完成项的回归提示**：T-03 / T-04 状态保持已完成，但 T-18 会改变提示词首段与笔记类别集合，
 批次实施后须重跑 `tests/agent/test_notes_prompt.py`、`tests/agent/test_system_prompt.py` 并刷新证据。
 
@@ -93,9 +95,11 @@ PC 端一部分活是「验证它确实生效」，而不是「实现它」—�
 
 ## 2. 明确不做（避免被 PRD 的功能表误导）
 
-以下条目在 PRD 里是 Android 的开发范围，PC 端不承接：记 07（记忆页）、记 08–09（留档 / 导出）、
+以下条目在 PRD 里是 Android 的开发范围，PC 端不承接：记 08–09（留档 / 导出）、
 聊 01–07（流式、中断、会话、错误态、草稿、模型切换）、文 01–09（文件选择器、分享意图、文本抽取、OCR）、
 同 06 / 07 / 09（交互式冲突仲裁、密钥轮换、实时协同）、设 01–06（首启向导、模型配置、遥测开关）。
+**记 07（记忆页）两边各有实现**：Android 为原生页；PC 已由桌面记忆页承接（PRD §5.4 v0.22 登记，
+`hermes_cli/web_routers/memory_docs.py` + `apps/desktop/src/app/memory/`），不是「PC 不承接」。
 
 **同 01–05、同 08 已改为 PC 端承接**（2026-11-09，T-27）：设备链的配对、白名单、加密封装、不透明
 命名、客户端定序与状态可见都已实现，PC 可以当主设备也可以当从设备。仍不做的是 同 06 的交互式
