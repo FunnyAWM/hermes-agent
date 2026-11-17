@@ -42,6 +42,15 @@ def test_full_access_profile_leaves_the_gate_off(hermes_home):
     assert gate.file_writes_read_only() is False
 
 
+def test_blocked_command_tells_the_model_how_to_ask_for_a_wider_level(hermes_home):
+    """A blocked run must name the escalation mechanism, not only the config file: the model
+    can widen ONE command, and without that sentence it retries at a tighter level instead."""
+    note = gate.failure_note(gate.BLOCKED_EXIT, "denied by policy")
+    assert 'sandbox="full-access"' in note
+    assert "approve" in note
+    assert "config.yaml" in note  # the user-facing widening path stays available
+
+
 def test_escalation_is_scoped_to_one_command(hermes_home):
     _write_config(hermes_home, READ_ONLY_CONFIG)
     assert gate.active_profile().preset == gate.READ_ONLY

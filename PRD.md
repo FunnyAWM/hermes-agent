@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.30（草稿，待评审） |
+| 文档版本 | v0.31（草稿，待评审） |
 | 日期 | 2026-11-17 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -749,5 +749,6 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.26 | 2026-11-16 | **新增轻量密封完整版（用户指令 2026-11-16 / T-38）**：§5.4 新增裁决条目，部分推翻 2026-11-06「只发 headless」（当时重量理由针对 3.7 GB 全量密封；轻量密封约 450 MB 装后 / 200 MB 安装包）。复用 `bundled` 变体链 + `HERMES_BUNDLE_TOOLS=python` 子集过滤，Electron 零改动；`pm` 写子命令在密封布局下拒绝执行（只读，升级换包）。§5.4 登记两条补丁；构建入口 `scripts/build-full.ps1`，产物 `apps/desktop/release-full/`；使用说明见 `INSTALL.md` 完整版章节 |
 | v0.27 | 2026-11-17 | **版本统一 + 密封安装放行 `pm install`（用户指令 2026-11-17）**：§5.4 版本方案改为安装包与软件本体同一字符串 `0.3.25+kaltsit`（SemVer build metadata 与 PEP 440 本地版本的交集形态；`-lungo` 的 pre-release 排序边界随之消失，`STABLE_TAG_RE` 边界保留）；T-38 密封守卫收窄为 `repair / gc / update / lock` + install 的 venv 同步形态（裸 install / `--extra` / `--test-environment`）——命名工具 `pm install` 写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径（懒安装路径同达，不经 CLI 守卫） |
 | v0.28 | 2026-11-17 | **pm 下载镜像 knob（用户指令 2026-11-17）**：npm/PyPI 已有镜像 knob，GitHub 等受管工具下载源（lock 里 104 个 URL）没有——新增 `HERMES_PM_DOWNLOAD_MIRROR` 前缀重写（`pm/artifact_mirror.py::pinned_source`），镜像优先、原站与 hermes-assets 兜底，sha256 全程校验；未设时行为不变。§5.4 登记一条补丁 |
+| v0.31 | 2026-11-17 | **Auto Review 失效与沙箱提权引导（用户指令 2026-11-17 / T-42）**：Auto Review 的 `{"enabled": false}` 在 custom 端点被投影成 `reasoning_effort: none`，serde 枚举拒绝的措辞未被 `agent/error_classifier.py` 识别 → 每次审查 400 → FAILED → 转人工；补 `unknown variant` / `expected one of` 进 closed-level-set 标记。沙箱提权机制（`terminal(sandbox=…)` + 人工审批 + 单次生效）本已存在；阻断反馈只指 config.yaml，模型改用更严档位，`failure_note` 补模型可执行的提权路径 |
 | v0.30 | 2026-11-17 | **完整版安装时长异常（用户指令 2026-11-17 / T-41）**：实测安装包 583 MB / 展开 2.2 GB / 7.6 万文件，超 T-38 设计 3 倍；根因是密封子集 venv 仍 `--all-extras`（49 个可选集成）。改为 `--extra all`（政策 9 个常驻 extras，其余在密封包内不可用——与只读语义一致）；`.pyc` 保留（`bake_bytecode` 覆盖率断言是防冷编译停顿的性能契约）。§5.4 T-38 行补记 |
 | v0.29 | 2026-11-17 | **整理时机对齐手机（用户指令 2026-11-17 / T-40）**：审计确认窗口（设 08）与 Android `ChatFrozenWindow` 逐轮调度一致，无需改动；整理（记 06）两处纠正——触发从 turn prologue 移到回答交付后（`turn_finalizer`，对齐 `finishStream`，错误/中止/拦截轮丢弃名额），并引入 `notes/.organize-incomplete` 补做标记（对齐 `MemoryOrganizer` 的 mark/commit/retry，取代 T-29 的「无标记」实现）。§5.4 该行改写 + T-40 登记 |

@@ -710,7 +710,10 @@ def failure_note(returncode: int, output: str) -> str:
         lines.append(f"[sandbox] Sandbox said:\n{detail}")
     lines.append(
         "[sandbox] Every command runs inside the sandctl boundary unless the session has Full Access. "
-        f"To widen it, change terminal.sandbox in {display_hermes_home()}/config.yaml.")
+        "To run only THIS command at a wider level, pass sandbox=\"workspace-exec\" or "
+        "sandbox=\"full-access\" on the terminal call; the user is asked to approve it, and the "
+        "configured profile applies again to the next command. "
+        f"To widen the session, change terminal.sandbox in {display_hermes_home()}/config.yaml.")
     return "\n".join(lines) + "\n"
 
 
