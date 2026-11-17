@@ -30,6 +30,41 @@ def _bundle_package_names() -> list[str]:
     return names
 
 
+def _bundle_tool_filter() -> set[str] | None:
+    """Build-lane subset for a sealed-lite payload (HERMES_BUNDLE_TOOLS=a,b):
+    stage only these tools instead of every locked default. The payload keeps
+    the interpreter and the venv; every other tool resolves from the user's
+    PATH exactly as a headless build's does. Unknown names fail the build —
+    a silently shorter payload would ship a promise the manifest can't keep."""
+    raw = os.environ.get("HERMES_BUNDLE_TOOLS", "")
+    if not raw.strip():
+        return None
+    only = {name.strip() for name in raw.split(",") if name.strip()}
+    unknown = sorted(only - set(_lockfile().names()))
+    if unknown:
+        raise ValueError(
+            "HERMES_BUNDLE_TOOLS names packages outside pm/lock.json: " + ", ".join(unknown)
+        )
+    return only
+
+
+def _staging_names(only: set[str] | None) -> list[str]:
+    from pm.package import InstallError
+
+    names = [
+        n for n in _bundle_package_names()
+        if (only is None or n in only) and get_package(n).missing_reason(current_target()) is None
+    ]
+    if only is not None:
+        unavailable = sorted(only - set(names))
+        if unavailable:
+            raise InstallError(
+                "tools",
+                "requested payload tools are unavailable for this target: " + ", ".join(unavailable),
+            )
+    return names
+
+
 def _arch_guard(store_dir: Path) -> list[str]:
     """Every staged binary must be built for this machine's target — a
     payload staged with a mismatched interpreter or PATH tool ships an
@@ -203,10 +238,8 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
         raise ValueError("selected revision's PM lock differs from the builder; use a checkout at that revision")
     build_env = os.environ if env is None else env
 
-    names = [
-        n for n in _bundle_package_names()
-        if get_package(n).missing_reason(current_target()) is None
-    ]
+    only = _bundle_tool_filter()
+    names = _staging_names(only)
     from pm import prepare_tools, stage_tools
 
     with _phase(f"preparing {len(names)} pinned tools"):
@@ -277,14 +310,19 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     payload_cache = out / "uv-cache"
     if payload_cache.exists():
         shutil.rmtree(payload_cache, ignore_errors=True)
-    src_cache = cache
-    if src_cache.is_dir():
-        print(f"  uv-cache: copying {src_cache} → payload...", flush=True)
-        stage_uv_cache(src_cache, payload_cache)
-        pruned = prune_uv_cache_to_lock(payload_cache, repo_dir)
-        print(f"✓ uv-cache (lock-scoped: pruned {pruned} stale entries; offline rebuilds resolve from shipped wheels)", flush=True)
+    if only is not None:
+        # A sealed subset payload refuses in-place pm writes (pm/cli.py), so no
+        # offline rebuild can ever run; the wheel cache would be dead weight.
+        print("✓ uv-cache skipped (sealed subset: no in-place rebuilds)", flush=True)
     else:
-        raise InstallError("uv-cache", "runtime dependency cache is missing")
+        src_cache = cache
+        if src_cache.is_dir():
+            print(f"  uv-cache: copying {src_cache} → payload...", flush=True)
+            stage_uv_cache(src_cache, payload_cache)
+            pruned = prune_uv_cache_to_lock(payload_cache, repo_dir)
+            print(f"✓ uv-cache (lock-scoped: pruned {pruned} stale entries; offline rebuilds resolve from shipped wheels)", flush=True)
+        else:
+            raise InstallError("uv-cache", "runtime dependency cache is missing")
     if current_target().startswith("win32-"):
         from scripts.bundles.msix_names import drop_msix_reserved_names
         for tree in drop_msix_reserved_names(out):

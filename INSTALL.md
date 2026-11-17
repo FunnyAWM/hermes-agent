@@ -5,12 +5,34 @@
 `HermesHeadless-0.23.2-fork.1-win-x64-portable.exe`。基座是上游 **v0.23.2**
 （合入记录见 [evidence/t36.md](evidence/t36.md)）。
 版本号已切换为独立版本线 `0.3.25+kaltsit`（2026-11-17，安装包与软件本体同一字符串）；上列包名是切换前的构建，
-下次发行起包名随新版本号。
+下次发行起包名随新版本号。密封运行时的完整版在 `apps/desktop/release-full/`（见 §0）。
 
 **这个包是什么**：`headless` 指**包里不携带运行时**，不是无界面程序。它照常打开桌面窗口，
 Agent 跑在你机器上已有的 Kouri Harness 源码树 + venv 上。好处是包小（约 140 MB）、升级源码不动包；
-代价是需要你自己把环境补齐。想要开箱即用的完整版（运行时密封进包）目前没有发行计划——
-包体会涨到 3.7 GB 以上，改为按需补环境。
+代价是需要你自己把环境补齐。想要开箱即用的完整版（运行时密封进包），见下节 §0。
+
+---
+
+## 0. 完整版（密封运行时，开箱即用）
+
+`release-full/` 下的 `...-setup.exe` 与 headless 同一条打包链，但把运行时密封进了包：
+**Python 3.14 解释器 + 全部 Python 依赖 + Agent 源码快照**，装完即用——首启不需要网络、
+不需要源码树、不需要 venv。运行时约 450 MB，安装包约 200 MB（headless 约 140 MB）。
+
+- **其余工具不密封**：git、node、ffmpeg、Chromium 等按 headless 同样的方式回退你机器上
+  已装的版本（`PATH` 复用）；缺了只是少对应能力（见 §5），聊天、终端、文件、任务列表、
+  定时任务、子代理不需要它们。
+- **运行时只读，升级换包**：运行时是包的一部分，不提供原地修改——完整版里
+  `hermes pm repair / gc / update / lock` 会拒绝执行并提示安装新包；命名工具 `pm install` / `--tools-only` 不受限（写可写 store，缺工具时 agent 也按需自动补装）；裸 `install` / `--extra` / `--test-environment` 会同步密封 venv，仍拒绝。
+  升级 = 跑新版完整包覆盖安装，应用数据 `%LOCALAPPDATA%\hermes\` 不受影响（见 §8）。
+- **源码不能 `git pull`**：源码快照属于包，与 headless 不同。要跑新代码，装用新代码构建的
+  完整包，或改用 headless 包。
+- 构建方式：`scripts/build-full.ps1`（`HERMES_DESKTOP_VARIANT=bundled` +
+  `HERMES_BUNDLE_TOOLS=python`，复用上游 bundled 变体的 payload 链，仅收窄工具集合）。
+
+完整版用户只需读 §2（安装）、§7（自检——About → Runtime 显示 `Embedded runtime`，日志出现
+`[backend] using bundled payload at <payload 目录>`）、§8（升级与卸载）；
+§1、§3–§6 是 headless 包的环境准备，完整版不需要。
 
 ---
 

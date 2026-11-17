@@ -724,3 +724,94 @@ def test_native_dispatch_child_environment(tmp_path, monkeypatch, cache_source, 
     assert (cache / "reused").read_text(encoding="utf-8-sig") == "xx"
     assert all(not home.exists() for home in homes)
     assert dict(os.environ) == before
+
+
+def test_bundle_tool_filter_defaults_to_every_locked_tool(monkeypatch):
+    monkeypatch.delenv("HERMES_BUNDLE_TOOLS", raising=False)
+    assert native._bundle_tool_filter() is None
+    assert "python" in native._staging_names(None)
+
+
+def test_bundle_tool_filter_stages_only_the_named_tools(monkeypatch):
+    monkeypatch.setenv("HERMES_BUNDLE_TOOLS", " python , uv ")
+    assert native._bundle_tool_filter() == {"python", "uv"}
+    assert native._staging_names({"python"}) == ["python"]
+
+
+def test_bundle_tool_filter_rejects_names_outside_the_lock(monkeypatch):
+    monkeypatch.setenv("HERMES_BUNDLE_TOOLS", "python,not-a-tool")
+    with pytest.raises(ValueError, match="not-a-tool"):
+        native._bundle_tool_filter()
+
+
+def test_staging_names_fail_closed_when_a_requested_tool_cannot_be_staged(monkeypatch):
+    from pm.package import InstallError
+
+    class Unavailable:
+        internal = False
+
+        def missing_reason(self, target):
+            return "not built for this target"
+
+    monkeypatch.setattr(native, "get_package", lambda name: Unavailable())
+    with pytest.raises(InstallError, match="unavailable for this target"):
+        native._staging_names({"python"})
+
+
+def test_prepared_inventory_admits_the_sealed_subset_without_uv_cache(tmp_path):
+    """Publish and load must agree that a sealed subset payload ships no uv-cache.
+
+    The sealed stager skips uv-cache (native.py: no in-place rebuilds) while the
+    runtime treats an absent payload cache as "nothing to seed" (uv_cache_dir);
+    the prepared inventory used to demand the directory unconditionally and so
+    rejected every sealed payload at publish time.
+    """
+    from scripts.build.inputs import AgentInputs, RESOURCE_ENV, dependency_site
+    from scripts.bundles.native_prepared import load_prepared, publish_prepared
+
+    target = native.current_target()
+
+    def staged(out, uv_cache):
+        code = out / "hermes-agent"
+        code.mkdir(parents=True)
+        (code / "pyproject.toml").write_text(
+            '[project]\nname="fixture"\nversion="1.0.0"\n', encoding="utf-8")
+        for name in RESOURCE_ENV:
+            (code / name).mkdir(parents=True)
+            (code / name / "asset").write_text("required", encoding="utf-8")
+        (out / "tools").mkdir()
+        venv = out / "venv"
+        site = dependency_site(venv, "3.14.9", target)
+        site.mkdir(parents=True)
+        python = out / "bin" / ("python.exe" if target.startswith("win32") else "python")
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"inert")
+        pm_runtime = out / "pm-runtime"
+        (pm_runtime / "site").mkdir(parents=True)
+        (pm_runtime / "python.txt").write_bytes(b"inert")
+        (pm_runtime / "pm-runtime.json").write_text(
+            json.dumps({"python": "python.txt", "sitePackages": "site"}), encoding="utf-8")
+        (out / "enabled-features.json").write_text("{}", encoding="utf-8")
+        if uv_cache:
+            (out / "uv-cache" / "wheels").mkdir(parents=True)
+            (out / "uv-cache" / "wheels" / "fixture.whl").write_bytes(b"inert")
+        return AgentInputs(
+            project=code / "pyproject.toml", code=code, repo="hermes-agent",
+            placement="contained", target=target, python=python, site_packages=site,
+            environment=venv, pm_runtime=pm_runtime, tools=out / "tools", ref="HEAD",
+            resources={name: code / name for name in RESOURCE_ENV},
+            features=out / "enabled-features.json")
+
+    sealed = tmp_path / "sealed"
+    inputs = staged(sealed, uv_cache=False)
+    prepared = publish_prepared(sealed, tmp_path, "a" * 40, inputs)
+    assert "uv-cache" not in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
+    # Install-time verification replays the same inventory; a publish/load
+    # disagreement would brick the payload after distribution.
+    assert load_prepared(prepared) == inputs
+
+    full = tmp_path / "full"
+    inputs = staged(full, uv_cache=True)
+    prepared = publish_prepared(full, tmp_path, "b" * 40, inputs)
+    assert "uv-cache" in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
+    assert load_prepared(prepared) == inputs

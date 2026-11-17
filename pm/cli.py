@@ -12,13 +12,39 @@ import urllib.error
 from pathlib import Path
 
 from pm import termux_libs
-from pm.install import _facts, _lockfile, _reclaim_set_aside, _store, ensure, stage_only
+from pm.install import _facts, _lockfile, _reclaim_set_aside, _store, ensure, sealed, stage_only
 from pm.operations import lock_project
 from pm.package import InstallError
 from pm.paths import repo_root
 from pm.registry import get_package, source_install_packages, tool_roots
 from pm.store import ALL_TARGETS, current_target, hash_url
 from pm.update import Resolved, resolve_package, reuse_index_responses
+
+
+# In-place writes to the sealed payload: uv.lock relock, lock repins, venv repair,
+# generation reclaim.
+_SEALED_WRITE_COMMANDS = {"repair", "gc", "update", "lock"}
+
+
+def _sealed_install_blocked(args) -> bool:
+    """Bare installs and extra/test-env installs sync the sealed venv; named tool
+    installs write the writable store (%LOCALAPPDATA%\\hermes\\tools), which is how
+    a sealed install pulls missing tools after setup."""
+    if getattr(args, "extra", None) or getattr(args, "test_environment", None) is not None:
+        return True
+    return not (getattr(args, "names", None) or getattr(args, "tools_only", False))
+
+
+def _sealed_refusal(command: str) -> int:
+    from pm import receipt
+
+    detail = (
+        "this install is sealed: the runtime ships inside the app package and cannot be "
+        "modified in place. To update the runtime, install a newer package."
+    )
+    receipt.record_refusal("sealed-install", f"{command}: {detail}")
+    print(f"✗ {detail}")
+    return 1
 
 
 def cmd_lock(args) -> int:
@@ -1049,6 +1075,9 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "lock" and (args.name is None) != (args.version is None):
         lock_parser.error("--bump NAME and VERSION go together; run with neither to relock uv.lock")
+    if sealed() and (args.cmd in _SEALED_WRITE_COMMANDS
+                     or (args.cmd == "install" and _sealed_install_blocked(args))):
+        return _sealed_refusal(args.cmd)
     from pm.runtime import is_runtime, run_cli
 
     try:

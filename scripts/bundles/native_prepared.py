@@ -88,7 +88,11 @@ def _input_paths(inputs: AgentInputs, out: Path) -> list[Path]:
             or not inputs.site_packages.is_relative_to(inputs.environment)):
         raise ValueError("native prepared input layout changed")
     paths = [inputs.code, inputs.tools, inputs.environment, inputs.pm_runtime,
-             inputs.python, inputs.features, out / "uv-cache"]
+             inputs.python, inputs.features]
+    # The sealed subset ships no uv-cache (no in-place rebuilds, native.py); the
+    # runtime treats an absent payload cache as "nothing to seed" (uv_cache_dir).
+    if (out / "uv-cache").exists():
+        paths.append(out / "uv-cache")
     for path in [inputs.project, inputs.site_packages, *inputs.resources.values(), *paths]:
         _owned(path, out)
     return paths
