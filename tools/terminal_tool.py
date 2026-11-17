@@ -1158,6 +1158,18 @@ def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str)
         raise _Rejected(_error_json(
             f"Escalating to the {level} sandbox level is turned off (terminal.sandbox.escalation); "
             "run the command inside the active profile or ask the user to change it.", status="error"))
+    # ``approvals.mode: auto`` delegates the decision to the automatic reviewer, which ruled on
+    # this exact call (with its ``sandbox`` argument and the conversation) before dispatch: an
+    # allow gets here, a deny/unknown verdict asks the human and never reaches this point. Asking
+    # a human again would double-gate one decision. When terminal is excluded from review
+    # (``skip_tools``) nothing ruled on it, so the human gate stays the only check.
+    from tools.approval_context import _get_approval_mode
+
+    if _get_approval_mode() == "auto":
+        from tools.auto_review import should_review
+
+        if should_review("terminal"):
+            return gate.escalation(level)
     import hashlib
 
     from tools.approval import request_tool_approval

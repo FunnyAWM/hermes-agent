@@ -96,6 +96,37 @@ def test_approved_escalation_applies_to_the_scope(hermes_home, monkeypatch):
     assert gate.active_profile().preset == gate.READ_ONLY
 
 
+def test_auto_mode_leaves_the_escalation_to_the_automatic_reviewer(hermes_home, monkeypatch):
+    """approvals.mode: auto — the reviewer already ruled on this call; ask nobody twice."""
+    _write_config(
+        hermes_home,
+        READ_ONLY_CONFIG + "approvals:\n  mode: auto\n",
+    )
+
+    def _unexpected(*args, **kwargs):
+        raise AssertionError("auto mode must not open the human gate for an escalation")
+
+    monkeypatch.setattr("tools.approval.request_tool_approval", _unexpected)
+    with terminal_tool._sandbox_escalation_scope(gate.FULL_ACCESS, "local", "npm ci"):
+        assert gate.active_profile().preset == gate.FULL_ACCESS
+
+
+def test_auto_mode_keeps_the_human_gate_when_terminal_is_not_reviewed(hermes_home, monkeypatch):
+    """terminal in skip_tools means nothing ruled on the call, so a human still decides."""
+    _write_config(
+        hermes_home,
+        READ_ONLY_CONFIG + "approvals:\n  mode: auto\n  auto_review:\n    skip_tools: [terminal]\n",
+    )
+    calls = []
+    monkeypatch.setattr(
+        "tools.approval.request_tool_approval",
+        lambda tool_name, reason, **kwargs: (calls.append(reason), {"approved": False})[1],
+    )
+    with pytest.raises(terminal_tool._Rejected):
+        terminal_tool._sandbox_escalation_scope(gate.FULL_ACCESS, "local", "npm ci")
+    assert calls
+
+
 def test_tighter_level_runs_without_asking(hermes_home, monkeypatch):
     _write_config(
         hermes_home,
