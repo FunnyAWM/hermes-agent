@@ -45,14 +45,13 @@ tag 清单，「`2bd378e` = 上游 v0.23.0 Release」按使用者核对记录。
 | 冲突 | 下列本地私有路径保留本地版；内核补丁按 `PRD.md` §5.4 登记表逐条 rebase，不允许「取其一」 |
 | 失败 | 停在当前基座继续开发，不阻塞 |
 
-**版本号（2026-11-16 改，独立版本线）**：当前桌面 `apps/desktop/package.json` = `0.3.25-lungo`，
-Python `pyproject.toml` = `0.3.25+lungo`（PEP 440 本地版本写法，同义不同串）。
+**版本号（2026-11-17 改，独立版本线）**：桌面 `apps/desktop/package.json` 与 Python `pyproject.toml`
+统一为同一字符串 **`0.3.25+kaltsit`**（SemVer build metadata 与 PEP 440 本地版本的交集形态——唯一能两处同串的写法）。
 原「上游版本-fork.<N>」方案（2026-10-28 定）停用：版本号不再随上游发版变化，
 两处 `version` 只在 fork 自己发版时重写。
 
-⚠️ 两条边界：`-lungo` 在 SemVer 里是 pre-release，排序低于 `0.3.25`；且本仓 `hermes_cli/update_channel.py:67`
-的 `STABLE_TAG_RE` 只认 `vX.Y.Z`——这个版本串**不得**传给 `scripts/releases/*` 或更新通道的校验器。
-细节见 `PRD.md` §5.4。
+⚠️ 边界：本仓 `hermes_cli/update_channel.py:67` 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`——这个版本串
+**不得**传给 `scripts/releases/*` 或更新通道的校验器。细节见 `PRD.md` §5.4。
 
 ⚠️ **上游 remote 尚未配置**：现在只有 `origin`（fork），仓里也没有任何上游 tag。要执行这条策略，先加一次：
 `git remote add upstream https://github.com/nousresearch/hermes-agent.git`，之后 `git fetch upstream --tags` 才取得到 Release tag。

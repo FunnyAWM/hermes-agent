@@ -2,7 +2,7 @@
   "name": "hermes",
   "productName": "Kouri Harness",
   "private": true,
-  "version": "0.3.25-lungo",
+  "version": "0.3.25+kaltsit",
   "description": "Native desktop shell for Rosmontis.",
   "author": {
     "name": "FunnyAWM",

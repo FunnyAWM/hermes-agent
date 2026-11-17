@@ -2,8 +2,8 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.25（草稿，待评审） |
-| 日期 | 2026-11-16 |
+| 文档版本 | v0.27（草稿，待评审） |
+| 日期 | 2026-11-17 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
 | 读者 | 执行团队：Android 客户端、同步与存储、测试 |
@@ -142,22 +142,23 @@
 | 改造 | 以 fork 为基座。定制优先落在配置、插件、客户端三层；确实做不到时才允许打补丁，且必须登记进下表 |
 | 升级失败 | 停在已固定的版本继续用，不阻塞手机端 |
 
-**版本号（2026-11-16 起）**：fork 采用**独立版本线**，当前为 `0.3.25-lungo`，不跟随上游版本号；
+**版本号（2026-11-17 起）**：fork 采用**独立版本线**，当前为 `0.3.25+kaltsit`，不跟随上游版本号；
 上游基座另行记录（见下）。裸 `0.3.25` 会与其他 fork / 衍生发行撞车且分不清谁是谁，带后缀才能一眼认出本发行。
+2026-11-17 用户指令：安装包与软件本体**统一为同一字符串**（此前是 `-lungo` / `+lungo` 两套拼写）。
 
-代价有两条，都必须知道：
+代价只有一条，必须知道：
 
-- **它是 pre-release，排序低于 `0.3.25`。** SemVer 里 `0.3.25-lungo < 0.3.25`，判断「谁更新」不能只做一次版本比较。
-- **本仓自己的版本语法不认它。** `hermes_cli/update_channel.py:67` 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`，`scripts/releases/semver.py` 只额外接受 canary 的 `+canary.<stamp>`。`-lungo` 不属于这两类，**不得喂进那两套校验器**——我们不跑上游 release 流水线，也不开自动更新（§5.5），所以它只出现在安装包与包元数据里，进不去那些路径。
+- **本仓自己的版本语法不认它。** `hermes_cli/update_channel.py:67` 的 `STABLE_TAG_RE` 只认 `vX.Y.Z`，`scripts/releases/semver.py` 只额外接受 canary 的 `+canary.<stamp>`。`+kaltsit` 不属于这两类，**不得喂进那两套校验器**——我们不跑上游 release 流水线，也不开自动更新（§5.5），所以它只出现在安装包与包元数据里，进不去那些路径。
 
-**同一个 release，两套拼写**（不能不区分）：
+**同一个 release，同一个字符串**：
 
 | 位置 | 写法 | 为什么 |
 |---|---|---|
-| 桌面端 `apps/desktop/package.json` | `0.3.25-lungo`（SemVer） | electron-builder / npm 认 pre-release；`-` 在文件名里也安全 |
-| Python `pyproject.toml` | `0.3.25+lungo`（PEP 440 本地版本） | PEP 440 不认 `-lungo`（`-` 后只接受 alpha/beta/rc/dev/post），只能写成 `+lungo` |
+| 桌面端 `apps/desktop/package.json` | `0.3.25+kaltsit`（SemVer build metadata） | electron-builder 对每段 parseInt 得 `0.3.25.0`（NSIS VIProductVersion 合法），`prerelease()` 为 null 不影响 channel（channel 由 `HERMES_PAYLOAD_TAG` 决定）；`+` 在 Windows 文件名里合法 |
+| Python `pyproject.toml` | `0.3.25+kaltsit`（PEP 440 本地版本） | PEP 440 本地版本段恰好就是 `+<ident>` 形态 |
 
-两者不是同一个字符串，**不要试图让它们相等**；它们的含义相同：fork 当前版本 `0.3.25-lungo`（独立版本线，不随上游发版变化）。
+`+kaltsit` 是 SemVer build metadata 与 PEP 440 本地版本的交集写法——唯一能让两处同串的形态。
+两处都写 `0.3.25+kaltsit`，含义相同：fork 当前版本（独立版本线，不随上游发版变化）。
 
 **受控补丁登记表**。往内核里加一处改动，就必须在这里加一行；表里没有的改动视为违规改造。
 
