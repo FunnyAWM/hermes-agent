@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.29（草稿，待评审） |
+| 文档版本 | v0.30（草稿，待评审） |
 | 日期 | 2026-11-17 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -175,7 +175,7 @@
 | `hermes_notes/store.py`、`tools/file_tools_write_guards.py` | 新增 `notes/docs/` 固定例外类别：只读、一层放平、计入清单、不参与摘要/合并；对 `notes/docs/**` 的写入/替换拒绝，读取放行 | 记 04 / 05、§7.1、D8 | 低：独立类别与路径守卫；需与其他写路径分开测试 |
 | `apps/desktop/src/themes/presets.ts` | 五个内置主题去掉 `typography.fontUrl`：主题加载器会把它作为远程样式表注入，默认配置的桌面因此访问 `fonts.googleapis.com`（隐 02）。内置 mono 栈本就不引用这些远程字族，删除后仅去掉外联、不改渲染；导入的第三方主题仍可携带（显式用户行为） | 隐 02、§8.1、T-11 | 低：只删内置预设字段；上游新增同名字段时按行 rebase，`presets.test.ts` 拦住回归 |
 | `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
-| `scripts/bundles/native.py`、`scripts/bundles/native_prepared.py` | `HERMES_BUNDLE_TOOLS` 工具子集过滤（未知包名与目标不可用包一律构建失败）+ 密封子集跳过 uv-cache：完整密封链复用 `bundled` 变体，仅把 payload 收窄到解释器 + venv + 源码；prepared 清单按实际落盘收录 uv-cache（密封子集缺席受运行时支持，`uv_cache_dir` 视为「无种可播」） | §5.5、T-38 | 低：默认（未设环境变量）行为不变，全量 16 包照旧 |
+| `scripts/bundles/native.py`、`scripts/bundles/native_prepared.py` | `HERMES_BUNDLE_TOOLS` 工具子集过滤（未知包名与目标不可用包一律构建失败）+ 密封子集跳过 uv-cache：完整密封链复用 `bundled` 变体，仅把 payload 收窄到解释器 + venv + 源码；prepared 清单按实际落盘收录 uv-cache（密封子集缺席受运行时支持，`uv_cache_dir` 视为「无种可播」）；**密封子集 venv 只装 `[all]` 的 9 个常驻 extras（`_venv_sync_extras`），全量包仍 `--all-extras`**——密封 venv 无法原地 sync，其余集成在包内不可用属既定只读语义（T-41） | §5.5、T-38、T-41 | 低：默认（未设环境变量）行为不变，全量 16 包照旧 |
 | `pm/cli.py` | 密封安装（`pm.install.sealed()`）拒绝 `pm repair / gc / update / lock` 的原地写（改 uv.lock / pm/lock.json / venv / generation 回收），提示换包升级；`pm install <工具名>` / `--tools-only` 放行——它写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径；裸 `install` 与 `--extra` / `--test-environment` 会同步密封 venv，仍拒绝；读命令与环境侧车不受限 | §5.5、T-38 | 低：新增一个分发前守卫；上游密封语义（post_update 已按 sealed 跳过原地修复）一致 |
 | `pm/artifact_mirror.py` | 新增 `HERMES_PM_DOWNLOAD_MIRROR` 下载镜像前缀（ghproxy 式 `<prefix><original URL>`）：拉取受管工具时镜像优先、原站与公共归档兜底，sha256 全程校验；http 前缀沿用 LAN npm registry 信任模型（钉死哈希 + 限长） | 用户指令 2026-11-17（镜像站） | 低：未设环境变量时 `pinned_source` 行为不变（前缀分支提前返回） |
 | `agent/prompt_builder.py`、`agent/system_prompt.py` | 任务分派路由提示：记录/跟踪任务 → `todo_list`，指定时间/周期/提醒 → `cronjob_manage`；仅在两个工具都启用时注入，不改动既有 guidance 顺序 | §5.5、桌面单机器人与任务分派、T-21 | 低：新增一个常量与一个工具门控分支；上游改动 guidance 清单时按行 rebase |
@@ -749,4 +749,5 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.26 | 2026-11-16 | **新增轻量密封完整版（用户指令 2026-11-16 / T-38）**：§5.4 新增裁决条目，部分推翻 2026-11-06「只发 headless」（当时重量理由针对 3.7 GB 全量密封；轻量密封约 450 MB 装后 / 200 MB 安装包）。复用 `bundled` 变体链 + `HERMES_BUNDLE_TOOLS=python` 子集过滤，Electron 零改动；`pm` 写子命令在密封布局下拒绝执行（只读，升级换包）。§5.4 登记两条补丁；构建入口 `scripts/build-full.ps1`，产物 `apps/desktop/release-full/`；使用说明见 `INSTALL.md` 完整版章节 |
 | v0.27 | 2026-11-17 | **版本统一 + 密封安装放行 `pm install`（用户指令 2026-11-17）**：§5.4 版本方案改为安装包与软件本体同一字符串 `0.3.25+kaltsit`（SemVer build metadata 与 PEP 440 本地版本的交集形态；`-lungo` 的 pre-release 排序边界随之消失，`STABLE_TAG_RE` 边界保留）；T-38 密封守卫收窄为 `repair / gc / update / lock` + install 的 venv 同步形态（裸 install / `--extra` / `--test-environment`）——命名工具 `pm install` 写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径（懒安装路径同达，不经 CLI 守卫） |
 | v0.28 | 2026-11-17 | **pm 下载镜像 knob（用户指令 2026-11-17）**：npm/PyPI 已有镜像 knob，GitHub 等受管工具下载源（lock 里 104 个 URL）没有——新增 `HERMES_PM_DOWNLOAD_MIRROR` 前缀重写（`pm/artifact_mirror.py::pinned_source`），镜像优先、原站与 hermes-assets 兜底，sha256 全程校验；未设时行为不变。§5.4 登记一条补丁 |
+| v0.30 | 2026-11-17 | **完整版安装时长异常（用户指令 2026-11-17 / T-41）**：实测安装包 583 MB / 展开 2.2 GB / 7.6 万文件，超 T-38 设计 3 倍；根因是密封子集 venv 仍 `--all-extras`（49 个可选集成）。改为 `--extra all`（政策 9 个常驻 extras，其余在密封包内不可用——与只读语义一致）；`.pyc` 保留（`bake_bytecode` 覆盖率断言是防冷编译停顿的性能契约）。§5.4 T-38 行补记 |
 | v0.29 | 2026-11-17 | **整理时机对齐手机（用户指令 2026-11-17 / T-40）**：审计确认窗口（设 08）与 Android `ChatFrozenWindow` 逐轮调度一致，无需改动；整理（记 06）两处纠正——触发从 turn prologue 移到回答交付后（`turn_finalizer`，对齐 `finishStream`，错误/中止/拦截轮丢弃名额），并引入 `notes/.organize-incomplete` 补做标记（对齐 `MemoryOrganizer` 的 mark/commit/retry，取代 T-29 的「无标记」实现）。§5.4 该行改写 + T-40 登记 |

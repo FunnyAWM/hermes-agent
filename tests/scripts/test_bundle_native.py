@@ -738,6 +738,12 @@ def test_bundle_tool_filter_stages_only_the_named_tools(monkeypatch):
     assert native._staging_names({"python"}) == ["python"]
 
 
+def test_sealed_subset_venv_takes_all_but_the_full_bundle_takes_every_extra():
+    """A sealed subset can never sync_venv again, so it ships [all] only (T-41)."""
+    assert native._venv_sync_extras(None) == {"all_extras": True, "extras": ()}
+    assert native._venv_sync_extras({"python"}) == {"all_extras": False, "extras": ("all",)}
+
+
 def test_bundle_tool_filter_rejects_names_outside_the_lock(monkeypatch):
     monkeypatch.setenv("HERMES_BUNDLE_TOOLS", "python,not-a-tool")
     with pytest.raises(ValueError, match="not-a-tool"):

@@ -48,6 +48,20 @@ def _bundle_tool_filter() -> set[str] | None:
     return only
 
 
+def _venv_sync_extras(only: set[str] | None) -> dict:
+    """Extras for the payload venv: ``--all-extras`` for the full bundle, the
+    ``[all]`` policy set for a sealed subset.
+
+    A sealed subset refuses in-place ``sync_venv`` (pm/cli.py), so every extra it
+    ships is permanent: ``--all-extras`` pulled all 49 opt-in integrations
+    (lark_oapi 113 MB, playwright 109 MB, googleapiclient 109 MB, dingtalk 93 MB,
+    ctranslate2/onnxruntime/piper voice stack …) into a 1.4 GB venv, which
+    tripled installer extraction time (T-41). ``[all]`` is the documented
+    "every session can use it" ceiling; the rest resolve at first use on
+    installs that can grow in place."""
+    return {"all_extras": True, "extras": ()} if only is None else {"all_extras": False, "extras": ("all",)}
+
+
 def _staging_names(only: set[str] | None) -> list[str]:
     from pm.package import InstallError
 
@@ -285,9 +299,10 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
 
     # Cold native wheels need a larger budget than interactive installs.
     build_environment(source=repo_dir, python=python_bin, out=venv_dir,
-                      env=env, cache=cache, all_extras=True, sealed=True, explicit=True,
-                      timeout=2 * 60 * 60)
-    print("✓ venv (all extras, on the staged interpreter)")
+                      env=env, cache=cache,
+                      **_venv_sync_extras(only),
+                      sealed=True, explicit=True, timeout=2 * 60 * 60)
+    print(f"✓ venv ({'all extras' if only is None else '[all] extras'}, on the staged interpreter)")
 
     # Inventory the staged interpreter before publishing the bundle contract.
     from pm.features import installed_extras, write_features
