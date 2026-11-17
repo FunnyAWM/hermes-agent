@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.27（草稿，待评审） |
+| 文档版本 | v0.28（草稿，待评审） |
 | 日期 | 2026-11-17 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -177,6 +177,7 @@
 | `scripts/bundles/native.py` | 快照锁比对前统一换行：`core.autocrlf` 会把工作树 `pm/lock.json` 写成 CRLF，而 git 快照是 LF，逐字节比较会让干净的 Windows 检出被判为「锁与修订不符」而无法打包 | §5.5、T-15、T-16 | 低：只放宽换行差异，锁内容不等仍然拒绝 |
 | `scripts/bundles/native.py`、`scripts/bundles/native_prepared.py` | `HERMES_BUNDLE_TOOLS` 工具子集过滤（未知包名与目标不可用包一律构建失败）+ 密封子集跳过 uv-cache：完整密封链复用 `bundled` 变体，仅把 payload 收窄到解释器 + venv + 源码；prepared 清单按实际落盘收录 uv-cache（密封子集缺席受运行时支持，`uv_cache_dir` 视为「无种可播」） | §5.5、T-38 | 低：默认（未设环境变量）行为不变，全量 16 包照旧 |
 | `pm/cli.py` | 密封安装（`pm.install.sealed()`）拒绝 `pm repair / gc / update / lock` 的原地写（改 uv.lock / pm/lock.json / venv / generation 回收），提示换包升级；`pm install <工具名>` / `--tools-only` 放行——它写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径；裸 `install` 与 `--extra` / `--test-environment` 会同步密封 venv，仍拒绝；读命令与环境侧车不受限 | §5.5、T-38 | 低：新增一个分发前守卫；上游密封语义（post_update 已按 sealed 跳过原地修复）一致 |
+| `pm/artifact_mirror.py` | 新增 `HERMES_PM_DOWNLOAD_MIRROR` 下载镜像前缀（ghproxy 式 `<prefix><original URL>`）：拉取受管工具时镜像优先、原站与公共归档兜底，sha256 全程校验；http 前缀沿用 LAN npm registry 信任模型（钉死哈希 + 限长） | 用户指令 2026-11-17（镜像站） | 低：未设环境变量时 `pinned_source` 行为不变（前缀分支提前返回） |
 | `agent/prompt_builder.py`、`agent/system_prompt.py` | 任务分派路由提示：记录/跟踪任务 → `todo_list`，指定时间/周期/提醒 → `cronjob_manage`；仅在两个工具都启用时注入，不改动既有 guidance 顺序 | §5.5、桌面单机器人与任务分派、T-21 | 低：新增一个常量与一个工具门控分支；上游改动 guidance 清单时按行 rebase |
 | `apps/desktop/electron/minimize-to-tray.ts`、`gateway-quit.ts`、`quit-guard.ts`、`main.ts` | 托盘默认驻留；真正退出时停本机 gateway，退出提示把本机工作视为会丢失；远程/Cloud 保持继续运行 | §5.5、托盘驻留与网关生命周期、T-23 | 中：与上游“gateway 脱离桌面端存活”相反；同步上游时保留本 fork 版本并重跑生命周期用例 |
 | `sync/**`（新增包）、`hermes_cli/subcommands/sync.py`、`hermes_cli/sync_cmd.py`、`hermes_cli/config_defaults_kourichat.py`、`hermes_cli/web_routers/kourichat_link.py`、`hermes_cli/main.py`、`hermes_cli/web_server.py`、`tui_gateway/{contracts/sync.py,methods_sync.py,server.py}`、`sync/discovery.py` | KouriChat Link 设备链的 PC 侧：24 词 BIP39 派生全部密钥；TLS 主设备服务端（27890）+ 从设备按需/定时拉取；AES-256-GCM 信封，AAD = `recordId\|hlc\|deviceId`；混合逻辑时钟定序、覆盖前归档到 `.versions/`；白名单只覆盖 `SOUL.md` / `memories/{MEMORY,USER}.md` / `notes/**.md` / `skills/**.md` / `sessions/<id>/`；配对无地址时用 mDNS（可选 `zeroconf`）发现候选并逐个握手，能过鉴权的才是同链 | 同 01–05、同 08、§6.4、T-27 | 中：新增独立包 + 一个 CLI 子命令 + 一个 REST 路由 + 一组 RPC 方法，内核现有路径只加挂载点；上游动 `web_server` 路由注册或 CLI 子命令表时按行 rebase。协议以 Android 为事实来源，两端只能同时改 |
@@ -747,3 +748,4 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.25 | 2026-11-16 | 文档回写：§5.4 版本方案改为独立版本线 `0.3.25-lungo` / `0.3.25+lungo`（2026-11-16 用户指令，停用「上游版本-fork.<N>」；上游基座仍为 v0.23.2，见 T-36）；§11 R4 改为 v0.23 已定口径（软上限 128 + 可选硬上限，软上限不截断）；§5.4 Auto Review 行的需求编号补为「用户指令 2026-11-12 / T-30、T-31」；T-37 登记完成并附证据 |
 | v0.26 | 2026-11-16 | **新增轻量密封完整版（用户指令 2026-11-16 / T-38）**：§5.4 新增裁决条目，部分推翻 2026-11-06「只发 headless」（当时重量理由针对 3.7 GB 全量密封；轻量密封约 450 MB 装后 / 200 MB 安装包）。复用 `bundled` 变体链 + `HERMES_BUNDLE_TOOLS=python` 子集过滤，Electron 零改动；`pm` 写子命令在密封布局下拒绝执行（只读，升级换包）。§5.4 登记两条补丁；构建入口 `scripts/build-full.ps1`，产物 `apps/desktop/release-full/`；使用说明见 `INSTALL.md` 完整版章节 |
 | v0.27 | 2026-11-17 | **版本统一 + 密封安装放行 `pm install`（用户指令 2026-11-17）**：§5.4 版本方案改为安装包与软件本体同一字符串 `0.3.25+kaltsit`（SemVer build metadata 与 PEP 440 本地版本的交集形态；`-lungo` 的 pre-release 排序边界随之消失，`STABLE_TAG_RE` 边界保留）；T-38 密封守卫收窄为 `repair / gc / update / lock` + install 的 venv 同步形态（裸 install / `--extra` / `--test-environment`）——命名工具 `pm install` 写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径（懒安装路径同达，不经 CLI 守卫） |
+| v0.28 | 2026-11-17 | **pm 下载镜像 knob（用户指令 2026-11-17）**：npm/PyPI 已有镜像 knob，GitHub 等受管工具下载源（lock 里 104 个 URL）没有——新增 `HERMES_PM_DOWNLOAD_MIRROR` 前缀重写（`pm/artifact_mirror.py::pinned_source`），镜像优先、原站与 hermes-assets 兜底，sha256 全程校验；未设时行为不变。§5.4 登记一条补丁 |

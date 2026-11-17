@@ -719,7 +719,16 @@ names, else `$HERMES_HOME/npmrc` when it exists, else `~/.npmrc`. That registry 
 Nexus). The bytes must match the lock's SHA256 before PM uses them, a plain-http
 download over 256 MiB is abandoned, and a plain-http redirect must stay on the
 registry's host. When the registry is unreachable, lacks the file, sends too much
-or redirects elsewhere, PM falls back to its own pinned HTTPS archive. Every other
+or redirects elsewhere, PM falls back to its own pinned HTTPS archive.
+
+Every other pinned download names its upstream host in `pm/lock.json` (mostly GitHub
+releases). When those hosts are unreachable from your network, set
+`HERMES_PM_DOWNLOAD_MIRROR` to a prefix mirror (ghproxy-style: the mirror serves
+`<prefix><original URL>`). PM tries the mirror first, then the original URL, then its
+own pinned HTTPS archive; the lock's SHA256 decides whether the bytes are usable, so
+the mirror cannot substitute different content. A plain-`http://` prefix follows the
+same rules as a LAN npm registry (SHA256-pinned, size-capped). Python package mirrors
+are separate: `index-url` in `pip.conf` or `UV_INDEX_URL` (see above). Every other
 download stays HTTPS-only.
 
 ## Diagnostics
