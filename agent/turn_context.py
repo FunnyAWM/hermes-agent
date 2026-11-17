@@ -861,7 +861,7 @@ def _tick_notes_lifecycle(agent: Any) -> None:
 
 
 def _tick_notes_organizer(agent: Any) -> None:
-    """Optional periodic notes housekeeping (memory.organize_turns, default off)."""
+    """Spawn the notes organizer when due; called after a delivered answer (记 06)."""
     with suppress(Exception):
         from agent.notes_organizer import maybe_spawn
 
@@ -1338,7 +1338,9 @@ def build_turn_context(
 
     agent._user_turn_count += 1
     _tick_notes_lifecycle(agent)
-    _tick_notes_organizer(agent)
+    # The notes organizer is NOT ticked here: 记 06 counts a send-time slot but runs the
+    # pass only after the answer is delivered (turn_finalizer, matching Android
+    # finishStream). A failed, interrupted or vetoed turn drops the slot.
     # Turn-initiator state for per-request provider headers: the first API call of this
     # user turn is user-initiated; tool-loop follow-ups are agent-initiated.
     agent._is_user_initiated_turn = True

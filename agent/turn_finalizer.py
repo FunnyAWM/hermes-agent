@@ -892,6 +892,13 @@ def finalize_turn(
         interrupted=interrupted, messages=messages, review_memory=_should_review_memory,
         review_skills=_should_review_skills, vetoed=vetoed,
     )
+    # 记 06 (Android finishStream): the organizer's slot was counted at send time; run the
+    # pass only after a delivered answer. A failed, interrupted or vetoed turn drops the
+    # slot (the next due turn re-evaluates; a failed pass leaves the recovery marker).
+    if final_response and not interrupted and not vetoed:
+        from agent.turn_context import _tick_notes_organizer
+
+        _tick_notes_organizer(agent)
 
     # Opt-in (compression.prepare_ahead): near the trigger, write the next compaction summary
     # between turns. No-op otherwise; never raises. Not after a vetoed turn (no model calls).

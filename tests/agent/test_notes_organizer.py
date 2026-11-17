@@ -1,4 +1,4 @@
-"""Notes organizer (Android 整理轮次): default off, turn-gated, notes-only write scope."""
+"""Notes organizer (Android 记 06): runs after a delivered answer, marker-recovered, notes-only."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -100,3 +100,66 @@ def test_notes_write_scope_allows_only_category_markdown(tmp_path, monkeypatch):
         for path in forbidden:
             assert _check_notes_write_scope(str(path)) is not None, path
     assert _check_notes_write_scope(str(forbidden[0])) is None
+
+
+def test_incomplete_marker_recovers_on_any_turn(tmp_path, monkeypatch, settings):
+    """Android 记 06: a failed pass is retried on any later turn, not just the next multiple."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    settings(organize_turns=5)
+    due = _agent(turns=6)
+    assert notes_organizer.should_organize(due) is False  # between intervals
+    marker = tmp_path / "notes" / ".organize-incomplete"
+    marker.write_text("incomplete", encoding="utf-8")
+    assert notes_organizer.should_organize(due) is True
+    assert notes_organizer.should_organize(_agent(turns=7)) is True
+    settings(organize_turns=0)
+    assert notes_organizer.should_organize(_agent(turns=7)) is False  # recovery needs the interval
+    settings(organize_turns=5)
+    due._notes_organizer_in_flight = True
+    assert notes_organizer.should_organize(due) is False  # a pass in flight owns the marker
+
+
+def test_organizer_marks_before_a_pass_and_clears_it_only_on_success(tmp_path, monkeypatch, settings):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    settings(organize_turns=5)
+    marker = tmp_path / "notes" / ".organize-incomplete"
+    marked_during_pass: list[bool] = []
+
+    class _Fork:
+        _session_messages: list = []
+
+        def run_conversation(self, *, user_message, conversation_history):
+            marked_during_pass.append(marker.is_file())
+            return {"final_response": "no changes"}
+
+    monkeypatch.setattr(
+        "agent.background_review.build_cache_parity_fork",
+        lambda agent, **kwargs: (_Fork(), None, None))
+    monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
+    agent = _agent(turns=5)
+    notes_organizer._run_notes_organizer(agent)
+    assert marked_during_pass == [True]  # marked before the pass ran
+    assert not marker.exists()  # a completed pass clears it
+    assert agent._notes_organizer_in_flight is False
+
+
+def test_failed_pass_keeps_the_marker_for_the_next_turn(tmp_path, monkeypatch, settings):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    settings(organize_turns=5)
+    marker = tmp_path / "notes" / ".organize-incomplete"
+
+    class _Fork:
+        def run_conversation(self, *, user_message, conversation_history):
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(
+        "agent.background_review.build_cache_parity_fork",
+        lambda agent, **kwargs: (_Fork(), None, None))
+    monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
+    agent = _agent(turns=5)
+    notes_organizer._run_notes_organizer(agent)  # must not raise out of the thread body
+    assert marker.is_file()
+    assert agent._notes_organizer_in_flight is False

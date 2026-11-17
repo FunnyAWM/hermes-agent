@@ -1,8 +1,15 @@
-"""Optional periodic notes organizer — Android 记 05 整理轮次, notes-only scope.
+"""Optional periodic notes organizer — Android 记 06 整理轮次, notes-only scope.
 
-Default off (``memory.organize_turns: 0``). When enabled it fires once every N user turns in a
-daemon thread, using the same cache-parity fork as background review: the parent's prompt and
-``tools[]`` stay untouched, so prompt caching is unaffected.
+Default off (``memory.organize_turns: 0``). When enabled it fires once every N user turns,
+after the turn's answer is delivered (the finalizer ticks it, matching Android's
+finishStream), in a daemon thread using the same cache-parity fork as background review:
+the parent's prompt and ``tools[]`` stay untouched, so prompt caching is unaffected.
+
+A pass writes ``notes/.organize-incomplete`` before it runs and clears it only on success,
+so a failed or killed pass is retried on any later turn (next turn or next launch), not
+just on the next multiple of the interval — Android 记 06 的下一轮补做. Recovery still
+requires the interval to stay configured. The marker is a dotfile without a ``.md``
+suffix, so no notes scan (index, lifecycle, stale documents) ever picks it up.
 
 Scope is deliberately narrower than background review: this pass only maintains
 ``notes/<category>/*.md`` (descriptions, duplicates, expiry), never ``MEMORY.md`` / ``USER.md`` /
@@ -13,6 +20,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Optional
 
@@ -41,6 +49,19 @@ Rules:
 Finish with one short plain-text line naming what changed, or "no changes"."""
 
 
+def _marker_path(agent: Any) -> Path:
+    from hermes_constants import get_hermes_home
+
+    return Path(str(get_hermes_home())) / "notes" / ".organize-incomplete"
+
+
+def _incomplete(agent: Any) -> bool:
+    try:
+        return _marker_path(agent).is_file()
+    except (OSError, ValueError):
+        return False
+
+
 def should_organize(agent: Any) -> bool:
     from hermes_notes.settings import load_notes_settings
 
@@ -48,10 +69,17 @@ def should_organize(agent: Any) -> bool:
     if every <= 0:
         return False
     turns = int(getattr(agent, "_user_turn_count", 0) or 0)
-    if turns <= 0 or turns % every:
+    if turns <= 0:
         return False
     # One auxiliary fork at a time: a review already in flight owns this turn's budget.
     if getattr(agent, "_background_review_agent", None) is not None:
+        return False
+    # A pass in flight owns the marker too; the next turn re-checks.
+    if getattr(agent, "_notes_organizer_in_flight", False):
+        return False
+    # 记 06: due on the interval, or on any turn once a failed pass left the marker
+    # (失败下一轮补做) — recovery still requires the interval to stay configured.
+    if turns % every and not _incomplete(agent):
         return False
     try:
         from hermes_constants import get_hermes_home
@@ -105,6 +133,10 @@ def _run_notes_organizer(agent: Any) -> None:
                 "write_file and patch on notes/<category>/*.md only. Do not retry {tool_name}."),
         )
         try:
+            # 记 06: mark before the pass so a crash or kill leaves the recovery marker;
+            # only a completed pass clears it.
+            with suppress(OSError):
+                _marker_path(agent).write_text("incomplete", encoding="utf-8")
             with bind_notes_write_scope():
                 fork.run_conversation(
                     user_message=f"{ORGANIZER_PROMPT}\n\n{_notes_context(agent)}",
@@ -121,10 +153,14 @@ def _run_notes_organizer(agent: Any) -> None:
                 safe_print(f"🗂 笔记整理：{summary}")
         else:
             logger.info("notes organizer made no changes")
+        with suppress(OSError):
+            _marker_path(agent).unlink(missing_ok=True)
     except Exception:
         # Thread boundary: a failing housekeeping pass must never take the process down.
+        # The marker stays; the next turn recovers.
         logger.exception("notes organizer failed")
     finally:
+        agent._notes_organizer_in_flight = False
         if fork is not None:
             _release(fork)
 
@@ -139,15 +175,21 @@ def _release(fork: Any) -> None:
 
 
 def maybe_spawn(agent: Any) -> bool:
-    """Start one organizer thread when the turn counter says it is due."""
+    """Start one organizer thread when the turn counter or the recovery marker says it is due."""
     if not should_organize(agent):
         return False
     from agent.memory_provider import spawn_context_thread
 
+    # Set before the thread starts so the next tick cannot double-spawn.
+    agent._notes_organizer_in_flight = True
     # spawn_context_thread keeps the caller's profile scope (a raw Thread does not).
     thread = spawn_context_thread(
         _run_notes_organizer, name="hermes-notes-organizer", args=(agent,))
-    thread.start()
+    try:
+        thread.start()
+    except BaseException:
+        agent._notes_organizer_in_flight = False  # a stuck flag would silence the organizer
+        raise
     return True
 
 
