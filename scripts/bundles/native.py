@@ -69,6 +69,19 @@ def _venv_sync_extras(only: set[str] | None) -> dict:
     return {"all_extras": False, "extras": _SEALED_EXTRAS}
 
 
+def _drop_bytecode(root: Path) -> int:
+    """Remove every ``__pycache__`` under *root*; returns how many were removed.
+
+    The interpreter and the venv arrive pre-compiled (the managed Python ships its stdlib
+    pyc, uv is asked for ``--compile-bytecode`` on the full bundle), so the sealed subset
+    has to strip them explicitly."""
+    dropped = 0
+    for cache in Path(root).rglob("__pycache__"):
+        shutil.rmtree(cache, ignore_errors=True)
+        dropped += 1
+    return dropped
+
+
 def _staging_names(only: set[str] | None) -> list[str]:
     from pm.package import InstallError
 
@@ -307,6 +320,7 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     # Cold native wheels need a larger budget than interactive installs.
     build_environment(source=repo_dir, python=python_bin, out=venv_dir,
                       env=env, cache=cache,
+                      compile_bytecode=only is None,
                       **_venv_sync_extras(only),
                       sealed=True, explicit=True, timeout=2 * 60 * 60)
     print(f"✓ venv ({'all extras' if only is None else '[all] extras'}, on the staged interpreter)")
@@ -366,9 +380,17 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
         Path(os.path.relpath(repo_dir, site)).as_posix() + "\n", encoding="utf-8")
     from scripts.bundles.payload import relativize_links
     relativize_links(out)
-    from scripts.bundles.bytecode import bake_bytecode
-    baked = bake_bytecode(out, python_bin)
-    print(f"✓ baked bytecode ({baked['modules']} modules, unchecked-hash, owner-writable caches)")
+    if only is None:
+        from scripts.bundles.bytecode import bake_bytecode
+        baked = bake_bytecode(out, python_bin)
+        print(f"✓ baked bytecode ({baked['modules']} modules, unchecked-hash, owner-writable caches)")
+    else:
+        # Sealed subset: ~8.7k pyc files are 32% of the payload's file count and a
+        # quarter of the installer's extraction work (T-44). With no baked marker the
+        # launcher redirects bytecode writes to %LOCALAPPDATA%\hermes\pycache on the
+        # user machine, so the cost is one cold compile on first launch instead.
+        dropped = _drop_bytecode(out)
+        print(f"✓ bytecode dropped from payload ({dropped} caches; first launch compiles into the user cache)")
     inputs = AgentInputs(
         project=repo_dir / "pyproject.toml", code=repo_dir, repo="hermes-agent",
         placement="contained", target=current_target(), python=python_bin,

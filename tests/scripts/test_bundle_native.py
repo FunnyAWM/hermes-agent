@@ -748,6 +748,18 @@ def test_sealed_subset_venv_takes_all_but_the_full_bundle_takes_every_extra():
         "acp", "cron", "mcp", "pty", "sms", "uvloop", "web", "youtube"}
 
 
+def test_drop_bytecode_strips_every_cache_under_the_payload(tmp_path):
+    """The sealed subset ships no pyc (T-44): stale caches from the interpreter and venv go."""
+    for rel in ("tools/python/Lib/json", "venv/Lib/site-packages/httpx", "hermes-agent/agent"):
+        cache = tmp_path / rel / "__pycache__"
+        cache.mkdir(parents=True)
+        (cache / "mod.cpython-314.pyc").write_bytes(b"pyc")
+    (tmp_path / "hermes-agent" / "agent" / "turn.py").write_text("x = 1\n", encoding="utf-8")
+    assert native._drop_bytecode(tmp_path) == 3
+    assert not list(tmp_path.rglob("__pycache__"))
+    assert (tmp_path / "hermes-agent" / "agent" / "turn.py").is_file()
+
+
 def test_bundle_tool_filter_rejects_names_outside_the_lock(monkeypatch):
     monkeypatch.setenv("HERMES_BUNDLE_TOOLS", "python,not-a-tool")
     with pytest.raises(ValueError, match="not-a-tool"):

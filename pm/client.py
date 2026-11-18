@@ -293,7 +293,7 @@ def build_environment(
     extras: Sequence[str] = (), groups: Sequence[str] = (),
     all_extras: bool = False, no_install_project: bool = False,
     frozen: bool = True, sealed: bool = False, offline: bool = False,
-    explicit: bool = False, timeout: int = 1800,
+    explicit: bool = False, timeout: int = 1800, compile_bytecode: bool = True,
 ) -> Path:
     """Build a validated Python environment without exposing install machinery."""
     return Path(_python_operation("build_environment", {
@@ -301,7 +301,7 @@ def build_environment(
         "env": dict(env) if env is not None else None, "extras": list(extras), "groups": list(groups),
         "all_extras": all_extras, "no_install_project": no_install_project,
         "frozen": frozen, "sealed": sealed, "offline": offline,
-        "explicit": explicit, "timeout": timeout,
+        "explicit": explicit, "timeout": timeout, "compile_bytecode": compile_bytecode,
     }))
 
 
