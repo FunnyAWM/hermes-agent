@@ -48,9 +48,14 @@ def _bundle_tool_filter() -> set[str] | None:
     return only
 
 
+# ``[all]`` minus ``google``: google-api-python-client is 109 MB of per-API
+# discovery modules and exists only for the google-workspace skill (T-43).
+_SEALED_EXTRAS = ("acp", "cron", "mcp", "pty", "sms", "uvloop", "web", "youtube")
+
+
 def _venv_sync_extras(only: set[str] | None) -> dict:
     """Extras for the payload venv: ``--all-extras`` for the full bundle, the
-    ``[all]`` policy set for a sealed subset.
+    sealed subset's explicit list otherwise.
 
     A sealed subset refuses in-place ``sync_venv`` (pm/cli.py), so every extra it
     ships is permanent: ``--all-extras`` pulled all 49 opt-in integrations
@@ -59,7 +64,9 @@ def _venv_sync_extras(only: set[str] | None) -> dict:
     tripled installer extraction time (T-41). ``[all]`` is the documented
     "every session can use it" ceiling; the rest resolve at first use on
     installs that can grow in place."""
-    return {"all_extras": True, "extras": ()} if only is None else {"all_extras": False, "extras": ("all",)}
+    if only is None:
+        return {"all_extras": True, "extras": ()}
+    return {"all_extras": False, "extras": _SEALED_EXTRAS}
 
 
 def _staging_names(only: set[str] | None) -> list[str]:

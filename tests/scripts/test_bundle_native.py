@@ -739,9 +739,13 @@ def test_bundle_tool_filter_stages_only_the_named_tools(monkeypatch):
 
 
 def test_sealed_subset_venv_takes_all_but_the_full_bundle_takes_every_extra():
-    """A sealed subset can never sync_venv again, so it ships [all] only (T-41)."""
+    """A sealed subset can never sync_venv again, so it ships a fixed set (T-41/T-43)."""
     assert native._venv_sync_extras(None) == {"all_extras": True, "extras": ()}
-    assert native._venv_sync_extras({"python"}) == {"all_extras": False, "extras": ("all",)}
+    sealed = native._venv_sync_extras({"python"})
+    assert sealed["all_extras"] is False
+    assert "google" not in sealed["extras"]
+    assert set(sealed["extras"]) <= {
+        "acp", "cron", "mcp", "pty", "sms", "uvloop", "web", "youtube"}
 
 
 def test_bundle_tool_filter_rejects_names_outside_the_lock(monkeypatch):
