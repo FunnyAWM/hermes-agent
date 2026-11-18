@@ -1757,7 +1757,7 @@ TERMINAL_SCHEMA = {
             "sandbox": {
                 "type": "string",
                 "enum": ["read-only", "workspace-write", "workspace-exec", "full-access"],
-                "description": "Local command sandbox: run THIS command at another level. Ask for a wider level when the active profile blocks the command — the user must approve it, and the configured profile applies again to the next call. 'full-access' runs this one command outside the sandbox."
+                "description": "Local command sandbox: the level for THIS command. Use the active level, or a WIDER one when the active profile blocks what you need — the user must approve a wider level, and the configured profile applies again to the next call. Do NOT pass a level tighter than the active one: narrowing a sandbox never fixes a command that was blocked for needing more access. 'full-access' runs this one command outside the sandbox."
             }
             # Legacy aliases (unadvertised, still accepted): notify_on_complete
             # (bool) and watch_patterns (list). notify=true|[...] maps onto

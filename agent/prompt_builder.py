@@ -838,7 +838,8 @@ _WINDOWS_SANDBOX_SHELL_HINT = (
     "refused while the sandbox is enabled — keep scripting in `terminal` and edits in the file tools. "
     "If the active profile blocks a command you need, pass `sandbox='workspace-exec'` (or `'full-access'`) "
     "on that one `terminal` call to request a wider level: the user is asked to approve it, and the "
-    "configured profile applies again to the next command."
+    "configured profile applies again to the next command. Never pass a tighter level to work around a "
+    "block — narrowing the sandbox only removes access, it never grants what the command needed."
 )
 
 
