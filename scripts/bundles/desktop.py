@@ -116,7 +116,14 @@ def _build_prepared(prepared, builder_args: list[str], variant: str | None) -> N
             cwd=repo, env=env)
         if prepared.payload is None:
             raise ValueError("payload dependencies were not prepared")
-        frontends = {name: products / name for name in ("tui", "web", "webapp")}
+        names = ("tui", "web", "webapp")
+        if env.get("HERMES_BUNDLE_TOOLS", "").strip():
+            # A sealed subset drops the browser-host bundle: `apps/desktop/dist-webapp`
+            # is 1,086 static files (985 js chunks) for `hermes webapp` / the browser
+            # dashboard, which this app never opens (T-46). `web_dist` stays — that is
+            # what `hermes serve` serves.
+            names = ("tui", "web")
+        frontends = {name: products / name for name in names}
         if finish_native(prepared.payload, frontends):
             raise RuntimeError("prepared payload assembly failed")
     from scripts.bundles.desktop_prepare import require_source

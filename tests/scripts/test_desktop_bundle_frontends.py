@@ -29,7 +29,8 @@ def _compile(argv: list[str], **_kwargs) -> None:
 
 
 @pytest.mark.parametrize("variant", ["bundled", "store"])
-def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, variant):
+@pytest.mark.parametrize("sealed", [False, True], ids=["full", "sealed-subset"])
+def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, variant, sealed):
     from scripts.build.agent import plant_surfaces
     from scripts.bundles import desktop_inputs, desktop_prepare, native
 
@@ -51,12 +52,18 @@ def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, 
     monkeypatch.setattr(desktop_prepare, "require_source", lambda *_a: None)
     monkeypatch.setattr(desktop_inputs, "validate_builder_identity", lambda *_a: None)
     monkeypatch.setattr(desktop_inputs, "select_variant", lambda _prepared, chosen: chosen)
-    monkeypatch.setattr(desktop_inputs, "build_environment", lambda *_a: {})
+    monkeypatch.setattr(desktop_inputs, "build_environment",
+                        lambda *_a: {"HERMES_BUNDLE_TOOLS": "python"} if sealed else {})
     monkeypatch.setattr(desktop_inputs, "packaging_environment", lambda *_a: {})
 
     desktop._build_prepared(prepared, [], variant)
 
-    assert (payload / "apps/desktop/dist-webapp/index.html").read_text(encoding="utf-8") == "webapp.mjs"
+    if sealed:
+        # T-46: a sealed subset ships no browser-host bundle (1,086 static files);
+        # `hermes webapp` rebuilds one in a home that enables it.
+        assert not (payload / "apps/desktop/dist-webapp").exists()
+    else:
+        assert (payload / "apps/desktop/dist-webapp/index.html").read_text(encoding="utf-8") == "webapp.mjs"
     assert (payload / "hermes_cli/web_dist/index.html").read_text(encoding="utf-8") == "web.mjs"
     assert (payload / "hermes_cli/tui_dist/entry.js").read_text(encoding="utf-8") == "tui.mjs"
 
