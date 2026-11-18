@@ -141,7 +141,10 @@ module.exports = {
     }
   ],
   asar: {
-    unpack: ['**/*.node', '**/prebuilds/**', 'dist/**']
+    // Only native binaries need real files on disk (`dist/native/*.exe` is spawned; `*.node` and
+    // prebuilds are dlopen'd). Unpacking `dist/**` put 1,126 renderer files (fonts, images, CSS)
+    // on disk for one 9.7 KB helper and made every install extract them one by one.
+    unpack: ['**/*.node', '**/prebuilds/**', 'dist/native/**']
   },
   mac: {
     // macOS 26 masks every icon into its own squircle: the layered Icon
@@ -284,7 +287,7 @@ module.exports = {
   linux: {
     category: 'Development',
     maintainer: 'FunnyAWM <funnyawm@qq.com>',
-    synopsis: 'Rosmontis',
+    synopsis: 'Kal\'tsit',
     target: ['AppImage']
   }
 }
