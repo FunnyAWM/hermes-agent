@@ -25,12 +25,6 @@ module.exports = {
   // upstream releases as "updates" and silently replace this fork.
   publish: null,
 
-  // Install time is dominated by decoding the ~700 MB payload (plus ~29k file
-  // creations). Storing it uncompressed trades download size for a straight
-  // sequential write: the fork ships through its own distribution channel, not a
-  // CDN where bytes are cheaper than user time.
-  compression: 'store',
-
   // The command-sandbox launcher ships with the app: a confined local command runs
   // through it, and `resolve_binary` falls back to this copy when `sandctl` is not on
   // PATH. `from` is relative to apps/desktop, where this config lives.
