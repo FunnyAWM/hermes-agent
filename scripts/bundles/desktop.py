@@ -112,8 +112,6 @@ def _build_prepared(prepared, builder_args: list[str], variant: str | None) -> N
         run([node, "scripts/build/tui.mjs", "--source", str(repo), "--out", str(products / "tui")], cwd=repo, env=env)
         run([node, "scripts/build/web.mjs", "--source", str(repo), "--icons", str(products / "icons"),
              "--out", str(products / "web")], cwd=repo, env=env)
-        run([node, "scripts/build/webapp.mjs", "--source", str(repo), "--out", str(products / "webapp")],
-            cwd=repo, env=env)
         if prepared.payload is None:
             raise ValueError("payload dependencies were not prepared")
         names = ("tui", "web", "webapp")
@@ -121,8 +119,11 @@ def _build_prepared(prepared, builder_args: list[str], variant: str | None) -> N
             # A sealed subset drops the browser-host bundle: `apps/desktop/dist-webapp`
             # is 1,086 static files (985 js chunks) for `hermes webapp` / the browser
             # dashboard, which this app never opens (T-46). `web_dist` stays — that is
-            # what `hermes serve` serves.
+            # what `hermes serve` serves. Skipping the build too saves one vite pass (T-48).
             names = ("tui", "web")
+        else:
+            run([node, "scripts/build/webapp.mjs", "--source", str(repo), "--out", str(products / "webapp")],
+                cwd=repo, env=env)
         frontends = {name: products / name for name in names}
         if finish_native(prepared.payload, frontends):
             raise RuntimeError("prepared payload assembly failed")
