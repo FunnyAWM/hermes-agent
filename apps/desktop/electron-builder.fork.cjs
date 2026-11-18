@@ -56,7 +56,12 @@ module.exports = {
     oneClick: false,
     allowToChangeInstallationDirectory: true,
     allowElevation: false,
-    perMachine: false
+    perMachine: false,
+    // LZMA archives are extracted into $PLUGINSDIR\7z-out and then CopyFiles'd into the
+    // install dir — a silent second pass over every file that leaves the progress bar
+    // parked (T-47). zip extracts straight into $INSTDIR: one write, visible progress.
+    // The archive is larger; install time is what this build optimises for.
+    useZip: true
   },
 
   portable: {

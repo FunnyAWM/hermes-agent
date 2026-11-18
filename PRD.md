@@ -2,7 +2,7 @@
 
 | 项目 | 内容 |
 |---|---|
-| 文档版本 | v0.34（草稿，待评审） |
+| 文档版本 | v0.35（草稿，待评审） |
 | 日期 | 2026-11-17 |
 | 事实依据 | 《技术白皮书 · 隐私与反锁定》Ver 1.2（2026-10-27）、[《选定方案与实施路线》仓库对齐版 v1.6](./IMPLEMENTATION_ROADMAP.md) |
 | 状态 | 待评审。评审通过后升 v1.0，此后任何范围变更需在文末「变更记录」留痕 |
@@ -749,6 +749,7 @@ headless 后端只出现回环 TCP，`evidence/t11.md`、`evidence/t11-desktop.j
 | v0.26 | 2026-11-16 | **新增轻量密封完整版（用户指令 2026-11-16 / T-38）**：§5.4 新增裁决条目，部分推翻 2026-11-06「只发 headless」（当时重量理由针对 3.7 GB 全量密封；轻量密封约 450 MB 装后 / 200 MB 安装包）。复用 `bundled` 变体链 + `HERMES_BUNDLE_TOOLS=python` 子集过滤，Electron 零改动；`pm` 写子命令在密封布局下拒绝执行（只读，升级换包）。§5.4 登记两条补丁；构建入口 `scripts/build-full.ps1`，产物 `apps/desktop/release-full/`；使用说明见 `INSTALL.md` 完整版章节 |
 | v0.27 | 2026-11-17 | **版本统一 + 密封安装放行 `pm install`（用户指令 2026-11-17）**：§5.4 版本方案改为安装包与软件本体同一字符串 `0.3.25+kaltsit`（SemVer build metadata 与 PEP 440 本地版本的交集形态；`-lungo` 的 pre-release 排序边界随之消失，`STABLE_TAG_RE` 边界保留）；T-38 密封守卫收窄为 `repair / gc / update / lock` + install 的 venv 同步形态（裸 install / `--extra` / `--test-environment`）——命名工具 `pm install` 写可写 store（`%LOCALAPPDATA%\hermes\tools`），是密封安装拉取缺失工具的途径（懒安装路径同达，不经 CLI 守卫） |
 | v0.28 | 2026-11-17 | **pm 下载镜像 knob（用户指令 2026-11-17）**：npm/PyPI 已有镜像 knob，GitHub 等受管工具下载源（lock 里 104 个 URL）没有——新增 `HERMES_PM_DOWNLOAD_MIRROR` 前缀重写（`pm/artifact_mirror.py::pinned_source`），镜像优先、原站与 hermes-assets 兜底，sha256 全程校验；未设时行为不变。§5.4 登记一条补丁 |
+| v0.35 | 2026-11-18 | **安装器改用 zip 解压（用户指令 2026-11-18 / T-47）**：7z 路径把 payload 解压到临时目录再用无进度的 `CopyFiles` 复制一遍（写三遍），进度条回退后长时间不动；`nsis.useZip: true` 让 `nsisunz::Unzip` 直接解压到安装目录，去掉复制阶段。代价：zip 压缩率低于 LZMA，安装包变大 |
 | v0.34 | 2026-11-18 | **完整版不打包 dist-webapp（用户指令 2026-11-18 / T-46）**：`apps/desktop/dist-webapp`（1,086 文件 / 985 个 js chunk，`hermes webapp` 浏览器宿主产物）不进密封子集；`hermes serve` 的面板走 `hermes_cli/web_dist`（60 文件）不受影响，启用 webapp 的 home 由 `hermes webapp` 重建 |
 | v0.33 | 2026-11-18 | **密封包不带 .pyc（用户指令 2026-11-18 / T-44）**：payload 的 8,724 个 pyc（占文件数 32%）全部去掉——`build_environment(compile_bytecode=False)`、跳过 `bake_bytecode`、清理解释器 stdlib 缓存；运行时对无 `.hermes-baked-pycache` 标记的 payload 本就重定向到 `%LOCALAPPDATA%\hermes\pycache`，代价是首启一次性冷编译。文件数 27,487 → 约 18,800 |
 | v0.32 | 2026-11-18 | **打包第二轮优化（用户指令 2026-11-18 / T-43）**：`asar.unpack` 由 `dist/**` 收窄为 `dist/native/**`（1,126 个渲染产物不再逐个解压）；密封包 extras 去掉 `google`（109 MB，google-workspace 在密封包内不可用）。压缩方式保持 electron-builder 默认 `normal`。剩余约 2 万 `.py`/`.pyc` 文件受 `bake_bytecode` 断言与 Python 导入约束，已到下限 |
