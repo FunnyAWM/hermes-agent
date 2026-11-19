@@ -177,3 +177,70 @@ def test_build_api_messages_never_drops_the_current_turn() -> None:
     conversation = [row for row in wire if row.get("role") != "system"]
     assert conversation[0] == _user("turn 1")
     assert any(row.get("content") == "turn 1" for row in conversation)
+
+
+# ── token budget (Android ChatContextTrimmer.trim) ─────────────────────────────
+
+def _budget_settings(value):
+    from agent.session_window import token_budget_settings
+
+    return token_budget_settings({"context": {"window_token_budget": value}})
+
+
+def test_token_budget_setting_is_off_by_default_and_rejects_junk() -> None:
+    from agent.session_window import token_budget_settings
+
+    assert token_budget_settings({}) == 0
+    assert token_budget_settings({"context": None}) == 0
+    assert _budget_settings(0) == 0
+    assert _budget_settings(-5) == 0
+    assert _budget_settings(True) == 0
+    assert _budget_settings("nope") == 0
+    assert _budget_settings("1200") == 1200
+
+
+def test_budget_keeps_the_newest_rows_that_fit() -> None:
+    from agent.session_window import budget_start_index
+
+    rows = [{"role": "user", "content": "a"}, {"role": "user", "content": "b"},
+            {"role": "user", "content": "c"}]
+    cost = {"a": 40, "b": 40, "c": 40}
+
+    def estimate(message):
+        return cost[message["content"]]
+
+    assert budget_start_index(rows, budget=0, system_tokens=0, estimate=estimate) == 0
+    assert budget_start_index(rows, budget=200, system_tokens=0, estimate=estimate) == 0
+    assert budget_start_index(rows, budget=100, system_tokens=0, estimate=estimate) == 1
+    # The system prompt pays for itself out of the same budget.
+    assert budget_start_index(rows, budget=100, system_tokens=60, estimate=estimate) == 2
+
+
+def test_budget_never_drops_the_newest_row() -> None:
+    from agent.session_window import budget_start_index
+
+    rows = [{"role": "user", "content": "old"}, {"role": "user", "content": "huge"}]
+
+    def estimate(message):
+        return 5 if message["content"] == "old" else 10_000
+
+    # Even when the newest row alone overruns, it stays: never cut the question just asked.
+    assert budget_start_index(rows, budget=50, system_tokens=0, estimate=estimate) == 1
+
+
+def test_build_api_messages_applies_the_token_budget_to_the_wire_copy_only() -> None:
+    from agent.turn_context import build_api_messages
+
+    history = _turns(3)
+    agent = _WireAgent(0, 0)
+    agent._window_token_budget = 40
+    wire, _system = build_api_messages(
+        agent, history, current_turn_user_idx=4,
+        ext_prefetch_cache="", plugin_user_context="", moa_config=None,
+        active_system_prompt="",
+    )
+
+    conversation = [row for row in wire if row.get("role") != "system"]
+    assert conversation, "the newest rows always survive"
+    assert len(conversation) < len(history), "the budget dropped older rows from the wire copy"
+    assert history[0].get("content"), "the persisted transcript is untouched"

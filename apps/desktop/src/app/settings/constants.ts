@@ -765,7 +765,9 @@ export const SECTIONS: DesktopConfigSection[] = [
       'display.show_reasoning',
       'agent.image_input_mode',
       'context.session_window_turns',
-      'context.frozen_window_turns'
+      'context.frozen_window_turns',
+      'context.window_token_budget',
+      'memory.organize_turns'
     ]
   },
   {

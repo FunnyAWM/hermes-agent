@@ -1234,8 +1234,10 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform, memory_manager=None):
 
 def _apply_agent_section(agent, _agent_cfg):
     # Conversation windows (Android 设 08): X caps user turns per request, Y freezes the prefix.
-    from agent.session_window import window_settings
+    from agent.session_window import token_budget_settings, window_settings
     agent._session_window_turns, agent._frozen_window_turns = window_settings(_agent_cfg)
+    # Token budget (Android ChatContextTrimmer.trim): newest rows that fit. 0 = off.
+    agent._window_token_budget = token_budget_settings(_agent_cfg)
 
     # Skills config: nudge interval for skill creation reminders
     agent._skill_nudge_interval = 10

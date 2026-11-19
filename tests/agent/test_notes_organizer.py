@@ -145,6 +145,52 @@ def test_organizer_marks_before_a_pass_and_clears_it_only_on_success(tmp_path, m
     assert agent._notes_organizer_in_flight is False
 
 
+def test_organizer_writes_the_memory_block_with_a_cas_baseline(tmp_path, monkeypatch, settings):
+    """Android MemoryOrganizer: the pass rewrites MEMORY.md from its final text."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "memories").mkdir()
+    memory = tmp_path / "memories" / "MEMORY.md"
+    memory.write_text("old entry\n", encoding="utf-8")
+    settings(organize_turns=5)
+
+    class _Fork:
+        _session_messages: list = []
+
+        def run_conversation(self, *, user_message, conversation_history):
+            return {"final_response": "no changes\n---MEMORY---\n- project uses uv\n"}
+
+    monkeypatch.setattr(
+        "agent.background_review.build_cache_parity_fork",
+        lambda agent, **kwargs: (_Fork(), None, None))
+    monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
+    notes_organizer._run_notes_organizer(_agent(turns=5))
+    assert memory.read_text(encoding="utf-8").strip() == "- project uses uv"
+
+
+def test_memory_write_is_skipped_when_the_file_changed_during_the_pass(tmp_path, monkeypatch, settings):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "memories").mkdir()
+    memory = tmp_path / "memories" / "MEMORY.md"
+    memory.write_text("old entry\n", encoding="utf-8")
+    settings(organize_turns=5)
+
+    class _Fork:
+        _session_messages: list = []
+
+        def run_conversation(self, *, user_message, conversation_history):
+            memory.write_text("edited by the user mid-pass\n", encoding="utf-8")
+            return {"final_response": "---MEMORY---\nclobbered"}
+
+    monkeypatch.setattr(
+        "agent.background_review.build_cache_parity_fork",
+        lambda agent, **kwargs: (_Fork(), None, None))
+    monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
+    notes_organizer._run_notes_organizer(_agent(turns=5))
+    assert memory.read_text(encoding="utf-8").strip() == "edited by the user mid-pass"
+
+
 def test_failed_pass_keeps_the_marker_for_the_next_turn(tmp_path, monkeypatch, settings):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     (tmp_path / "notes").mkdir()

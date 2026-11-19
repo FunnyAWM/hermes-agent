@@ -259,6 +259,24 @@ _WINDOW_SCHEMA_FIELDS: dict[str, dict[str, Any]] = {
         ),
         "category": "agent",
     },
+    "context.window_token_budget": {
+        "type": "number",
+        "description": (
+            "Token budget for each model request after the turn window: the newest messages "
+            "that fit are sent, the system prompt counts against it, and the newest message is "
+            "never dropped. 0 = off. A budget that changes the cut point breaks the provider "
+            "prefix cache, so keep it off unless the model window demands it."
+        ),
+        "category": "agent",
+    },
+    "memory.organize_turns": {
+        "type": "number",
+        "description": (
+            "Run a notes/MEMORY.md housekeeping pass every N user turns, after the answer is "
+            "delivered (0 = off)."
+        ),
+        "category": "agent",
+    },
 }
 
 def _infer_type(value: Any) -> str:

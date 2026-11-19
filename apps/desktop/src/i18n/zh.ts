@@ -1159,12 +1159,14 @@ export const zhOverrides = {
         userProfileEnabled: '用户画像',
         memoryCharLimit: '记忆预算',
         userCharLimit: '画像预算',
-        provider: '记忆提供方'
+        provider: '记忆提供方',
+        organizeTurns: '整理轮次间隔'
       },
       context: {
         engine: '上下文引擎',
         sessionWindowTurns: '会话滑动窗口（轮）',
-        frozenWindowTurns: '冻结窗口（轮）'
+        frozenWindowTurns: '冻结窗口（轮）',
+        windowTokenBudget: 'token 预算（每请求）'
       },
       compression: {
         enabled: '自动压缩',
@@ -1253,7 +1255,9 @@ export const zhOverrides = {
         engine: '在接近上下文上限时管理长对话的策略。',
         sessionWindowTurns: '每次请求只发送最近 N 轮用户消息（0 = 发送全部历史）。对本配置下的所有对话生效。',
         frozenWindowTurns:
-          '会话窗口满时，把最近 M 轮冻结为固定的缓存前缀，之后只追加新轮，直到再次填满窗口（0 = 关闭；须小于会话窗口）。'
+          '会话窗口满时，把最近 M 轮冻结为固定的缓存前缀，之后只追加新轮，直到再次填满窗口（0 = 关闭；须小于会话窗口）。',
+        windowTokenBudget:
+          '每次请求的 token 上限：只发送放得下的最新消息，系统提示词也计入，最新一条永不丢弃（0 = 关闭）。注意：裁剪起点变化会打破服务商的前缀缓存。'
       },
       compression: {
         enabled: '当对话变大时对较早的上下文进行摘要。',

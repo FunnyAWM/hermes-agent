@@ -1515,6 +1515,25 @@ def build_api_messages(
         window_start = min(window_start, split)
     if window_start > 0:
         canonical_messages = canonical_messages[window_start:]
+    # Token budget (Android ChatContextTrimmer.trim; config: context.window_token_budget).
+    # Runs after the turn window and still on the wire copy only: the system prompt pays for
+    # itself, the newest rows win, and the newest row survives even when it alone overruns.
+    _budget = int(getattr(agent, "_window_token_budget", 0) or 0)
+    if _budget > 0 and canonical_messages:
+        from agent.chat_completion_helpers import estimate_request_context_tokens
+        from agent.session_window import budget_start_index
+
+        _system_text = active_system_prompt or ""
+        if getattr(agent, "ephemeral_system_prompt", None):
+            _system_text = (_system_text + "\n\n" + agent.ephemeral_system_prompt).strip()
+        _system_tokens = (estimate_request_context_tokens([{"role": "system", "content": _system_text}])
+                          if _system_text else 0)
+        budget_start = budget_start_index(
+            canonical_messages, budget=_budget, system_tokens=_system_tokens,
+            estimate=lambda message: estimate_request_context_tokens([message]),
+        )
+        if budget_start > 0:
+            canonical_messages = canonical_messages[budget_start:]
 
     api_messages = []
     for idx, msg in enumerate(canonical_messages):

@@ -32,7 +32,8 @@ const CONFIG_SUBPAGE_DEFINITIONS: Record<string, ConfigSubpageDefinition[]> = {
     {
       id: 'bot',
       labelKey: 'chatBot',
-      fields: ['context.session_window_turns', 'context.frozen_window_turns']
+      fields: ['context.session_window_turns', 'context.frozen_window_turns',
+               'context.window_token_budget', 'memory.organize_turns']
     }
   ],
   workspace: [

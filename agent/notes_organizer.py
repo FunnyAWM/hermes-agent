@@ -30,6 +30,11 @@ _MAX_ITERATIONS = 12
 _TOOL_NAMES = frozenset({"read_file", "search_files", "write_file", "patch"})
 _WRITE_TOOLS = frozenset({"write_file", "patch"})
 
+# Marks the MEMORY.md block in the organizer's final text (Android MemoryOrganizer writes the
+# summary back to MEMORY.md; here the code owns the write so it can stay CAS-guarded).
+MEMORY_SEPARATOR = "---MEMORY---"
+_DEFAULT_MEMORY_CHAR_LIMIT = 3000
+
 ORGANIZER_PROMPT = """Maintain the user's notes. This is a background housekeeping pass, not a
 conversation turn: do not greet anyone and do not try to talk to the user.
 
@@ -46,7 +51,12 @@ Rules:
   rewrite is the point.
 - When there is nothing worth changing, make no tool calls.
 
-Finish with one short plain-text line naming what changed, or "no changes"."""
+Finish with one short plain-text line naming what changed, or "no changes".
+
+Then, on its own line, print exactly """ + MEMORY_SEPARATOR + """ and after it the COMPLETE new
+contents of memories/MEMORY.md: one concise, deduplicated long-term memory keeping every fact
+still worth remembering. Do not wrap it in a code fence. Keep it under {limit} characters.
+When nothing in MEMORY.md should change, omit the separator and the block entirely."""
 
 
 def _marker_path(agent: Any) -> Path:
@@ -89,8 +99,68 @@ def should_organize(agent: Any) -> bool:
         return False
 
 
+def _memory_path(agent: Any) -> Path:
+    from hermes_constants import get_hermes_home
+
+    return Path(str(get_hermes_home())) / "memories" / "MEMORY.md"
+
+
+def _read_memory(agent: Any) -> str:
+    try:
+        return _memory_path(agent).read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _memory_char_limit() -> int:
+    try:
+        from hermes_cli.config import load_config_readonly
+
+        return int(load_config_readonly().get("memory", {}).get("memory_char_limit", _DEFAULT_MEMORY_CHAR_LIMIT))
+    except (TypeError, ValueError, OSError):
+        return _DEFAULT_MEMORY_CHAR_LIMIT
+
+
+def _split_memory_block(text: str) -> Optional[str]:
+    """The MEMORY.md body after the separator; ``None`` when the organizer sent none."""
+    if MEMORY_SEPARATOR not in (text or ""):
+        return None
+    body = text.split(MEMORY_SEPARATOR, 1)[1].strip()
+    if body.startswith("```"):
+        body = body.split("\n", 1)[1] if "\n" in body else ""
+        body = body.rsplit("```", 1)[0]
+    body = body.strip()
+    return body or None
+
+
+def _commit_memory(agent: Any, expected: str, summary: str) -> bool:
+    """CAS-write the organized MEMORY.md (Android ``commitOrganizedMemory``).
+
+    The write is skipped when the file changed while the pass ran, so a concurrent model or
+    user edit is never clobbered. Overwrites go through ``archive_before_overwrite``.
+    """
+    path = _memory_path(agent)
+    current = _read_memory(agent)
+    if current != expected:
+        logger.info("notes organizer: memories/MEMORY.md changed during the pass; keeping it")
+        return False
+    limit = _memory_char_limit()
+    if limit > 0 and len(summary) > limit:
+        summary = summary[:limit].rstrip()
+    try:
+        from hermes_notes.lifecycle import archive_before_overwrite
+
+        archive_before_overwrite(Path(str(path.parent.parent)), path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(summary + "\n", encoding="utf-8")
+    except OSError:
+        logger.exception("notes organizer: writing memories/MEMORY.md failed")
+        return False
+    return True
+
+
 def _notes_context(agent: Any) -> str:
-    """Index plus stale-document candidates, both empty-safe."""
+    """Index plus stale-document candidates and the current MEMORY.md, all empty-safe."""
     from hermes_constants import get_hermes_home
     from hermes_notes import NotesStore
     from hermes_notes.lifecycle import stale_documents
@@ -104,6 +174,8 @@ def _notes_context(agent: Any) -> str:
     if stale:
         lines.append("STALE DOCUMENTS (user is asked separately; do not delete):")
         lines.extend(f"- {item.path} (unused for {item.unused_turns} turns)" for item in stale)
+    memory = _read_memory(agent).strip()
+    lines += ["", "CURRENT memories/MEMORY.md:", memory or "(empty)"]
     return "\n".join(lines)
 
 
@@ -137,13 +209,22 @@ def _run_notes_organizer(agent: Any) -> None:
             # only a completed pass clears it.
             with suppress(OSError):
                 _marker_path(agent).write_text("incomplete", encoding="utf-8")
+            # The CAS baseline must be what the model was shown, not a later re-read.
+            memory_before = _read_memory(agent)
+            prompt = ORGANIZER_PROMPT.replace("{limit}", str(_memory_char_limit()))
             with bind_notes_write_scope():
-                fork.run_conversation(
-                    user_message=f"{ORGANIZER_PROMPT}\n\n{_notes_context(agent)}",
+                result = fork.run_conversation(
+                    user_message=f"{prompt}\n\n{_notes_context(agent)}",
                     conversation_history=[],
                 )
         finally:
             clear_thread_tool_whitelist()
+        # Android MemoryOrganizer: the pass also rewrites MEMORY.md. Code owns the write so a
+        # concurrent edit loses nothing (CAS) and the old file lands in .versions/.
+        summary = _split_memory_block(str((result or {}).get("final_response") or ""))
+        if summary is not None:
+            if _commit_memory(agent, memory_before, summary):
+                logger.info("notes organizer rewrote memories/MEMORY.md (%d chars)", len(summary))
         changes = _summarize_changes(list(getattr(fork, "_session_messages", [])))
         if changes:
             summary = " · ".join(f"{name} {count}" for name, count in sorted(changes.items()))
