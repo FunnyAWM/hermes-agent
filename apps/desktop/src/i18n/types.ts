@@ -1973,6 +1973,7 @@ export interface Translations extends NoticeTranslations {
     autoSyncEvery: (minutes: number) => string
     listenPortLabel: string
     portHint: string
+    portInvalid: string
     saveSettings: string
     settingsSaved: string
   }

@@ -1,15 +1,18 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { linkErrorOf } from '@/api/kourichat-link'
 import { I18nProvider } from '@/i18n'
 import { queryClient } from '@/lib/query-client'
+import { $notifications, clearNotifications } from '@/store/notifications'
 
+import { LINK_QUERY_KEY } from './link-data'
 import { LinkTab } from './link-tab'
 
 afterEach(() => {
   cleanup()
+  clearNotifications()
   queryClient.clear()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -54,6 +57,14 @@ const PAIRED_SECONDARY = {
   syncable_files: 4
 }
 
+const PAIRED_MASTER = {
+  ...NOT_PAIRED,
+  role: 'master',
+  paired: true,
+  device_id: 'a'.repeat(32),
+  pinned_fingerprint: 'b'.repeat(64)
+}
+
 describe('LinkTab', () => {
   it('offers pairing and chain creation when not paired', async () => {
     vi.stubGlobal('hermesDesktop', {
@@ -81,5 +92,78 @@ describe('LinkTab', () => {
     expect(linkErrorOf(envelope)).toEqual({ code: 'HM-6001', message: 'unreachable' })
     const plain = new Error('backend exploded')
     expect(linkErrorOf(plain)).toEqual({ code: 'UNKNOWN', message: 'backend exploded' })
+  })
+})
+
+describe('LinkTab settings form', () => {
+  const settingsWrites = (api: ReturnType<typeof vi.fn>) =>
+    api.mock.calls.filter(([request]) => (request as { method?: string }).method === 'PUT')
+
+  it.each(['70000', 'abc', '0', '12.5'])('refuses listen port %s without submitting', async port => {
+    const api = vi.fn().mockResolvedValue(PAIRED_MASTER)
+    vi.stubGlobal('hermesDesktop', { api })
+    renderTab()
+
+    fireEvent.change(await screen.findByLabelText('Master listen port'), { target: { value: port } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
+
+    await waitFor(() =>
+      expect($notifications.get().map(({ message }) => message)).toContain('Enter a port between 1 and 65535.')
+    )
+    expect(settingsWrites(api)).toEqual([])
+  })
+
+  it('submits a valid master listen port', async () => {
+    const api = vi.fn().mockResolvedValue(PAIRED_MASTER)
+    vi.stubGlobal('hermesDesktop', { api })
+    renderTab()
+
+    fireEvent.change(await screen.findByLabelText('Master listen port'), { target: { value: '3000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
+
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith(
+        expect.objectContaining({ body: { auto_sync_minutes: 0, listen_port: 3000 }, method: 'PUT' })
+      )
+    )
+    await waitFor(() =>
+      expect($notifications.get().map(({ message }) => message)).toContain('Settings saved.')
+    )
+    expect($notifications.get().some(({ kind }) => kind === 'error')).toBe(false)
+  })
+
+  it('re-seeds the form when a refresh moves the server values', async () => {
+    const api = vi.fn().mockResolvedValue(PAIRED_MASTER)
+    vi.stubGlobal('hermesDesktop', { api })
+    renderTab()
+
+    const port = (await screen.findByLabelText('Master listen port')) as HTMLInputElement
+    expect(port.value).toBe('27890')
+    fireEvent.change(port, { target: { value: '1234' } })
+
+    api.mockResolvedValue({ ...PAIRED_MASTER, listen_port: 30000 })
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: LINK_QUERY_KEY })
+    })
+
+    await waitFor(() =>
+      expect((screen.getByLabelText('Master listen port') as HTMLInputElement).value).toBe('30000')
+    )
+  })
+
+  it('keeps an in-progress edit when a refresh reports unchanged values', async () => {
+    const api = vi.fn().mockResolvedValue(PAIRED_MASTER)
+    vi.stubGlobal('hermesDesktop', { api })
+    renderTab()
+
+    fireEvent.change(await screen.findByLabelText('Master listen port'), { target: { value: '1234' } })
+
+    api.mockResolvedValue({ ...PAIRED_MASTER })
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: LINK_QUERY_KEY })
+    })
+    await waitFor(() => expect(api.mock.calls.length).toBeGreaterThan(1))
+
+    expect((screen.getByLabelText('Master listen port') as HTMLInputElement).value).toBe('1234')
   })
 })

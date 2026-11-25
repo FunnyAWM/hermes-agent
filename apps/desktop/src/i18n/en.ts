@@ -2212,6 +2212,7 @@ export const en: Translations = {
     autoSyncEvery: minutes => `Every ${minutes} min`,
     listenPortLabel: 'Master listen port',
     portHint: 'Takes effect the next time the sync server starts.',
+    portInvalid: 'Enter a port between 1 and 65535.',
     saveSettings: 'Save settings',
     settingsSaved: 'Settings saved.'
   },

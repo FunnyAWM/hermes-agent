@@ -48,6 +48,7 @@ export const zhLinkSync = {
   autoSyncEvery: (minutes: number) => `每 ${minutes} 分钟`,
   listenPortLabel: '主设备监听端口',
   portHint: '下次同步服务启动时生效。',
+  portInvalid: '请输入 1–65535 之间的端口号。',
   saveSettings: '保存设置',
   settingsSaved: '设置已保存。'
 }

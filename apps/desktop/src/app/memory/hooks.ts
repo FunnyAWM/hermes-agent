@@ -117,6 +117,11 @@ export function useMemoryDraft({
     try {
       await onSaved(draft)
       setDrafts(current => {
+        // Only drop the draft the save covered; input typed during the await stays.
+        if (current[path] !== draft) {
+          return current
+        }
+
         const next = { ...current }
         delete next[path]
 

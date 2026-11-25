@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
@@ -82,6 +83,48 @@ describe('SandboxProfilesPanel', () => {
     expect(screen.getByText('Read directories')).toBeTruthy()
     expect(screen.getByText('Write directories')).toBeTruthy()
     expect((screen.getByDisplayValue('C:\\shared') as HTMLTextAreaElement).value).toBe('C:\\shared')
+  })
+
+  it('keeps typed path lines verbatim while the config round-trips', () => {
+    const custom = {
+      terminal: {
+        sandbox: {
+          profile: 'mine',
+          profiles: { mine: { preset: 'custom', read: ['C:\\shared'], write: [] } }
+        }
+      }
+    }
+
+    const onChange = vi.fn()
+
+    function StatefulPanel() {
+      const [config, setConfig] = useState<Record<string, unknown>>(custom)
+
+      return (
+        <SandboxProfilesPanel
+          activeSectionId="workspace"
+          config={config}
+          onChange={next => {
+            setConfig(next)
+            onChange(next)
+          }}
+          subpage="shell"
+        />
+      )
+    }
+
+    render(<StatefulPanel />)
+
+    const read = screen.getByDisplayValue('C:\\shared') as HTMLTextAreaElement
+    // The newline that starts the next path must survive the round-trip re-render.
+    fireEvent.change(read, { target: { value: 'C:\\shared\n' } })
+    expect(read.value).toBe('C:\\shared\n')
+
+    // Lines keep their leading spaces; only blank lines drop out of the stored list.
+    fireEvent.change(read, { target: { value: 'C:\\shared\n\n  C:\\spaced' } })
+    expect(read.value).toBe('C:\\shared\n\n  C:\\spaced')
+    const sandbox = sandboxOf(onChange.mock.calls.at(-1)?.[0])
+    expect((sandbox.profiles as Record<string, { read?: string[] }>).mine.read).toEqual(['C:\\shared', '  C:\\spaced'])
   })
 
   it('renders the panel copy in the selected locale', () => {

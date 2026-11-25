@@ -66,6 +66,9 @@ const DEFAULT_PROFILE = 'workspace-exec'
 const asStringList = (value: unknown): string[] =>
   Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
 
+// Lines are kept verbatim so paths with leading spaces survive; blank lines drop out.
+const splitLines = (text: string) => text.split('\n').filter(Boolean)
+
 const hasValue = (value: unknown) =>
   value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)
 
@@ -170,7 +173,16 @@ function PathListEditor({
   // swallow the newline the user just typed while starting a second path.
   const [draft, setDraft] = useState(value.join('\n'))
 
-  useEffect(() => setDraft(value.join('\n')), [value])
+  // `value` is a fresh array on every render, so resync only when its content no
+  // longer matches the draft (lines are kept verbatim — no trim — so leading
+  // spaces and the trailing newline survive while typing).
+  const joined = value.join('\n')
+
+  useEffect(() => {
+    setDraft(current =>
+      JSON.stringify(splitLines(current)) === JSON.stringify(splitLines(joined)) ? current : joined
+    )
+  }, [joined])
 
   return (
     <label className="mt-2 block">
@@ -179,7 +191,7 @@ function PathListEditor({
         className={CONTROL_TEXT}
         onChange={event => {
           setDraft(event.target.value)
-          onChange(event.target.value.split('\n').map(line => line.trim()).filter(Boolean))
+          onChange(splitLines(event.target.value))
         }}
         placeholder={placeholder}
         rows={2}

@@ -930,6 +930,7 @@
   "linkSync.pairWithMaster": ["ar","de","es","fr","ja","ru"],
   "linkSync.pairedTitle": ["ar","de","es","fr","ja","ru"],
   "linkSync.portHint": ["ar","de","es","fr","ja","ru"],
+  "linkSync.portInvalid": ["ar","de","es","fr","ja","ru"],
   "linkSync.resetChain": ["ar","de","es","fr","ja","ru"],
   "linkSync.roleMaster": ["ar","de","es","fr","ja","ru"],
   "linkSync.roleSecondary": ["ar","de","es","fr","ja","ru"],

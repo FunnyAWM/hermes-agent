@@ -105,7 +105,14 @@ export function LinkTab({ profile }: LinkTabProps) {
             onSyncNow={onSyncNow}
             status={status}
           />
-          <LinkSettingsSection busy={busy} profile={profile} status={status} />
+          <LinkSettingsSection
+            busy={busy}
+            // Remount when the server values move: the form seeds its state once,
+            // so a refresh that changes them has to re-seed it.
+            key={`${status.auto_sync_minutes}:${status.listen_port}`}
+            profile={profile}
+            status={status}
+          />
         </>
       ) : (
         <UnpairedCard busy={busy} onCreateChain={onCreateChain} onPair={() => setPairDialog(true)} />
@@ -216,8 +223,16 @@ function LinkSettingsSection({ busy, profile, status }: { busy: boolean; profile
 
   const onSave = () =>
     run_settings(async () => {
+      const port = Number(listenPort)
+
+      if (status.role === 'master' && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+        notify({ kind: 'error', message: t.linkSync.portInvalid })
+
+        return
+      }
+
       await updateLinkSettings(
-        { auto_sync_minutes: Number(autoSyncMinutes), listen_port: status.role === 'master' ? Number(listenPort) : null },
+        { auto_sync_minutes: Number(autoSyncMinutes), listen_port: status.role === 'master' ? port : null },
         profile
       )
       await invalidateLink(profile)

@@ -65,7 +65,14 @@ export function MemoryView() {
 
       await saveMemoryFile(path, content)
       setSaved(current => ({ ...current, [path]: content }))
-      setDocs(await getMemoryDocs())
+
+      // Refreshing the listing is not part of the save: its failure must not
+      // report a failed save (the bytes are on disk) or leave a dirty draft.
+      try {
+        setDocs(await getMemoryDocs())
+      } catch {
+        // keep the stale listing until the next successful refresh
+      }
     },
     [path]
   )

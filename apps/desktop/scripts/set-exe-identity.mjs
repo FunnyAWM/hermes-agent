@@ -87,7 +87,7 @@ async function stampExeIdentity(
     icon,
     'version-string': {
       ProductName: 'Hermes',
-      FileDescription: 'Rosmontis',
+      FileDescription: 'Kal\'tsit',
       CompanyName: 'FunnyAWM',
       LegalCopyright: 'Copyright (c) 2026 FunnyAWM'
     }

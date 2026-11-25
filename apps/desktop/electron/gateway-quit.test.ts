@@ -9,7 +9,7 @@ const HERMES = process.platform === 'win32' ? path.join('Scripts', 'hermes.exe')
 
 test('quit requests a detached gateway stop without waiting', () => {
   const unref = vi.fn()
-  const spawn = vi.fn(() => ({ unref }))
+  const spawn = vi.fn(() => ({ unref, on: () => {} }))
   const log = vi.fn()
   const cli = path.join('C:\\source', '.venv', HERMES)
 
@@ -49,4 +49,29 @@ test('a spawn failure is logged, never thrown', () => {
     })
   )
   assert.match(log.mock.calls[0][0], /spawn denied/)
+})
+
+test('an async spawn error is caught by the error listener, never thrown', () => {
+  let onError: ((error: Error) => void) | undefined
+
+  const spawn = vi.fn(() => ({
+    unref: vi.fn(),
+    on: (event: string, listener: (error: Error) => void) => {
+      if (event === 'error') {
+        onError = listener
+      }
+    }
+  }))
+
+  const log = vi.fn()
+  const cli = path.join('C:\\source', 'venv', HERMES)
+
+  stopGatewayForQuit(['C:\\source'], 'C:\\home', log, {
+    existsSync: candidate => candidate === cli,
+    spawn: spawn as never
+  })
+
+  assert.ok(onError, 'the child must carry an error listener')
+  assert.doesNotThrow(() => onError?.(new Error('spawn ENOENT')))
+  assert.match(log.mock.calls.map(call => call[0] as string).join('\n'), /spawn ENOENT/)
 })

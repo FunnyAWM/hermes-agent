@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 interface ChildLike {
+  on: (event: 'error', listener: (error: Error) => void) => void
   unref: () => void
 }
 
@@ -45,6 +46,12 @@ export function stopGatewayForQuit(
       windowsHide: true
     })
 
+    // A spawn that only fails asynchronously surfaces as an 'error' event;
+    // without a listener it becomes an uncaught exception during quit.
+    child.on('error', error => {
+      log(`[gateway] stop on quit failed: ${error instanceof Error ? error.message : String(error)}`)
+    })
+    // Detach it: desktop quit must not wait on a CLI stop confirmation.
     child.unref()
     log(`[gateway] stop requested for desktop quit via ${cliPath}`)
   } catch (error) {
