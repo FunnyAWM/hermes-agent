@@ -32,10 +32,12 @@ def server():
     from unittest.mock import patch
     import importlib
 
+    import hermes_constants  # real get_process_hermes_home: a mocked one put state.db under the cwd (repo)
     with patch.dict(
         "sys.modules",
         {
-            "hermes_constants": MagicMock(get_hermes_home=MagicMock(return_value="/tmp/hermes_test")),
+            "hermes_constants": MagicMock(get_hermes_home=MagicMock(return_value="/tmp/hermes_test"),
+                                          get_process_hermes_home=hermes_constants.get_process_hermes_home),
             "hermes_cli.env_loader": MagicMock(),
             "hermes_cli.banner": MagicMock(),
             "hermes_state": MagicMock(),
