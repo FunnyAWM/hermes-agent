@@ -208,6 +208,19 @@ def widening(level: str) -> bool:
     return _RANK[level] > _RANK.get(active_profile().preset, 1)
 
 
+def tightening(level: str) -> bool:
+    """Whether a bare *level* boundary provably tightens the one in force right now.
+
+    A bare preset only drops grants the active profile adds (extra read/write paths), so
+    the swap tightens while the preset ranks strictly lower — except when the profile pins
+    a ``policy`` fragment or ``backend``: those cover axes the presets do not model
+    (network, syscall filter, resource caps), and a bare preset would silently lose them."""
+    active = active_profile()
+    if active.policy or active.backend:
+        return False
+    return _RANK[level] < _RANK.get(active.preset, 1)
+
+
 @contextlib.contextmanager
 def escalation(level: str):
     """Run one command at *level*; the configured profile applies again afterwards."""

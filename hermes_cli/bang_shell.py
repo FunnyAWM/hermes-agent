@@ -75,12 +75,21 @@ def check_bang_approval(command: str) -> dict:
     hardline blocklist, user deny rules and the dangerous-command prompt all apply
     to user-typed bang commands too. Returns the gate's ``{"approved": bool, "message": ...}``;
     falls back to *approved* only when the gate itself cannot be imported (a broken install, not a
-    policy decision).
+    policy decision). In ``approvals.mode: auto`` no automatic review covers a user-typed
+    command either, so the dangerous-command prompt is what decides it.
     """
     try:
         from tools.terminal_tool import _check_all_guards
     except Exception:
         return {"approved": True, "message": None}
+
+    # A ruling the automatic reviewer stamped for a MODEL tool call must never carry
+    # over to a user-typed command: drop it so bang keeps the guard's own policy.
+    try:
+        from tools.auto_review import take_ruling
+        take_ruling("terminal")
+    except Exception:
+        pass
 
     # Bang commands always run locally in the CLI process, never inside a remote/sandbox backend.
     return _check_all_guards(command, "local", has_host_access=False)

@@ -1332,8 +1332,17 @@ def check_all_command_guards(command: str, env_type: str,
         return prepared
 
     approval_mode = approval_context._get_approval_mode()
-    if _yolo_active() or approval_mode in ("off", "auto"):
+    if _yolo_active() or approval_mode == "off":
         return _approved()
+    if approval_mode == "auto":
+        # The automatic reviewer ruled on this exact call at dispatch and stamped
+        # the ruling; consume it so an already-ruled call is not gated twice. A
+        # call with no ruling (a user bang command, a skip_tools terminal call
+        # nothing ruled on) keeps the human gate below.
+        from tools.auto_review import take_ruling
+
+        if take_ruling("terminal"):
+            return _approved()
     if _command_matches_permanent_allowlist(command):
         return _allowlisted(command)
 
@@ -1406,8 +1415,16 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
     if _should_skip_container_guards(env_type, has_host_access=has_host_access):
         return _approved()
     approval_mode = approval_context._get_approval_mode()
-    if _yolo_active() or approval_mode in ("off", "auto"):
+    if _yolo_active() or approval_mode == "off":
         return _approved()
+    if approval_mode == "auto":
+        # Same ruling-stamp contract as ``check_all_command_guards``: only a call
+        # the automatic reviewer (or its human escalation) ruled on skips the
+        # gates below; an unruled execute_code call still meets them.
+        from tools.auto_review import take_ruling
+
+        if take_ruling("execute_code"):
+            return _approved()
 
     # (-q clears the presence flags, but its unattended context resolves first anyway.)
     approval_callback, is_cli, is_gateway, is_ask = _presence()

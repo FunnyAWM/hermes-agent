@@ -1,10 +1,21 @@
 """The auto-review gate's decision routing (tools.approval mode == "auto")."""
 
+import pytest
+
 from tools import auto_review as ar
 
 
+@pytest.fixture(autouse=True)
+def _clean_ruling_stamp():
+    # The ruling stamp is per-context and one-shot; tests share the process context.
+    ar._ruling_stamp.set(None)
+    yield
+    ar._ruling_stamp.set(None)
+
+
 def _decide(monkeypatch, decision, *, mode="auto", approved=False, tool="terminal"):
-    calls = {"review": 0, "approval": 0, "reason": None, "command": None, "justification": None}
+    calls = {"review": 0, "approval": 0, "reason": None, "command": None, "justification": None,
+             "rule_key": None}
 
     def fake_review(tool_name, args, *, messages, cwd):
         calls["review"] += 1
@@ -16,6 +27,7 @@ def _decide(monkeypatch, decision, *, mode="auto", approved=False, tool="termina
         calls["reason"] = reason
         calls["command"] = command
         calls["justification"] = justification
+        calls["rule_key"] = rule_key
         return {"approved": approved, "message": None if approved else "the user rejected the call"}
 
     monkeypatch.setattr("tools.approval_context._get_approval_mode", lambda: mode)
@@ -103,3 +115,34 @@ def test_read_only_tools_are_not_reviewed(monkeypatch):
     )
     assert (body, error_type) == (None, None)
     assert calls["review"] == 0
+
+
+def test_allow_stamps_one_ruling_for_the_command_guard(monkeypatch):
+    # The reviewer ruled on this call: the tool's own command guard consumes the stamp
+    # instead of prompting a second time — and only once.
+    _body, _error_type, _ = _decide(monkeypatch, ar.AutoReviewDecision(ar.ALLOW, "low"))
+    assert ar.take_ruling("terminal") is True
+    assert ar.take_ruling("terminal") is False
+
+
+def test_nothing_ruled_nothing_stamped(monkeypatch):
+    # A skipped tool (or a gate that never ruled) leaves no stamp: the human gate stays.
+    _body, _error_type, _ = _decide(
+        monkeypatch, ar.AutoReviewDecision(ar.DENY, "medium"), tool="read_file",
+    )
+    assert ar.take_ruling("read_file") is False
+    assert ar.take_ruling("terminal") is False
+
+
+def test_escalation_rule_key_is_the_call_not_the_reason(monkeypatch):
+    _body, _error_type, calls = _decide(
+        monkeypatch, ar.AutoReviewDecision(ar.DENY, "medium", "reason one"), approved=False,
+    )
+    first = calls["rule_key"]
+    _body, _error_type, calls = _decide(
+        monkeypatch, ar.AutoReviewDecision(ar.DENY, "medium", "reason two"), approved=False,
+    )
+    assert calls["rule_key"] == first  # the verdict wording must not move the [a]lways grain
+    assert first.startswith("auto_review:terminal:")
+    assert ar._ruling_key("terminal", {"command": "ls"}) != first  # a different call, a different rule
+    assert ar._ruling_key("t", {"b": 1, "a": 2}) == ar._ruling_key("t", {"a": 2, "b": 1})  # canonical

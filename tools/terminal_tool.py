@@ -1130,8 +1130,10 @@ def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str)
 
     A level wider than the active profile goes through the same human-approval gate as a
     dangerous command (the model cannot widen the boundary on its own); ``[a]lways``
-    persists for that command + level. A tighter level runs without asking. Raises
-    :class:`_Rejected` when the request cannot be honored.
+    persists for that command + level. The active profile's own level keeps its exact
+    boundary, and a strictly tighter level runs without asking — but only when the swap
+    provably cannot widen it (``gate.tightening``). Raises :class:`_Rejected` when the
+    request cannot be honored.
     """
     from contextlib import nullcontext
 
@@ -1152,7 +1154,13 @@ def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str)
         raise _Rejected(_error_json(
             "sandbox levels need terminal.sandbox.enabled: the command sandbox is off, so "
             "every command already runs unconfined and a level cannot be applied.", status="error"))
-    if not gate.widening(level):
+    active = gate.active_profile(cfg)
+    if level == active.preset:
+        # Nothing to change: keep the active profile verbatim. Swapping in a bare preset
+        # would silently drop a custom profile's policy/backend (network, syscall filter,
+        # caps) — a quiet widening of the boundary the user configured.
+        return nullcontext()
+    if gate.tightening(level):
         return gate.escalation(level)
     if not cfg.escalation:
         raise _Rejected(_error_json(
@@ -1175,11 +1183,14 @@ def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str)
     from tools.approval import request_tool_approval
 
     current = gate.active_profile(cfg).preset
-    preview = " ".join(command.split())[:160]
+    normalised = " ".join(command.split())
+    preview = normalised[:160]
     approval = request_tool_approval(
         "terminal",
         f"run one command at the wider '{level}' sandbox level (active: '{current}'): {preview}",
-        rule_key=f"sandbox_escalation:{level}:{hashlib.sha1(preview.encode('utf-8')).hexdigest()[:12]}",
+        # The rule identity hashes the full command: a preview-truncated key would let one
+        # "[a]lways" cover every command sharing its first 160 characters.
+        rule_key=f"sandbox_escalation:{level}:{hashlib.sha1(normalised.encode('utf-8')).hexdigest()}",
         approval_callback=_get_approval_callback(),
     )
     if not approval.get("approved"):
