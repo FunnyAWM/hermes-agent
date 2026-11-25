@@ -38,15 +38,15 @@ Agent 跑在你机器上已有的 Kouri Harness 源码树 + venv 上。好处是
 
 ## 1. 你需要准备什么
 
-| 项 | 要求 | 说明 |
-| --- | --- | --- |
-| 操作系统 | Windows 10 / 11，x64 | 安装包是 per-user，不需要管理员权限 |
-| 磁盘 | 源码树 + venv 预留 3 GB；工具按需另计 | Chromium 约 170 MB，llama.cpp 变体每个约 100 MB |
-| Kouri Harness 源码树 | 任意路径的一份检出 | 必须含 `hermes_cli\main.py`；桌面端按下面的阶梯找它 |
-| Python | **3.11–3.14**（`pyproject.toml`：`>=3.11,<3.15`） | 必须是真实 CPython，Microsoft Store 的 `python` 是重定向 stub，建不出 venv |
-| uv | 建议 0.13.x | 用于建 venv、装依赖、装受管工具 |
-| 网络 | 首次装依赖需要访问 PyPI | 走镜像见 §6 |
-| 模型凭据 | API Key 或 OAuth | 写在 `%LOCALAPPDATA%\hermes\.env`，**不要写进仓库或对话** |
+| 项                 | 要求                                             | 说明                                                          |
+| ----------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| 操作系统              | Windows 10 / 11，x64                            | 安装包是 per-user，不需要管理员权限                                      |
+| 磁盘                | 源码树 + venv 预留 3 GB；工具按需另计                      | Chromium 约 170 MB，llama.cpp 变体每个约 100 MB                    |
+| Kouri Harness 源码树 | 任意路径的一份检出                                      | 必须含 `hermes_cli\main.py`；桌面端按下面的阶梯找它                        |
+| Python            | **3.11–3.14**（`pyproject.toml`：`>=3.11,<3.15`） | 必须是真实 CPython，Microsoft Store 的 `python` 是重定向 stub，建不出 venv |
+| uv                | 建议 0.13.x                                      | 用于建 venv、装依赖、装受管工具                                          |
+| 网络                | 首次装依赖需要访问 PyPI                                 | 走镜像见 §6                                                     |
+| 模型凭据              | API Key 或 OAuth                                | 写在 `%LOCALAPPDATA%\hermes\.env`，**不要写进仓库或对话**               |
 
 ## 2. 安装
 
