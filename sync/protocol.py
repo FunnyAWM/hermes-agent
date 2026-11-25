@@ -15,7 +15,8 @@ import secrets
 from dataclasses import dataclass, field
 from typing import Any
 
-from sync.framing import read_frame, write_frame
+from sync.errors import SyncErrorCode, SyncError
+from sync.framing import FrameTooLargeError, read_frame, write_frame
 from sync.records import SyncEnvelope, decode_envelope, encode_envelope, strict_json_object
 from sync.crypto import hmac_hex
 
@@ -120,14 +121,26 @@ def decode_message(payload: bytes) -> SyncMessage | None:
 
 
 def read_message(reader) -> SyncMessage | None:
-    payload = read_frame(reader)
+    """One message; ``None`` at an orderly end. A framing error (oversize length claim or
+    truncated frame) surfaces as HM-6003 instead of escaping as a bare framing exception,
+    so every caller sees one error type to disconnect on. Transport failures propagate."""
+    try:
+        payload = read_frame(reader)
+    except (FrameTooLargeError, EOFError) as error:
+        raise SyncError(SyncErrorCode.VERIFY, str(error)) from error
     if payload is None:
         return None
     return decode_message(payload)
 
 
 def write_message(writer, message: SyncMessage) -> None:
-    write_frame(writer, encode_message(message))
+    """Transport failures propagate. An oversize frame surfaces as HM-6003 instead of
+    escaping as a bare framing exception (the batched list_result is the one message that
+    can exceed the 32 MiB frame cap)."""
+    try:
+        write_frame(writer, encode_message(message))
+    except FrameTooLargeError as error:
+        raise SyncError(SyncErrorCode.VERIFY, str(error)) from error
 
 
 def _dumps(obj: dict[str, Any]) -> bytes:

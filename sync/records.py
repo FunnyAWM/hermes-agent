@@ -22,7 +22,7 @@ from typing import Any
 
 from sync.clock import SyncClock
 from sync.crypto import encrypt, decrypt, hmac_hex, sha256_hex
-from sync.keys import SyncKeys
+from sync.keys import SyncKeys, INITIAL_GENERATION
 
 MAX_PLAINTEXT_BYTES = 20 * 1024 * 1024
 
@@ -172,7 +172,11 @@ def pack(keys: SyncKeys, hlc: SyncClock, device_id: str, payload: SyncPayload) -
 
 
 def unpack(keys: SyncKeys, envelope: SyncEnvelope) -> SyncPayload | None:
-    """AAD mismatch, digest mismatch or a corrupt payload returns ``None`` (HM-6003)."""
+    """A generation other than the initial one, an AAD mismatch (the record id is part of the
+    AAD, so a ciphertext cannot be replayed under another name), a digest mismatch, a record
+    id that does not bind the unpacked path or a corrupt payload returns ``None`` (HM-6003)."""
+    if envelope.generation != INITIAL_GENERATION:
+        return None
     try:
         ciphertext = base64.b64decode(envelope.ciphertext, validate=True)
     except (binascii.Error, ValueError):
@@ -189,5 +193,7 @@ def unpack(keys: SyncKeys, envelope: SyncEnvelope) -> SyncPayload | None:
         return None
     content_bytes = (payload.content or "").encode("utf-8")
     if sha256_hex(content_bytes) != envelope.digest:
+        return None
+    if envelope.record_id != record_id(keys.name_key(), payload.relative_path):
         return None
     return payload

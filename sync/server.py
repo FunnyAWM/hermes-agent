@@ -10,6 +10,7 @@ any LAN address of this device accepts connections (VALIDATION §2).
 from __future__ import annotations
 
 import contextvars
+import hmac
 import socket
 import ssl
 import sys
@@ -134,8 +135,9 @@ class SyncServer:
             with context.wrap_socket(raw, server_side=True) as stream:
                 if self._handshake(stream):
                     self._serve_requests(stream)
-        except (OSError, ssl.SSLError):
-            # TLS handshake failures and abrupt disconnects are routine (scans, dropouts).
+        except (OSError, ssl.SSLError, SyncError):
+            # TLS handshake failures, abrupt disconnects and mapped frame errors (HM-6003)
+            # are routine (scans, dropouts): drop the connection instead of the thread.
             pass
 
     def _handshake(self, stream: ssl.SSLSocket) -> bool:
@@ -149,7 +151,7 @@ class SyncServer:
             return False
         auth_key = self._records.auth_key()
         expected = proof(auth_key, hello.nonce_client, server_nonce) if auth_key else None
-        if expected is None or expected != auth.proof:
+        if expected is None or not hmac.compare_digest(expected, auth.proof):
             write_message(stream, SyncMessage(TYPE_AUTH_FAIL))
             return False
         write_message(stream, SyncMessage(TYPE_AUTH_OK))

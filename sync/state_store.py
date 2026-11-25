@@ -13,19 +13,38 @@ absent defaults exactly like kotlinx does.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import secrets
 import tempfile
+import threading
+import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
+
+# Cross-process advisory locking for state.json: fcntl (Unix) or msvcrt (Windows). Without
+# either backend the store degrades to in-process locking rather than failing
+# (cron/jobs.py's pattern).
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-Unix
+    fcntl = None
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - non-Windows
+    msvcrt = None
 
 from sync.clock import SyncClock
 from sync.keys import INITIAL_GENERATION
 from sync.records import strict_json_object
 
 FILE_NAME = "state.json"
+LOCK_FILE_NAME = "state.json.lock"
+#: How long a read-modify-write waits for the cross-process lock before degrading to
+#: in-process-only locking: a wedged sibling must not freeze sync forever.
+LOCK_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,10 +189,99 @@ def decode_state(obj: dict[str, Any]) -> SyncState | None:
     )
 
 
+class _StateLock:
+    """One read-modify-write critical section per state file: an in-process re-entrant lock
+    (per-connection push threads vs. the scheduler's refresh) plus a cross-process advisory
+    lock on ``state.json.lock`` (CLI vs. desktop backend). Without both, concurrent
+    read-modify-writes overwrite each other's entries/tombstones/HLC. Nested use in one
+    thread reuses the held lock; a missing backend or a stuck sibling degrades to
+    in-process-only locking rather than deadlocking sync (cron/jobs.py's pattern)."""
+
+    def __init__(self, lock_file: Path) -> None:
+        self._lock_file = lock_file
+        self._thread_lock = threading.RLock()
+        self._depth = threading.local()
+
+    @contextlib.contextmanager
+    def held(self):
+        depth = getattr(self._depth, "n", 0)
+        if depth:
+            self._depth.n = depth + 1
+            try:
+                yield
+            finally:
+                self._depth.n = depth
+            return
+        with self._thread_lock:
+            self._depth.n = 1
+            handle = None
+            try:
+                handle = self._acquire_file_lock()
+                yield
+            finally:
+                self._release_file_lock(handle)
+                self._depth.n = 0
+
+    def _acquire_file_lock(self):
+        try:
+            self._lock_file.parent.mkdir(parents=True, exist_ok=True)
+            handle = open(self._lock_file, "a+b")
+        except OSError:
+            return None  # in-process lock still serializes this process
+        deadline = time.monotonic() + LOCK_TIMEOUT_SECONDS
+        while True:
+            try:
+                handle.seek(0)
+                if fcntl is not None:
+                    fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                elif msvcrt is not None:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    break  # no backend: degrade to in-process locking
+                return handle
+            except OSError:
+                if time.monotonic() >= deadline:
+                    break  # a wedged sibling must not freeze sync forever
+                time.sleep(0.05)
+        handle.close()
+        return None
+
+    def _release_file_lock(self, handle) -> None:
+        if handle is None:
+            return
+        try:
+            try:
+                if fcntl is not None:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+                elif msvcrt is not None:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            finally:
+                handle.close()
+        except OSError:
+            pass
+
+
+_lock_registry: dict[str, _StateLock] = {}
+_lock_registry_guard = threading.Lock()
+
+
+def _state_lock(state_file: Path) -> _StateLock:
+    """The process-wide lock object for one state file (several stores can share a home)."""
+    key = str(state_file.absolute())
+    with _lock_registry_guard:
+        lock = _lock_registry.get(key)
+        if lock is None:
+            lock = _StateLock(state_file.with_name(LOCK_FILE_NAME))
+            _lock_registry[key] = lock
+        return lock
+
+
 class SyncStateStore:
     def __init__(self, meta_dir: Path) -> None:
         self.meta_dir = Path(meta_dir)
         self.state_file = self.meta_dir / FILE_NAME
+        self._lock = _state_lock(self.state_file)
 
     def exists(self) -> bool:
         return self.state_file.is_file()
@@ -210,12 +318,20 @@ class SyncStateStore:
             return None
         return state
 
+    def locked(self):
+        """The read-modify-write critical section around :meth:`load`/:meth:`save` — see
+        :class:`_StateLock`. :meth:`update` takes it automatically; :class:`~sync.engine.SyncEngine`
+        holds it around its own load→apply→save so pushes and refreshes cannot interleave."""
+        return self._lock.held()
+
     def update(self, transform: Callable[[SyncState], SyncState]) -> SyncState | None:
-        """Read-modify-write; ``None`` on a corrupt state or a failed save (HM-6004)."""
-        current = self.load()
-        if current is None:
-            return None
-        return self.save(transform(current))
+        """Read-modify-write serialized under :meth:`locked`; ``None`` on a corrupt state or
+        a failed save (HM-6004)."""
+        with self.locked():
+            current = self.load()
+            if current is None:
+                return None
+            return self.save(transform(current))
 
     def clear(self) -> bool:
         try:

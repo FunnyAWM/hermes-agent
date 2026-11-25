@@ -48,12 +48,16 @@ def _archive(root: Path, relative_path: str, file: Path) -> None:
 
 
 def read_current(root: Path, relative_path: str) -> str | None:
-    """Current file content as text (UTF-8), or ``None`` when absent/unreadable."""
+    """Current file content as text (UTF-8), or ``None`` when absent/unreadable — including a
+    symlinked path whose real target escapes the root (read side of apply_sync_file's guard)."""
     if not scope.is_syncable_path(relative_path):
         return None
-    file = root / relative_path
+    root_resolved = Path(root).resolve()
+    target = (root / relative_path).resolve()
+    if root_resolved not in target.parents:
+        return None
     try:
-        return file.read_bytes().decode("utf-8")
+        return target.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None
 
@@ -199,56 +203,59 @@ class SyncEngine:
 
     def apply_remote(self, envelopes: list[SyncEnvelope], keys: SyncKeys) -> SyncErrorCode | None:
         """Apply one pulled batch. ``None`` on success; otherwise the error code the
-        caller maps to the user-facing message (nothing is partially applied)."""
-        state = self._state_store.load()
-        if state is None:
-            return SyncErrorCode.STATE_CORRUPT
-        payloads: list[tuple[SyncEnvelope, SyncPayload]] = []
-        for envelope in envelopes:
-            payload = unpack(keys, envelope)
-            if payload is None:
-                return SyncErrorCode.VERIFY
-            payloads.append((envelope, payload))
-        clock = state.hlc
-        now = _now_ms()
-        applied = 0
-        archived = 0
-        entries: dict[str, SyncEntry] = {entry.relative_path: entry for entry in state.entries}
-        for envelope, payload in payloads:
-            clock = clock.recv(envelope.hlc, now)
-            existing = entries.get(payload.relative_path)
-            if payload.deleted:
-                # Only delete files this device knows to be sync mirrors; a local-only
-                # file the master never recorded is never touched.
-                if existing is not None and existing.hlc < envelope.hlc:
-                    if archive_and_delete(self._root, payload.relative_path):
-                        del entries[payload.relative_path]
-                        applied += 1
-            else:
-                if existing is not None and envelope.hlc <= existing.hlc:
-                    continue
-                content = payload.content or ""
-                local = read_current(self._root, payload.relative_path)
-                if local is not None and sha256_hex(local.encode("utf-8")) == envelope.digest:
-                    pass  # local content already matches: only refresh the cache
+        caller maps to the user-facing message (nothing is partially applied). The whole
+        load→apply→save runs under the state store's lock so a concurrent refresh or push
+        can never overwrite this batch's entries/HLC."""
+        with self._state_store.locked():
+            state = self._state_store.load()
+            if state is None:
+                return SyncErrorCode.STATE_CORRUPT
+            payloads: list[tuple[SyncEnvelope, SyncPayload]] = []
+            for envelope in envelopes:
+                payload = unpack(keys, envelope)
+                if payload is None:
+                    return SyncErrorCode.VERIFY
+                payloads.append((envelope, payload))
+            clock = state.hlc
+            now = _now_ms()
+            applied = 0
+            archived = 0
+            entries: dict[str, SyncEntry] = {entry.relative_path: entry for entry in state.entries}
+            for envelope, payload in payloads:
+                clock = clock.recv(envelope.hlc, now)
+                existing = entries.get(payload.relative_path)
+                if payload.deleted:
+                    # Only delete files this device knows to be sync mirrors; a local-only
+                    # file the master never recorded is never touched.
+                    if existing is not None and existing.hlc < envelope.hlc:
+                        if archive_and_delete(self._root, payload.relative_path):
+                            del entries[payload.relative_path]
+                            applied += 1
                 else:
-                    if local is not None:
-                        archived += 1
-                    if not apply_sync_file(self._root, payload.relative_path, content):
+                    if existing is not None and envelope.hlc <= existing.hlc:
                         continue
-                    applied += 1
-                entries[payload.relative_path] = SyncEntry(payload.relative_path, envelope.hlc, envelope.digest)
-        saved = self._state_store.save(
-            replace(
-                state,
-                hlc=clock,
-                entries=sorted(entries.values(), key=lambda entry: entry.relative_path),
-                applied_count=state.applied_count + applied,
-                archived_count=state.archived_count + archived,
-                last_sync_at_ms=now,
-                last_sync_error=None,
+                    content = payload.content or ""
+                    local = read_current(self._root, payload.relative_path)
+                    if local is not None and sha256_hex(local.encode("utf-8")) == envelope.digest:
+                        pass  # local content already matches: only refresh the cache
+                    else:
+                        if local is not None:
+                            archived += 1
+                        if not apply_sync_file(self._root, payload.relative_path, content):
+                            continue
+                        applied += 1
+                    entries[payload.relative_path] = SyncEntry(payload.relative_path, envelope.hlc, envelope.digest)
+            saved = self._state_store.save(
+                replace(
+                    state,
+                    hlc=clock,
+                    entries=sorted(entries.values(), key=lambda entry: entry.relative_path),
+                    applied_count=state.applied_count + applied,
+                    archived_count=state.archived_count + archived,
+                    last_sync_at_ms=now,
+                    last_sync_error=None,
+                )
             )
-        )
         return None if saved else SyncErrorCode.STATE_CORRUPT
 
     def compute_outgoing(self, remote: list[SyncEnvelope], keys: SyncKeys) -> list[SyncEnvelope]:

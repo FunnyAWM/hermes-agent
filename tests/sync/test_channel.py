@@ -276,6 +276,20 @@ class TestDiscoveryJoin:
         assert not (tmp_path / "secondary" / ".meta" / "state.json").exists()
         assert secondary.status().role == ROLE_DISABLED
 
+    def test_join_total_failure_records_the_error_before_clearing_state(self, tmp_path, monkeypatch):
+        # Total failure must record its error while state.json still exists: recording
+        # after the cleanup silently dropped it.
+        secondary = _manager(tmp_path / "secondary")
+        order: list[str] = []
+        monkeypatch.setattr(secondary, "_record_sync_error", lambda error: order.append("record"))
+        monkeypatch.setattr(secondary._state_store, "clear", lambda: order.append("clear"))
+
+        with pytest.raises(SyncError):
+            secondary.join_chain(OTHER_WORDS, "127.0.0.1:1")
+
+        assert order[-1:] == ["clear"]
+        assert all(entry == "record" for entry in order[:-1])
+
     def test_join_pushes_local_files_upstream(self, tmp_path, running_master, monkeypatch):
         """v2.8:加入时本机已有内容一并上行(不是空列表)。"""
         master, server, words = running_master

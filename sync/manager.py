@@ -208,8 +208,10 @@ class SyncManager:
             last_error = result
             # Candidates may include masters of other chains: every failure moves on;
             # only a full negotiation pins the pairing (Android joinChain's loop).
-        self._state_store.clear()
+        # Record the failure first: state.json is about to be deleted, so recording after
+        # the cleanup would silently drop the error.
         self._record_sync_error(last_error or SyncError(SyncErrorCode.UNREACHABLE, "no master answered"))
+        self._state_store.clear()
         raise last_error or SyncError(SyncErrorCode.UNREACHABLE, "no master answered")
 
     def _join_at(

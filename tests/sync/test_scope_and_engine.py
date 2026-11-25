@@ -113,6 +113,19 @@ class TestScope:
         )
         assert outside.read_text(encoding="utf-8") == "out"
 
+    def test_scan_and_read_current_skip_symlinks_escaping_root(self, root: Path):
+        outside = root.parent / "outside.md"
+        outside.write_text("secret", encoding="utf-8")
+        (root / "notes").mkdir(parents=True)
+        (root / "notes" / "keep.md").write_text("keep", encoding="utf-8")
+        try:
+            (root / "notes" / "leak.md").symlink_to(outside)
+        except (OSError, NotImplementedError) as error:  # e.g. Windows without symlink privilege
+            pytest.skip(f"symlink unavailable: {error}")
+        assert [entry.relative_path for entry in scope.scan(root)] == ["notes/keep.md"]
+        assert read_current(root, "notes/leak.md") is None
+        assert read_current(root, "notes/keep.md") == "keep"
+
 
 # ── engine apply semantics ───────────────────────────────────────────────────────
 

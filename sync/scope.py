@@ -64,13 +64,21 @@ def is_syncable_path(relative_path: str) -> bool:
     return top in ("notes", "skills")
 
 
+def _within_root(root_resolved: Path, file: Path) -> bool:
+    """True when the file's real target stays under the root — a notes/ or skills/ symlink can
+    otherwise pull outside content into the sync scope (read side of apply_sync_file's guard)."""
+    return root_resolved in file.resolve().parents
+
+
 def scan(root: Path) -> list[SyncFile]:
-    """All currently syncable files, sorted by relative path (forward slashes)."""
+    """All currently syncable files, sorted by relative path (forward slashes). A symlink
+    whose real target escapes the root is skipped."""
     root = Path(root)
+    root_resolved = root.resolve()
     result: list[SyncFile] = []
     for fixed in _FIXED_FILES:
         file = root / fixed
-        if file.is_file():
+        if file.is_file() and _within_root(root_resolved, file):
             result.append(SyncFile(fixed, file))
     for directory in _SCANNED_DIRS:
         dir_file = root / directory
@@ -79,13 +87,13 @@ def scan(root: Path) -> list[SyncFile]:
         for file in dir_file.rglob("*"):
             if file.is_file() and file.suffix.lower() == ".md":
                 relative = file.relative_to(root).as_posix()
-                if is_syncable_path(relative):
+                if is_syncable_path(relative) and _within_root(root_resolved, file):
                     result.append(SyncFile(relative, file))
     sessions_dir = root / _SESSIONS_DIR
     if sessions_dir.is_dir():
         for file in sessions_dir.rglob("*"):
             if file.is_file():
                 relative = file.relative_to(root).as_posix()
-                if is_syncable_path(relative):
+                if is_syncable_path(relative) and _within_root(root_resolved, file):
                     result.append(SyncFile(relative, file))
     return sorted(result, key=lambda entry: entry.relative_path)

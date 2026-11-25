@@ -9,20 +9,24 @@ from __future__ import annotations
 
 import io
 import json
+import threading
 from dataclasses import replace as dc_replace
 
 import pytest
 
 from sync.clock import SyncClock
-from sync.crypto import decrypt, sha256_hex
+from sync.crypto import decrypt, encrypt, sha256_hex
+from sync.errors import SyncErrorCode, SyncError
 from sync.framing import FrameTooLargeError, MAX_FRAME_BYTES, read_frame, write_frame
-from sync.keys import SyncKeys
+from sync.keys import INITIAL_GENERATION, SyncKeys
 from sync.mnemonic import SyncMnemonic
 from sync.protocol import (
     TYPE_HELLO,
     SyncMessage,
     decode_message,
     encode_message,
+    read_message,
+    write_message,
 )
 from sync.records import (
     MAX_PLAINTEXT_BYTES,
@@ -76,6 +80,29 @@ class TestFraming:
         stream = io.BytesIO((10).to_bytes(4, "big") + b"abc")
         with pytest.raises(EOFError):
             read_frame(stream)
+
+
+class TestFrameErrorMapping:
+    """Protocol-level framing errors surface as HM-6003 so the server thread and the sync
+    loop see one error type instead of a bare framing exception."""
+
+    def test_length_claim_beyond_cap_maps_to_hm6003(self):
+        stream = io.BytesIO((MAX_FRAME_BYTES + 1).to_bytes(4, "big"))
+        with pytest.raises(SyncError) as error:
+            read_message(stream)
+        assert error.value.code is SyncErrorCode.VERIFY
+
+    def test_truncated_frame_maps_to_hm6003(self):
+        stream = io.BytesIO((10).to_bytes(4, "big") + b"abc")
+        with pytest.raises(SyncError) as error:
+            read_message(stream)
+        assert error.value.code is SyncErrorCode.VERIFY
+
+    def test_oversize_write_maps_to_hm6003(self, monkeypatch):
+        monkeypatch.setattr("sync.protocol.encode_message", lambda message: b"x" * (MAX_FRAME_BYTES + 1))
+        with pytest.raises(SyncError) as error:
+            write_message(io.BytesIO(), SyncMessage(TYPE_HELLO))
+        assert error.value.code is SyncErrorCode.VERIFY
 
 
 # ── clock ────────────────────────────────────────────────────────────────────────
@@ -165,6 +192,34 @@ class TestRecords:
         assert decrypt(keys.content_key(envelope.generation), ciphertext, aad) is not None
         # Generation keys are isolated: a different generation cannot open this record.
         assert decrypt(keys.content_key(envelope.generation + 1), ciphertext, aad) is None
+
+    def test_record_id_must_bind_the_path(self, keys):
+        import base64
+
+        # A chain peer knows the keys, so it can seal the payload under a well-formed record
+        # id belonging to another path with a matching AAD: unpack must still reject it.
+        base = _envelope(keys)
+        claimed = record_id(keys.name_key(), "notes/other.md")
+        plaintext = encode_payload(SyncPayload(A_PATH, "hello world"))
+        ciphertext = encrypt(keys.content_key(keys.generation), plaintext, aad_of(claimed, base.hlc, base.device_id))
+        forged = dc_replace(base, record_id=claimed, ciphertext=base64.b64encode(ciphertext).decode("ascii"))
+        assert unpack(keys, forged) is None
+
+    def test_non_initial_generation_rejected(self, keys):
+        import base64
+
+        # Even a record that would decrypt under its own generation key is refused: unpack
+        # pins the initial generation.
+        base = _envelope(keys)
+        plaintext = encode_payload(SyncPayload(A_PATH, "hello world"))
+        aad = aad_of(base.record_id, base.hlc, base.device_id)
+        ciphertext = encrypt(keys.content_key(INITIAL_GENERATION + 1), plaintext, aad)
+        forged = dc_replace(
+            base,
+            generation=INITIAL_GENERATION + 1,
+            ciphertext=base64.b64encode(ciphertext).decode("ascii"),
+        )
+        assert unpack(keys, forged) is None
 
     def test_payload_json_omits_defaults(self):
         assert json.loads(encode_payload(SyncPayload(A_PATH)).decode("utf-8")) == {"relativePath": A_PATH}
@@ -271,6 +326,22 @@ class TestStateStore:
         (meta / "state.json").write_text("{nope", encoding="utf-8")
         store = SyncStateStore(meta)
         assert store.update(lambda state: state) is None
+
+    def test_concurrent_updates_lose_no_writes(self, tmp_path):
+        store = SyncStateStore(tmp_path / ".meta")
+        state = store.create()
+        assert state is not None
+
+        def bump() -> None:
+            for _ in range(20):
+                store.update(lambda current: dc_replace(current, applied_count=current.applied_count + 1))
+
+        workers = [threading.Thread(target=bump) for _ in range(8)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+        assert store.load().applied_count == 8 * 20
 
     def test_encode_decode_json_shape(self, tmp_path):
         store = SyncStateStore(tmp_path / ".meta")

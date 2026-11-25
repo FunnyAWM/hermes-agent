@@ -56,6 +56,23 @@ def _paired_error(error: ValueError) -> dict:
     return {"ok": False, "code": "ALREADY_PAIRED", "message": str(error)}
 
 
+def _destructive_refusal(rid, params: dict, route: str) -> dict | None:
+    """The REST side's ``destructive_profile`` seam (kourichat_link.py): disconnect and
+    reset_chain discard pairing state, so a multiplexing backend must never act on the
+    launch profile just because the caller omitted one. A named profile (or a genuinely
+    single-profile host) passes; anything else answers the structured refusal."""
+    profile = str(params.get("profile") or "").strip() if isinstance(params, dict) else ""
+    if profile:
+        return None
+    from agent.secret_scope import is_multiplex_active
+
+    if not is_multiplex_active():
+        return None
+    return _ok(rid, {"ok": False, "code": "PROFILE_REQUIRED",
+                     "message": f"{route} requires an explicit profile: this backend serves several "
+                                "profiles, so an unnamed target would act on the wrong profile's data."})
+
+
 @method("sync.status")
 @_scoped
 def _(rid, params: dict) -> dict:
@@ -142,6 +159,9 @@ def _(rid, params: dict) -> dict:
 @method("sync.disconnect")
 @_scoped
 def _(rid, params: dict) -> dict:
+    refusal = _destructive_refusal(rid, params, "sync.disconnect")
+    if refusal is not None:
+        return refusal
     _sync_manager().disconnect_and_clear()
     return _ok(rid, {"ok": True})
 
@@ -149,6 +169,9 @@ def _(rid, params: dict) -> dict:
 @method("sync.reset_chain")
 @_scoped
 def _(rid, params: dict) -> dict:
+    refusal = _destructive_refusal(rid, params, "sync.reset_chain")
+    if refusal is not None:
+        return refusal
     _sync_manager().reset_chain()
     return _ok(rid, {"ok": True})
 
