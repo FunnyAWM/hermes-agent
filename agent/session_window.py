@@ -69,7 +69,8 @@ def budget_start_index(messages: list[dict[str, Any]], *, budget: int, system_to
     Walks newest → oldest accumulating ``estimate(message)`` and stops before the first row
     that would overrun ``budget - system_tokens``. The newest row is kept even when it alone
     overruns (Android ``ChatContextTrimmer.trim`` does the same: never drop the question the
-    user just asked).
+    user just asked). The cut then snaps back to a user row — ``request_start_index`` keeps
+    the same invariant — so a tool result never loses its call.
     """
     if budget <= 0 or not messages:
         return 0
@@ -82,6 +83,8 @@ def budget_start_index(messages: list[dict[str, Any]], *, budget: int, system_to
             break
         used += cost
         start = index
+    while start > 0 and not (isinstance(messages[start], dict) and messages[start].get("role") == USER_ROLE):
+        start -= 1
     return start
 
 

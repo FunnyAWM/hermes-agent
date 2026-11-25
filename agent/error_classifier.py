@@ -634,6 +634,10 @@ _REASONING_LEVEL_REJECTION_MARKERS = (
     # of the disable, same floor step-up.
     "unknown variant", "expected one of",
 )
+# The two serde wordings name no field, so a closed-set complaint about any other enum
+# ("tool_choice: unknown variant `autoo`") would match on a stray "thinking" nearby;
+# these two count only when the error text says ``reasoning`` as well.
+_REASONING_FIELDLESS_MARKERS = ("unknown variant", "expected one of")
 
 
 def is_reasoning_level_rejection(error_msg: str) -> bool:
@@ -649,7 +653,10 @@ def is_reasoning_level_rejection(error_msg: str) -> bool:
     if token is None:
         return False
     near = msg[max(0, token.start() - 48):token.end() + 96]
-    return any(m in near for m in _REASONING_LEVEL_REJECTION_MARKERS)
+    for marker in _REASONING_LEVEL_REJECTION_MARKERS:
+        if marker in near and (marker not in _REASONING_FIELDLESS_MARKERS or "reasoning" in msg):
+            return True
+    return False
 
 
 def is_reasoning_required_rejection(error_msg: str) -> bool:

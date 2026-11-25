@@ -1526,13 +1526,23 @@ def build_api_messages(
         _system_text = active_system_prompt or ""
         if getattr(agent, "ephemeral_system_prompt", None):
             _system_text = (_system_text + "\n\n" + agent.ephemeral_system_prompt).strip()
-        _system_tokens = (estimate_request_context_tokens([{"role": "system", "content": _system_text}])
-                          if _system_text else 0)
+        # Fixed request cost pays for itself: the system prompt and the tool schemas.
+        _tools = getattr(agent, "tools", None) or None
+        _system_tokens = (estimate_request_context_tokens(
+            {"messages": [{"role": "system", "content": _system_text}], "tools": _tools})
+            if (_system_text or _tools) else 0)
         budget_start = budget_start_index(
             canonical_messages, budget=_budget, system_tokens=_system_tokens,
-            estimate=lambda message: estimate_request_context_tokens([message]),
+            # Price the wire shape: ``api_content`` is bookkeeping that is popped from
+            # every outgoing copy below, so it must not count against the budget either.
+            estimate=lambda message: estimate_request_context_tokens(
+                [{k: v for k, v in message.items() if k != "api_content"}]),
         )
         if budget_start > 0:
+            if has_current:
+                # Never cut into the turn being replayed: the question the user just asked
+                # must survive the budget pass (the window clamp above agrees).
+                budget_start = min(budget_start, split - window_start)
             canonical_messages = canonical_messages[budget_start:]
 
     api_messages = []
