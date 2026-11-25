@@ -55,6 +55,7 @@ def test_native_worker_passes_shared_toolchain_to_native_owner(tmp_path, monkeyp
 def test_native_cli_consumes_real_minimal_preparation_without_bootstrap(tmp_path):
     from scripts.build.inputs import AgentInputs, RESOURCE_ENV
     from scripts.bundles.native_prepared import publish_prepared
+    from pm import SCHEMA
     from pm.store import current_target
 
     out = tmp_path / "payload"
@@ -73,12 +74,16 @@ def test_native_cli_consumes_real_minimal_preparation_without_bootstrap(tmp_path
     features = out / "enabled-features.json"
     features.write_text('{"extras":[]}')
     (out / "uv-cache").mkdir()
+    # A prepared manifest and the payload's staged tool facts must agree on the
+    # tool subset (bundle_tools_of cross-checks them fail-closed).
+    (out / "tools/facts.json").write_text(
+        json.dumps({"schema": SCHEMA, "packages": {"python": {"entry": "tools/python"}}}), encoding="utf-8")
     prepared = publish_prepared(out, ROOT, "a" * 40, AgentInputs(
         project=code / "pyproject.toml", code=code, repo="hermes-agent", placement="contained",
         target=current_target(), python=python, site_packages=site, environment=out / "venv",
         tools=out / "tools", pm_runtime=runtime, features=features, ref="fixture",
         resources={name: code / name for name in RESOURCE_ENV},
-    ))
+    ), bundle_tools={"python"})
     env = {**os.environ, "UV_OFFLINE": "1", "HERMES_HOME": str(tmp_path / "private")}
     command = [sys.executable, "-S", "-B", str(SCRIPT), "--prepared", str(prepared)]
     result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30, check=False)

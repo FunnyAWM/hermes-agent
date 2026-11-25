@@ -83,7 +83,8 @@ def test_missing_or_old_uv_installs_only_missing_tool(local_toolchain, monkeypat
 @pytest.mark.parametrize("name,version,accepted", [
     ("python", "3.14.2", True), ("python", "3.13.9", False), ("python", "3.14.0rc1", False),
     ("node", "v26.0.0", True), ("node", "v24.13.0", False),
-    ("npm", "10.9.0", True), ("npm", "11.9.0", True), ("npm", "11.10.0", False),
+    ("npm", "1.4.2", False), ("npm", "9.9.9", False), ("npm", "10.9.0", True),
+    ("npm", "11.9.0", True), ("npm", "11.10.0", False),
     ("npm", "11.16.9", False), ("npm", "11.17.0", True),
 ])
 def test_runtime_compatibility(name, version, accepted):

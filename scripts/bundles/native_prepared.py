@@ -1,6 +1,7 @@
 """Job-local native preparation admission; never a portable environment cache."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import asdict
 import hashlib
@@ -98,7 +99,8 @@ def _input_paths(inputs: AgentInputs, out: Path) -> list[Path]:
     return paths
 
 
-def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs) -> Path:
+def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs,
+                     bundle_tools: Iterable[str] | None) -> Path:
     from hermes_cli.runtime_state import _atomic_bytes
     from pm.paths import lockfile_path
 
@@ -110,7 +112,11 @@ def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs
         _check_links(path, out)
         digests[path.relative_to(out).as_posix()] = _source_digest(path) if path == inputs.code else _digest(path)
     data = {"schema": 1, "out": str(out), "source": str(source), "revision": revision,
-            "lock": _digest(lockfile_path()), "inputs": asdict(inputs), "digests": digests}
+            "lock": _digest(lockfile_path()), "inputs": asdict(inputs), "digests": digests,
+            # The tool subset this preparation ran (None = the full lock). Finish
+            # phases bind their staging decisions to this fact instead of their
+            # shell env (two-stage builds and a leftover env used to skew them).
+            "bundle_tools": sorted(bundle_tools) if bundle_tools is not None else None}
     prepared = prepared_path(out)
     _atomic_bytes(prepared, (json.dumps(data, default=str, indent=2) + "\n").encode())
     return prepared

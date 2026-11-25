@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -323,7 +324,9 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
                       compile_bytecode=only is None,
                       **_venv_sync_extras(only),
                       sealed=True, explicit=True, timeout=2 * 60 * 60)
-    print(f"✓ venv ({'all extras' if only is None else '[all] extras'}, on the staged interpreter)")
+    # Log the extras actually synced: a sealed subset takes the fixed set, not [all].
+    synced = "all extras" if only is None else f"sealed extras ({', '.join(_SEALED_EXTRAS)})"
+    print(f"✓ venv ({synced}, on the staged interpreter)")
 
     # Inventory the staged interpreter before publishing the bundle contract.
     from pm.features import installed_extras, write_features
@@ -399,7 +402,34 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
         resources={name: repo_dir / name for name in RESOURCE_ENV},
         features=out / "enabled-features.json",
     )
-    return publish_prepared(out, source, revision, inputs)
+    return publish_prepared(out, source, revision, inputs, bundle_tools=only)
+
+
+def bundle_tools_of(prepared: Path) -> set[str] | None:
+    """The tool subset this prepared payload stages (None = the full lock).
+
+    Reads the subset the preparation recorded in the prepared manifest and
+    cross-checks it against the tools the payload actually staged (its
+    ``tools/facts.json``); a payload that disagrees with its manifest fails
+    closed here. The desktop webapp cut (T-46/T-48) follows this fact — never
+    ``HERMES_BUNDLE_TOOLS`` in the build shell, which two-stage builds and a
+    leftover env used to skew."""
+    prepared = Path(prepared).absolute()
+    data = json.loads(prepared.read_text(encoding="utf-8-sig"))
+    try:
+        recorded = data["bundle_tools"]
+    except KeyError:
+        raise ValueError("native preparation records no tool subset; run preparation again") from None
+    claim = set(recorded) if recorded is not None else None
+    out = prepared.with_name(prepared.name.removesuffix(".prepared.json"))
+    facts = Facts(out / "tools/facts.json")
+    staged = {name for name in _bundle_package_names() if (fact := facts.get(name)) and "entry" in fact}
+    expected = set(_staging_names(claim))
+    if staged != expected:
+        raise ValueError(
+            f"prepared payload stages tools {sorted(staged)} but its manifest records "
+            f"{sorted(claim) if claim is not None else 'the full lock'} (expected {sorted(expected)})")
+    return claim
 
 
 def finish_native(prepared: Path, frontends: dict[str, Path]) -> int:
@@ -415,6 +445,9 @@ def finish_native(prepared: Path, frontends: dict[str, Path]) -> int:
     with preparation_lock(out):
         (out / "manifest.json").unlink(missing_ok=True)
         inputs = load_prepared(prepared)
+        # The manifest's tool subset and the payload's staged tools must agree
+        # before assembly (fail closed on a swapped or half-staged payload).
+        bundle_tools_of(prepared)
         values = asdict(inputs)
         values["frontends"] = {name: Path(path).absolute() for name, path in frontends.items()}
         print("assembling verified payload", flush=True)

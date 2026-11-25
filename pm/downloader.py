@@ -397,6 +397,8 @@ class Download:
         return [source.dest for source in self.sources]
 
     def _try_sources(self, source: Source, operation, failures: list[DownloadTransportError]):
+        # Sources rotate on transport failure only: a HashError (wrong bytes) is
+        # deliberately not caught here and aborts the install fail-closed.
         urls = tuple(dict.fromkeys((source.url, *source.fallbacks)))
         for index, url in enumerate(urls):
             self._check_pause()

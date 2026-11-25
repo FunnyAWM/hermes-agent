@@ -50,8 +50,10 @@ def _compatible(name: str, version: str, pin: str) -> bool:
     if name == "node":
         return actual >= (required[0], 0, 0)
     if name == "npm":
-        # package.json 的 engines 排除了这个已知有问题的区间。
-        return not (11, 10, 0) <= actual < (11, 17, 0)
+        # 本地 npm 允许复用,但要有主版本下限(至少 npm 10;太老的主版本跑不动
+        # 这里依赖的命令);package.json 的 engines 也排除了 11.10–11.16 这个
+        # 已知有问题的区间。越界即落回锁定版本。
+        return actual >= (10, 0, 0) and not (11, 10, 0) <= actual < (11, 17, 0)
     return actual >= required
 
 

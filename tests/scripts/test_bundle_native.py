@@ -826,7 +826,7 @@ def test_prepared_inventory_admits_the_sealed_subset_without_uv_cache(tmp_path):
 
     sealed = tmp_path / "sealed"
     inputs = staged(sealed, uv_cache=False)
-    prepared = publish_prepared(sealed, tmp_path, "a" * 40, inputs)
+    prepared = publish_prepared(sealed, tmp_path, "a" * 40, inputs, bundle_tools={"python"})
     assert "uv-cache" not in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
     # Install-time verification replays the same inventory; a publish/load
     # disagreement would brick the payload after distribution.
@@ -834,6 +834,6 @@ def test_prepared_inventory_admits_the_sealed_subset_without_uv_cache(tmp_path):
 
     full = tmp_path / "full"
     inputs = staged(full, uv_cache=True)
-    prepared = publish_prepared(full, tmp_path, "b" * 40, inputs)
+    prepared = publish_prepared(full, tmp_path, "b" * 40, inputs, bundle_tools=None)
     assert "uv-cache" in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
     assert load_prepared(prepared) == inputs

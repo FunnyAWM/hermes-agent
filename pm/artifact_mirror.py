@@ -35,8 +35,9 @@ def download_mirror_prefix(env: Mapping[str, str]) -> str:
     """The user's download-mirror prefix (ghproxy-style: ``<prefix><original-url>``), or "".
 
     The bytes stay sha256-pinned end to end, so any mirror serving the pinned
-    content is integrity-equivalent; one that cannot serve a pin falls back to
-    the original URL and the public archive.
+    content is integrity-equivalent. Sources only rotate on transport failure:
+    bytes that hash wrong abort the install right there (HashError is never
+    retried at another source), keeping the pin check fail-closed.
     """
     value = (env.get(DOWNLOAD_MIRROR_ENV) or "").strip().rstrip("/")
     if not value:
