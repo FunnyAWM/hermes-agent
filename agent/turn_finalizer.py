@@ -621,10 +621,13 @@ def _mirror_turn_to_memory(
     # user's task. Suppressed by skip_background_review (e.g. cron): the fork costs
     # ~30K tokens / event with no human-in-the-loop benefit. Best-effort; the review
     # clones the snapshot structurally so its sanitizers can't reach the live transcript.
+    # Also suppressed while the notes-organizer fork is in flight: one auxiliary fork
+    # at a time, mirroring should_organize's symmetric check.
     if (
         final_response
         and not interrupted
         and not getattr(agent, "skip_background_review", False)
+        and not getattr(agent, "_notes_organizer_in_flight", False)
         and (review_memory or review_skills)
     ):
         with suppress(Exception):

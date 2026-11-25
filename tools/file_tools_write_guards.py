@@ -147,9 +147,10 @@ def _resolved_or_raw(filepath: str, task_id: str) -> str:
         return filepath
 
 
-#: Set only by the notes organizer fork: writes may then touch ``notes/<category>/*.md`` and
-#: nothing else (never ``memories/``, ``SOUL.md`` or ``notes/docs/``), so an auxiliary model can
-#: maintain notes without any path to the memory files.
+#: Set only by the notes organizer fork: the actual write target must then be
+#: ``notes/<category>/*.md`` and nothing else (never ``memories/``, ``SOUL.md``,
+#: ``notes/docs/`` or ``notes/.versions/``), so an auxiliary model can maintain notes
+#: without any path to the memory files.
 _NOTES_WRITE_SCOPE: ContextVar[bool] = ContextVar("hermes_notes_write_scope", default=False)
 
 
@@ -163,23 +164,30 @@ def bind_notes_write_scope() -> Iterator[None]:
 
 
 def _check_notes_write_scope(filepath: str, task_id: str = "default") -> str | None:
-    """Inside the organizer fork, only writable-category note files are addressable."""
+    """Inside the organizer fork, only ``notes/<category>/*.md`` files are addressable.
+
+    Judged by the path the write actually resolves to — one category level, a Markdown
+    file, never ``notes/docs`` (imported source text, read-only) or ``notes/.versions``
+    (archives). A path shaped like the target but pointing somewhere else cannot pass.
+    """
     if not _NOTES_WRITE_SCOPE.get():
         return None
     home = _get_real_hermes_home()
     if not home:
         return f"Refusing to write {filepath}: the profile home is unresolved in note-organizer mode."
     notes = os.path.normcase(os.path.realpath(os.path.join(home, "notes")))
-    docs = os.path.join(notes, "docs") + os.sep
-    for candidate in (_resolved_or_raw(filepath, task_id), os.path.normpath(_expand_tilde(filepath))):
-        try:
-            real = os.path.normcase(os.path.realpath(candidate))
-        except (OSError, ValueError):
-            continue
-        if real.startswith(notes + os.sep) and not real.startswith(docs) and real.lower().endswith(".md"):
+    try:
+        real = os.path.normcase(os.path.realpath(_resolved_or_raw(filepath, task_id)))
+    except (OSError, ValueError):
+        real = ""
+    if real.startswith(notes + os.sep):
+        parts = real[len(notes) + 1:].split(os.sep)
+        if (len(parts) == 2 and parts[0] not in ("docs", ".versions")
+                and parts[1].lower().endswith(".md")):
             return None
     return (f"Refusing to write {filepath}: the note organizer may only change Markdown notes "
-            "under notes/<category>/ (not notes/docs, memories/ or SOUL.md).")
+            "under notes/<category>/ (one category level; not notes/docs, notes/.versions, "
+            "notes/ top-level files, memories/ or SOUL.md).")
 
 
 def _check_notes_docs_readonly(filepath: str, task_id: str = "default") -> str | None:

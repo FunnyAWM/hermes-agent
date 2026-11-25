@@ -5,15 +5,19 @@ after the turn's answer is delivered (the finalizer ticks it, matching Android's
 finishStream), in a daemon thread using the same cache-parity fork as background review:
 the parent's prompt and ``tools[]`` stay untouched, so prompt caching is unaffected.
 
-A pass writes ``notes/.organize-incomplete`` before it runs and clears it only on success,
+A pass writes ``notes/.organize-incomplete`` before it runs and clears it on success,
 so a failed or killed pass is retried on any later turn (next turn or next launch), not
-just on the next multiple of the interval — Android 记 06 的下一轮补做. Recovery still
-requires the interval to stay configured. The marker is a dotfile without a ``.md``
+just on the next multiple of the interval — Android 记 06 的下一轮补做. An internal
+``AttributeError`` clears the marker too: it would fail every retry identically.
+Recovery still requires the interval to stay configured. The marker is a dotfile without a ``.md``
 suffix, so no notes scan (index, lifecycle, stale documents) ever picks it up.
 
 Scope is deliberately narrower than background review: this pass only maintains
-``notes/<category>/*.md`` (descriptions, duplicates, expiry), never ``MEMORY.md`` / ``USER.md`` /
-``SOUL.md``. It coexists with background review, which keeps owning fact extraction.
+``notes/<category>/*.md`` (descriptions, duplicates, expiry), never ``USER.md`` /
+``SOUL.md``. The model never writes ``memories/MEMORY.md`` either: the optional MEMORY.md
+rewrite travels as text after the ``MEMORY_SEPARATOR`` marker and the code commits it
+itself, CAS-guarded and archived. It coexists with background review, which keeps owning
+fact extraction.
 """
 
 from __future__ import annotations
@@ -82,7 +86,10 @@ def should_organize(agent: Any) -> bool:
     if turns <= 0:
         return False
     # One auxiliary fork at a time: a review already in flight owns this turn's budget.
-    if getattr(agent, "_background_review_agent", None) is not None:
+    # Both flags count — ``_background_review_run`` is set before the review thread
+    # starts, ``_background_review_agent`` only inside it (the window between the two).
+    if (getattr(agent, "_background_review_agent", None) is not None
+            or getattr(agent, "_background_review_run", None) is not None):
         return False
     # A pass in flight owns the marker too; the next turn re-checks.
     if getattr(agent, "_notes_organizer_in_flight", False):
@@ -112,12 +119,19 @@ def _read_memory(agent: Any) -> str:
         return ""
 
 
-def _memory_char_limit() -> int:
+def _memory_char_limit(agent: Any = None) -> int:
+    """The MEMORY.md char budget: the active store's limit first (the store is built from
+    the same ``memory`` config section, so the two can never diverge), else the section's
+    value via ``get_builtin_memory_config`` (a malformed section reads as ``{}``, never
+    raises), else the default."""
+    limit = getattr(getattr(agent, "_memory_store", None), "memory_char_limit", None)
+    if isinstance(limit, int) and limit >= 0:
+        return limit
     try:
-        from hermes_cli.config import load_config_readonly
+        from tools.memory_tool import get_builtin_memory_config
 
-        return int(load_config_readonly().get("memory", {}).get("memory_char_limit", _DEFAULT_MEMORY_CHAR_LIMIT))
-    except (TypeError, ValueError, OSError):
+        return int(get_builtin_memory_config().get("memory_char_limit", _DEFAULT_MEMORY_CHAR_LIMIT))
+    except (AttributeError, TypeError, ValueError):
         return _DEFAULT_MEMORY_CHAR_LIMIT
 
 
@@ -144,15 +158,15 @@ def _commit_memory(agent: Any, expected: str, summary: str) -> bool:
     if current != expected:
         logger.info("notes organizer: memories/MEMORY.md changed during the pass; keeping it")
         return False
-    limit = _memory_char_limit()
+    limit = _memory_char_limit(agent)
     if limit > 0 and len(summary) > limit:
         summary = summary[:limit].rstrip()
     try:
-        from hermes_notes.lifecycle import archive_before_overwrite
+        from hermes_notes.lifecycle import _atomic_write, archive_before_overwrite
 
         archive_before_overwrite(Path(str(path.parent.parent)), path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(summary + "\n", encoding="utf-8")
+        _atomic_write(path, summary + "\n")
     except OSError:
         logger.exception("notes organizer: writing memories/MEMORY.md failed")
         return False
@@ -211,7 +225,7 @@ def _run_notes_organizer(agent: Any) -> None:
                 _marker_path(agent).write_text("incomplete", encoding="utf-8")
             # The CAS baseline must be what the model was shown, not a later re-read.
             memory_before = _read_memory(agent)
-            prompt = ORGANIZER_PROMPT.replace("{limit}", str(_memory_char_limit()))
+            prompt = ORGANIZER_PROMPT.replace("{limit}", str(_memory_char_limit(agent)))
             with bind_notes_write_scope():
                 result = fork.run_conversation(
                     user_message=f"{prompt}\n\n{_notes_context(agent)}",
@@ -234,6 +248,12 @@ def _run_notes_organizer(agent: Any) -> None:
                 safe_print(f"🗂 笔记整理：{summary}")
         else:
             logger.info("notes organizer made no changes")
+        with suppress(OSError):
+            _marker_path(agent).unlink(missing_ok=True)
+    except AttributeError:
+        # A programming error fails every retry identically: clear the recovery marker
+        # so the pass is not re-run on every turn, and give up this interval.
+        logger.exception("notes organizer hit an unexpected attribute error")
         with suppress(OSError):
             _marker_path(agent).unlink(missing_ok=True)
     except Exception:

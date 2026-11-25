@@ -311,15 +311,24 @@ class MemoryStore:
         return memory_tool.get_memory_dir() / ("USER.md" if target == "user" else "MEMORY.md")
 
     @staticmethod
-    def _archive_before_write(path: Path) -> None:
-        """Copy the current memory file into ``.versions/`` before an accepted rewrite (T-28)."""
+    def _archive_before_write(path: Path) -> Optional[str]:
+        """Copy the current memory file into ``.versions/`` before an accepted rewrite (T-28).
+
+        Fail closed: ``None`` means "proceed", anything else is the error message and the
+        write must be refused — without the snapshot the old content is not recoverable.
+        """
         try:
             from hermes_constants import get_hermes_home
             from hermes_notes.lifecycle import archive_before_overwrite
 
             archive_before_overwrite(Path(str(get_hermes_home())), path)
         except (ImportError, OSError, ValueError) as error:
-            logger.debug("memory archive skipped for %s: %s", path, error)
+            logger.warning("memory archive failed for %s: %s", path, error)
+            return (
+                f"Refusing to write {path.name}: the current memory file could not be "
+                "archived, so the previous content would not be recoverable. Nothing was "
+                "changed — retry the write.")
+        return None
 
     def _entries_for(self, target: str) -> list[str]:
         return self.user_entries if target == "user" else self.memory_entries
@@ -426,7 +435,8 @@ class MemoryStore:
             from hermes_constants import mkdir_under_hermes_home
 
             mkdir_under_hermes_home(path.parent)
-            self._archive_before_write(path)
+            if archive_error := self._archive_before_write(path):
+                return _error(archive_error, "archive_failed")
             self._write_file(path, result[0])
             return self._success_response(target, result[1], **extra_fields)
 

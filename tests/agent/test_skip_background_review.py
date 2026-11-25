@@ -103,6 +103,15 @@ def test_finalize_turn_fires_review_when_flag_unset() -> None:
     agent._spawn_background_review.assert_called_once()
 
 
+def test_finalize_turn_skips_review_while_notes_organizer_in_flight() -> None:
+    """One auxiliary fork at a time: an in-flight organizer pass defers this turn's review."""
+    agent = _make_agent(skip_background_review=False)
+    _stub_agent_for_finalize(agent)
+    agent._notes_organizer_in_flight = True
+    _run_finalize(agent)
+    agent._spawn_background_review.assert_not_called()
+
+
 
 
 def test_persistence_failure_error_fallback_is_pinned_and_leaves_final_response_empty(monkeypatch, tmp_path) -> None:

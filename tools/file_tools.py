@@ -801,21 +801,28 @@ def _resolve_or_none(filepath: str, task_id: str, *, entry: bool = False) -> str
         return None
 
 
-def _archive_memory_surface_before_write(resolved: str | None) -> None:
+def _archive_memory_surface_before_write(resolved: str | None) -> str | None:
     """Snapshot memories/ or notes/ Markdown into ``.versions/`` before the agent rewrites it.
 
     Android 记 05 parity (T-28): a bad model rewrite stays recoverable on disk. Anything outside
-    that surface — SOUL.md, project files — is untouched.
+    that surface — SOUL.md, project files — is untouched. Fail closed: when the snapshot of an
+    in-surface file cannot be made the write is refused. ``None`` means "proceed"; anything else
+    is the error to return instead of writing.
     """
     if not resolved:
-        return
+        return None
     try:
         from hermes_constants import get_hermes_home
         from hermes_notes.lifecycle import archive_before_overwrite
 
         archive_before_overwrite(Path(str(get_hermes_home())), resolved)
     except (ImportError, OSError, ValueError) as error:
-        logger.debug("memory-surface archive skipped for %s: %s", resolved, error)
+        logger.warning("memory-surface archive failed for %s: %s", resolved, error)
+        return (
+            f"Refusing to write {resolved}: the current memories/notes file could not be "
+            "archived, so the previous content would not be recoverable. The file was NOT "
+            "modified — retry the write.")
+    return None
 
 
 def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: str,
@@ -953,7 +960,8 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
                 return json.dumps(_stale_write_refusal(path, blocker, _resolved), ensure_ascii=False)
             warnings = _edit_warnings([path], path_to_resolved, task_id)
             rewrite_hint = _whole_file_rewrite_hint(task_id, _resolved, content)
-            _archive_memory_surface_before_write(_resolved)
+            if _archive_error := _archive_memory_surface_before_write(_resolved):
+                return tool_error(_archive_error)
             result = _get_file_ops(task_id).write_file(_resolved or path, content)
             result_dict = result.to_dict()
             if warnings:
@@ -1048,7 +1056,8 @@ def patch_tool(mode: str = "replace", path: str | None = None, old_string: str |
             # every baseline check it stats the host path, so a sandbox path carries nothing.
             _known = _known_full_content_sha256(_path_to_resolved.values(), task_id)
             for _target in _path_to_resolved.values():
-                _archive_memory_surface_before_write(_target)
+                if _archive_error := _archive_memory_surface_before_write(_target):
+                    return tool_error(_archive_error)
 
             # Hand the shell layer the RESOLVED targets so both layers agree on
             # which file is edited even when the shell's cwd differs.

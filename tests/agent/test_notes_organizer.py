@@ -56,6 +56,10 @@ def test_organizer_skips_while_review_in_flight_and_without_notes(tmp_path, monk
     busy._background_review_agent = object()
     assert notes_organizer.should_organize(busy) is False
 
+    spawning = _agent(turns=5)  # the spawn window: the run exists, its agent not yet
+    spawning._background_review_run = object()
+    assert notes_organizer.should_organize(spawning) is False
+
     empty = tmp_path / "empty-home"
     empty.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(empty))
@@ -91,6 +95,9 @@ def test_notes_write_scope_allows_only_category_markdown(tmp_path, monkeypatch):
         tmp_path / "notes" / "docs" / "spec.md",
         tmp_path / "notes" / "work" / "plan.txt",
         tmp_path / "SOUL.md",
+        tmp_path / "notes" / "top-level.md",
+        tmp_path / "notes" / ".versions" / "old.md",
+        tmp_path / "notes" / "work" / "sub" / "deep.md",
     ]
     for path in forbidden:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -166,6 +173,7 @@ def test_organizer_writes_the_memory_block_with_a_cas_baseline(tmp_path, monkeyp
     monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
     notes_organizer._run_notes_organizer(_agent(turns=5))
     assert memory.read_text(encoding="utf-8").strip() == "- project uses uv"
+    assert b"\r" not in memory.read_bytes()  # _atomic_write: no newline translation
 
 
 def test_memory_write_is_skipped_when_the_file_changed_during_the_pass(tmp_path, monkeypatch, settings):
@@ -209,3 +217,41 @@ def test_failed_pass_keeps_the_marker_for_the_next_turn(tmp_path, monkeypatch, s
     notes_organizer._run_notes_organizer(agent)  # must not raise out of the thread body
     assert marker.is_file()
     assert agent._notes_organizer_in_flight is False
+
+
+def test_attribute_error_clears_the_marker(tmp_path, monkeypatch, settings):
+    """A programming error fails every retry identically: no endless per-turn retries."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "notes").mkdir()
+    settings(organize_turns=5)
+    marker = tmp_path / "notes" / ".organize-incomplete"
+
+    class _Fork:
+        def run_conversation(self, *, user_message, conversation_history):
+            raise AttributeError("broken internals")
+
+    monkeypatch.setattr(
+        "agent.background_review.build_cache_parity_fork",
+        lambda agent, **kwargs: (_Fork(), None, None))
+    monkeypatch.setattr("agent.background_review._release_fork_clients", lambda fork: None)
+    agent = _agent(turns=5)
+    notes_organizer._run_notes_organizer(agent)  # must not raise out of the thread body
+    assert not marker.is_file()
+    assert agent._notes_organizer_in_flight is False
+
+
+def test_memory_char_limit_prefers_the_store_and_never_raises(monkeypatch):
+    store = SimpleNamespace(memory_char_limit=42)
+    assert notes_organizer._memory_char_limit(SimpleNamespace(_memory_store=store)) == 42
+
+    def _garbage(config=None):
+        return {"memory_char_limit": "garbage"}
+
+    monkeypatch.setattr("tools.memory_tool.get_builtin_memory_config", _garbage)
+    assert notes_organizer._memory_char_limit(SimpleNamespace()) == notes_organizer._DEFAULT_MEMORY_CHAR_LIMIT
+
+    def _malformed(config=None):
+        raise AttributeError("memory config is not a mapping")
+
+    monkeypatch.setattr("tools.memory_tool.get_builtin_memory_config", _malformed)
+    assert notes_organizer._memory_char_limit(SimpleNamespace()) == notes_organizer._DEFAULT_MEMORY_CHAR_LIMIT
