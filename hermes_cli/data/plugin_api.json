@@ -165,6 +165,15 @@
         "hermes_yaml:safe_load",
         "hermes_yaml:safe_dump"
       ]
+    },
+    {
+      "source": "plugins/super_agent/README.md — Super Agent managed Worker lifecycle and sandbox preflight",
+      "entries": [
+        "agent.runtime_session_store:is_worker_process",
+        "hermes_cli.gateway_client:connect_gateway",
+        "tools.environments.local_command_sandbox:resolve_binary",
+        "tools.environments.local_command_sandbox:settings"
+      ]
     }
   ]
 }

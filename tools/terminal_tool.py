@@ -26,6 +26,7 @@ import sys
 import time
 import threading
 import atexit
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -1200,6 +1201,30 @@ def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str)
     return gate.escalation(level)
 
 
+@contextmanager
+def _sandbox_execution_scope(
+    level: Optional[str], env_type: str, command: str, *, mandatory: bool = False,
+):
+    from tools.environments import local_command_sandbox as gate
+
+    if mandatory and (not isinstance(level, str) or level.strip().lower() not in _SANDBOX_LEVELS[:-1]):
+        raise _Rejected(_error_json(
+            "a mandatory sandbox requires read-only, workspace-write, or workspace-exec.", status="error"))
+    if mandatory:
+        if env_type != "local":
+            raise _Rejected(_error_json(
+                "a mandatory sandbox requires the local terminal backend.", status="error"))
+        cfg = gate.settings()
+        if not cfg.enabled:
+            raise _Rejected(_error_json(
+                "a mandatory sandbox requires terminal.sandbox.enabled.", status="error"))
+        scope = gate.escalation(level.strip().lower())
+    else:
+        scope = _sandbox_escalation_scope(level, env_type, command)
+    with gate.mandatory(mandatory), scope:
+        yield
+
+
 @dataclass
 class _ApprovalVerdict:
     """Outcome of the pre-exec guard pass.
@@ -1583,6 +1608,7 @@ def terminal_tool(
     notify_on_complete: bool = False,
     watch_patterns: Optional[list[str]] = None,
     _host_local: bool = False,
+    _sandbox_required: bool = False,
     _completion_output_chars: int = 0,
     heartbeat: int = 0,
     persist_on_release: bool = False,
@@ -1675,7 +1701,7 @@ def terminal_tool(
                 # Promotion implies notify_on_complete; watch_patterns is a background-only flag the
                 # caller could not have meant for a foreground call, and the two are exclusive anyway.
                 background, notify_on_complete, watch_patterns = True, True, None
-            with _sandbox_escalation_scope(sandbox, env_type, command):
+            with _sandbox_execution_scope(sandbox, env_type, command, mandatory=_sandbox_required):
                 if background:
                     result = spawn_background_process(
                         command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,

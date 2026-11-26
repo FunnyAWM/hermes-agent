@@ -1,0 +1,51 @@
+name: super_agent
+version: 0.1.0
+description: Opt-in Router whose isolated Worker sessions are read-only to users.
+kind: standalone
+settings_page:
+  location: root
+  title: Super Agent
+  icon: hubot
+  order: 85
+provides_hooks:
+  - post_gateway_admission
+  - pre_tool_call
+config_schema:
+  message_sources:
+    type: list
+    default:
+      - "*"
+    label: Message sources
+    description: Gateway platform IDs allowed to submit Super Agent messages. Use ["*"] for every configured robot channel, including Weixin/OpenClaw; use [] to disable message intake.
+  worker_provider:
+    type: string
+    default: ""
+    label: Worker provider
+    description: Provider for new Worker Sessions. Leave blank to use the profile default.
+  worker_model:
+    type: string
+    default: ""
+    label: Worker model
+    description: Model for new Worker Sessions. Leave blank to use the profile default.
+  max_concurrent_workers:
+    type: string
+    choices: ["1", "2", "3", "4", "5", "6", "7", "8"]
+    default: "2"
+    label: Maximum concurrent Workers
+    description: Router-wide concurrent Worker limit. Each Ticket currently owns one Worker.
+  workspace_root:
+    type: string
+    required: true
+    label: Workspace root
+    description: Absolute Git repository root used to create per-Assignment worktrees.
+  default_sandbox:
+    type: string
+    choices: [read-only, workspace-write, workspace-exec]
+    default: workspace-write
+    label: Default sandbox
+    description: read-only, workspace-write, or workspace-exec.
+  watchdog_seconds:
+    type: number
+    default: 1800
+    label: Watchdog threshold
+    description: Seconds without a persisted Assignment or Turn state change before an alert.

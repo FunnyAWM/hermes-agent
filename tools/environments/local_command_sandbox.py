@@ -76,6 +76,8 @@ _RANK = {READ_ONLY: 0, WORKSPACE_WRITE: 1, WORKSPACE_EXEC: 2, FULL_ACCESS: 3}
 # execute/spawn, inherited by the deadline worker through copy_context.
 _ESCALATED: contextvars.ContextVar[SandboxProfile | None] = contextvars.ContextVar(
     "hermes_sandbox_escalation", default=None)
+_MANDATORY: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "hermes_sandbox_mandatory", default=False)
 
 
 @dataclass(frozen=True)
@@ -231,6 +233,16 @@ def escalation(level: str):
         _ESCALATED.reset(token)
 
 
+@contextlib.contextmanager
+def mandatory(enabled: bool = True):
+    """Keep the command boundary active even when approval policy normally bypasses it."""
+    token = _MANDATORY.set(bool(enabled))
+    try:
+        yield
+    finally:
+        _MANDATORY.reset(token)
+
+
 def file_writes_read_only() -> bool:
     """True when the active profile grants no file writes: the file tools must refuse too.
 
@@ -255,7 +267,7 @@ def active() -> bool:
     """True when this command must be confined: enabled, not Full Access (session or profile),
     and not running under a one-command escalation to ``full-access``."""
     cfg = settings()
-    if not cfg.enabled or _bypass_active():
+    if not cfg.enabled or (_bypass_active() and not _MANDATORY.get()):
         return False
     return active_profile(cfg).preset != FULL_ACCESS
 
@@ -819,7 +831,7 @@ __all__ = [
     "BLOCKED_EXIT", "FULL_ACCESS", "REFUSED_EXIT", "ConfinedRun", "SandboxProfile",
     "SandboxSettings", "SandboxShell", "active", "active_profile", "background_command",
     "build_policy", "confined_shell", "escalation", "failure_note", "file_tools_native",
-    "file_writes_read_only", "finalize", "make_run", "missing_binary_message", "policy_path",
+    "file_writes_read_only", "finalize", "make_run", "mandatory", "missing_binary_message", "policy_path",
     "powershell_script", "publish_policy", "resolve_binary", "sandbox_argv", "settings",
     "shell_argv", "unsupported_shell_message", "widening",
 ]
