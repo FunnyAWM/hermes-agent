@@ -61,10 +61,15 @@ module.exports = {
     // install dir — a silent second pass over every file that leaves the progress bar
     // parked (T-47). zip extracts straight into $INSTDIR: one write, visible progress.
     // The archive is larger; install time is what this build optimises for.
-    useZip: true
+    useZip: true,
+    // Differential packaging forces a 7z payload even when NSIS uses its ZIP extractor.
+    differentialPackage: false,
+    include: 'scripts/nsis/fork-installer.nsh'
   },
 
   portable: {
+    // Embed the files directly so the portable target cannot reuse the setup ZIP as a 7z archive.
+    useZip: true,
     artifactName: `${artifactNamePascal}-\${version}-\${os}-\${arch}-portable.\${ext}`
   }
 }
