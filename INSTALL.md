@@ -148,8 +148,9 @@ powershell -NoProfile -File .\scripts\download-managed-tools.ps1             # �
 
 ## 6. 网络受限、要用 PyPI 镜像时
 
-PM 有一条供应链年龄门禁：**只接受发布满 3 天的依赖**。它需要索引提供每个包的上传时间。
-所以选镜像时必须选**报上传时间**的，否则解析会失败，典型报错：
+Windows 完整版打包脚本 `scripts/build-full.ps1` 使用 `http://mirrors.aliyun.com/pypi/simple/` 下载 Python 包。已锁定的 PyPI 文件从阿里云读取并按原锁校验 SHA-256。隔离构建所需的 `setuptools`、`wheel` 和 `packaging` 同样校验预先记录的哈希。安装包内保留原始锁文件，GitHub 等直链仍取自各自的发布地址。
+
+维护者运行 `hermes pm lock` 重新生成锁文件时，PM 需要索引提供上传时间，才能执行 3 天发布年龄检查。缺少上传时间时会出现以下错误。
 
 ```
 Because there are no versions of setuptools and you require setuptools>=40.8.0, ...

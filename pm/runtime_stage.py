@@ -19,6 +19,7 @@ def stage_runtime(uv: Path, python: Path, destination: Path, *,
     No project install, application extra, or application lock enters this graph.
     """
     from pm.environment import PythonEnvironment  # noqa: TID251
+    from pm.bundle_mirror import mirrored_build_inputs
     from pm.packages import uv_cache_dir
     from pm.runtime import runtime_environment
 
@@ -37,8 +38,9 @@ def stage_runtime(uv: Path, python: Path, destination: Path, *,
             shutil.copyfile(project / name, snapshot / name)
         environment.create()
         if wheelhouse is None:
-            environment.sync(snapshot, locked=True, no_default_groups=True,
-                             no_install_project=True, timeout=600)
+            with mirrored_build_inputs(snapshot):
+                environment.sync(snapshot, locked=True, no_default_groups=True,
+                                 no_install_project=True, timeout=600)
         else:
             environment.install_wheelhouse(snapshot, wheelhouse, timeout=600)
     checked = subprocess.run(

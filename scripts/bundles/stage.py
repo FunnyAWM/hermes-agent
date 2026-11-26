@@ -38,10 +38,12 @@ def main(argv=None) -> int:
         products = Path(temp)
         source = products / "source"
         from scripts.bundles.payload import snapshot
+        from pm.bundle_mirror import mirrored_build_inputs
         from scripts.build.icon_environment import prepare_icon_environment
         snapshot(ROOT, args.ref, source)
         # The staging interpreter need not be a Hermes runtime; render icons on one.
-        icon_python = prepare_icon_environment(source, products / "icon-environment", args.cache)
+        with mirrored_build_inputs(source):
+            icon_python = prepare_icon_environment(source, products / "icon-environment", args.cache)
         env = {**os.environ, "HERMES_PYTHON": str(icon_python)}
         commands = [
             ["scripts/build/node-deps.mjs", "--source", str(source), "--workspace", "ui-tui", "--workspace", "web",

@@ -27,9 +27,20 @@ if (-not ($env:PATH -split ';' | Where-Object { $_ -and (Test-Path (Join-Path $_
   throw "pnpm.exe (v12) not found on PATH or in the managed tool store; run 'hermes pm install pnpm'"
 }
 Push-Location "$PSScriptRoot\..\apps\desktop";
+$savedIndex = $env:UV_DEFAULT_INDEX
+$savedInsecureHost = $env:UV_INSECURE_HOST
+$savedNoProxy = $env:NO_PROXY
 try {
+  $env:UV_DEFAULT_INDEX = "http://mirrors.aliyun.com/pypi/simple/"
+  $env:UV_INSECURE_HOST = "http://mirrors.aliyun.com"
+  $env:NO_PROXY = ($savedNoProxy, "mirrors.aliyun.com" | Where-Object { $_ }) -join ","
   pnpm run payload; if ($LASTEXITCODE -ne 0) { throw "payload staging failed ($LASTEXITCODE)" }
   pnpm run build; if ($LASTEXITCODE -ne 0) { throw "desktop build failed ($LASTEXITCODE)" }
   pnpm exec electron-builder --config electron-builder.fork.cjs --win nsis --x64 --publish never "-c.directories.output=release-full";
   if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
-} finally { Pop-Location }
+} finally {
+  $env:UV_DEFAULT_INDEX = $savedIndex
+  $env:UV_INSECURE_HOST = $savedInsecureHost
+  $env:NO_PROXY = $savedNoProxy
+  Pop-Location
+}

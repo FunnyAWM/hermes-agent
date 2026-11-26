@@ -571,7 +571,8 @@ def test_staged_cache_ships_full_wheel_set_and_rebuilds_offline(tmp_path):
         encoding="utf-8",
     )
     cache = tmp_path / "build-cache"
-    env = {**os.environ, "UV_CACHE_DIR": str(cache), "UV_NO_CONFIG": "1", "UV_PYTHON_DOWNLOADS": "never"}
+    env = {**os.environ, "UV_CACHE_DIR": str(cache), "UV_NO_CONFIG": "1", "UV_PYTHON_DOWNLOADS": "never",
+           "NO_PROXY": "127.0.0.1"}
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(dist)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

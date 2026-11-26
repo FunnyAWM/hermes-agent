@@ -257,6 +257,7 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     store_dir.mkdir(parents=True, exist_ok=True)
     repo_dir = out / "hermes-agent"
     from scripts.bundles.payload import INERT_SNAPSHOT_DIRS, snapshot
+    from pm.bundle_mirror import mirrored_build_inputs
     revision = subprocess.check_output(
         ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"], cwd=source,
         text=True, encoding="utf-8").strip()
@@ -319,11 +320,12 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     from pm import build_environment
 
     # Cold native wheels need a larger budget than interactive installs.
-    build_environment(source=repo_dir, python=python_bin, out=venv_dir,
-                      env=env, cache=cache,
-                      compile_bytecode=only is None,
-                      **_venv_sync_extras(only),
-                      sealed=True, explicit=True, timeout=2 * 60 * 60)
+    with mirrored_build_inputs(repo_dir):
+        build_environment(source=repo_dir, python=python_bin, out=venv_dir,
+                          env=env, cache=cache,
+                          compile_bytecode=only is None,
+                          **_venv_sync_extras(only),
+                          sealed=True, explicit=True, timeout=2 * 60 * 60)
     # Log the extras actually synced: a sealed subset takes the fixed set, not [all].
     synced = "all extras" if only is None else f"sealed extras ({', '.join(_SEALED_EXTRAS)})"
     print(f"✓ venv ({synced}, on the staged interpreter)")
