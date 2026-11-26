@@ -56,6 +56,7 @@ export async function buildDesktop({ source, out, icons, stamp, nativeDeps, type
   const reuse = !typecheck && rendererCurrent(out, inputs)
   await withProduct(out, async (product, scratch) => {
     if (reuse) {
+      console.log('[desktop] reusing verified renderer')
       cpSync(out, product, { recursive: true, filter: file => !notReused.has(relative(out, file).split(sep)[0]) })
     } else await compileRenderer(product, scratch)
     // The receipt must carry the clock this output BAKED, not whatever the live

@@ -8,6 +8,8 @@
 # fails pm-runtime with "stage pinned tools before building the manager runtime".
 # Shipping the lock-matched uv also keeps `hermes pm` off whatever uv the user
 # happens to have on PATH.
+param([switch]$RebuildPayload)
+
 $env:HERMES_DESKTOP_VARIANT = "bundled";
 $env:HERMES_BUNDLE_TOOLS = "python,uv";
 $env:HERMES_DESKTOP_LOCAL_ROOT = (Resolve-Path "$PSScriptRoot\..").Path;
@@ -30,15 +32,21 @@ Push-Location "$PSScriptRoot\..\apps\desktop";
 $savedIndex = $env:UV_DEFAULT_INDEX
 $savedInsecureHost = $env:UV_INSECURE_HOST
 $savedNoProxy = $env:NO_PROXY
+$buildLock = $null
 try {
+  # The receipt, install stamp and NSIS output belong to one build at a time.
+  $lockDir = [IO.Directory]::CreateDirectory((Join-Path $env:HERMES_DESKTOP_LOCAL_ROOT '.build'))
+  $buildLock = [IO.File]::Open((Join-Path $lockDir.FullName '.desktop-build.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
   $env:UV_DEFAULT_INDEX = "http://mirrors.aliyun.com/pypi/simple/"
   $env:UV_INSECURE_HOST = "http://mirrors.aliyun.com"
   $env:NO_PROXY = ($savedNoProxy, "mirrors.aliyun.com" | Where-Object { $_ }) -join ","
-  pnpm run payload; if ($LASTEXITCODE -ne 0) { throw "payload staging failed ($LASTEXITCODE)" }
-  pnpm run build; if ($LASTEXITCODE -ne 0) { throw "desktop build failed ($LASTEXITCODE)" }
+  $stageOptions = if ($RebuildPayload) { @('--rebuild-payload') } else { @() }
+  node scripts/build-fork-inputs.mjs @stageOptions
+  if ($LASTEXITCODE -ne 0) { throw "desktop preparation failed ($LASTEXITCODE)" }
   pnpm run builder:fork --win nsis --x64 --publish never "-c.directories.output=release-full";
   if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
 } finally {
+  if ($buildLock) { $buildLock.Dispose() }
   $env:UV_DEFAULT_INDEX = $savedIndex
   $env:UV_INSECURE_HOST = $savedInsecureHost
   $env:NO_PROXY = $savedNoProxy

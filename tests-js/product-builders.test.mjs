@@ -378,6 +378,8 @@ test('a browser renderer publish never invalidates the native Desktop inputs', a
   const before = sourceHash(source, 'desktop')
   put(source, 'apps/desktop/dist-webapp/index.html', 'browser renderer')
   put(source, 'apps/desktop/.dist-webapp-build-1/product/index.html', 'staged renderer')
+  put(source, 'apps/desktop/release-full/win-unpacked/resources/app.asar', 'full package')
+  put(source, 'apps/desktop/release-headless/setup.exe', 'headless package')
   expect(sourceHash(source, 'desktop')).toBe(before)
   put(source, 'apps/desktop/src/main.ts', 'export const changed = true')
   expect(sourceHash(source, 'desktop')).not.toBe(before)
