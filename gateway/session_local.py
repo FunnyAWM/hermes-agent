@@ -285,7 +285,12 @@ def stage_local_session(authority, actor, params, *, trusted_policy=None, truste
         raise RuntimeStoreError('profile_mismatch')
     if 'session:create' not in actor.capabilities:
         raise RuntimeStoreError('permission_denied')
-    from gateway.session_policy import build_policy, BYPASS_FIELDS, FOLLOW_ADOPTED, LOCAL_DESKTOP_CHAT
+    from gateway.session_policy import (
+        build_policy, BYPASS_FIELDS, FOLLOW_ADOPTED, LOCAL_DESKTOP_CHAT, MANAGED_WORKER_SOURCE,
+    )
+    manages_workers = 'session:manage-worker' in actor.capabilities
+    if manages_workers != (params.get('source') == MANAGED_WORKER_SOURCE):
+        raise RuntimeStoreError('permission_denied')
     from gateway.run import _resolve_gateway_model
     from dataclasses import replace
     private_secrets = dict(trusted_secrets or {})
@@ -462,6 +467,7 @@ def local_session_info(authority, ref):
     else:
         source = policy.source if policy else live.source.platform.value
     info = {'source': source,
+            'read_only': source == 'managed_worker',
             'model': (getattr(agent, 'model', policy.current_model(authority) if policy else None) if agent is not None
                       else _lazy_model(authority, policy)),
             'lazy': agent is None,

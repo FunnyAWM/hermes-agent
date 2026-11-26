@@ -106,6 +106,7 @@ class SessionLiveInfo(OpenModel):
     system_prompt: str | None = None
     credential_warning: str | None = None
     lazy: bool | None = None
+    read_only: bool = False
 
 
 class StoredSessionRow(OpenModel):

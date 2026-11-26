@@ -8780,7 +8780,8 @@
               "gui",
               "acp",
               "tool",
-              "oneshot"
+              "oneshot",
+              "managed_worker"
             ],
             "title": "Source",
             "type": "string"
@@ -10523,6 +10524,11 @@
             ],
             "default": null
           },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -10832,6 +10838,11 @@
           },
           "running": {
             "title": "Running",
+            "type": "boolean"
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
             "type": "boolean"
           },
           "model": {
@@ -11395,6 +11406,11 @@
               }
             ],
             "default": null
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
           },
           "desktop_protocol": {
             "const": "hermes-gateway-v1",
@@ -38595,6 +38611,11 @@
             ],
             "default": null,
             "title": "Lazy"
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
           }
         },
         "title": "SessionCwdSetResult",
@@ -39350,6 +39371,11 @@
             "title": "Source",
             "type": "string"
           },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
+          },
           "_lineage_root_id": {
             "anyOf": [
               {
@@ -39603,6 +39629,11 @@
             ],
             "default": null,
             "title": "Lazy"
+          },
+          "read_only": {
+            "default": false,
+            "title": "Read Only",
+            "type": "boolean"
           }
         },
         "title": "SessionLiveInfo",

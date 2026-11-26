@@ -327,11 +327,13 @@ def outside_restart_wait():
 
 
 @asynccontextmanager
-async def connect_gateway(endpoint=None, subject=None, *, max_size=8 * 1024 * 1024):
+async def connect_gateway(endpoint=None, subject=None, *, purpose="interactive", max_size=8 * 1024 * 1024):
     """Attach to this home's owner. ``endpoint``: an already-discovered ready owner to dial as-is
     (maintenance that must never start a gateway); default ensures one, starting it if needed.
     ``subject``: mint the ticket for this principal (the caller's authenticated dashboard user)
     rather than the socket identity; only a peer the owner already trusts may name one.
+    ``purpose`` selects the owner's capability grant; plugins use ``managed-session`` for their
+    Router-owned worker conversations.
     ``max_size``: the largest frame accepted; a ``session.resume`` answer carries the whole history.
     Inside ``outside_restart_wait()`` an owner in a restart's after-turn wait is refused as
     ``draining`` (``restart_wait``) instead of attached, and the ticket carries that policy so the
@@ -346,7 +348,7 @@ async def connect_gateway(endpoint=None, subject=None, *, max_size=8 * 1024 * 10
     protocols = None
     if endpoint is not None:
         ticket = await asyncio.to_thread(_session_ticket, gateway_profile_home(get_hermes_home()), endpoint,
-                                         subject=subject)
+                                         subject=subject, purpose=purpose)
         url, protocols = gateway_ws_target(endpoint, ticket)
     elif remote:
         parsed = urlsplit(remote)
@@ -369,7 +371,10 @@ async def connect_gateway(endpoint=None, subject=None, *, max_size=8 * 1024 * 10
                                           result.state, result.reason_code)
         endpoint = result.endpoint
         try:
-            policy: dict = {"refuse_restart_wait": True} if _REFUSE_RESTART_WAIT.get() else {}
+            policy: dict = {"purpose": purpose, **(
+                {"refuse_restart_wait": True} if _REFUSE_RESTART_WAIT.get() else {})}
+            if subject is not None:
+                policy["subject"] = subject
             ticket = await asyncio.to_thread(_session_ticket, home, endpoint, **policy)
         except DiscoveryError as exc:
             # The control socket refused the ticket: the verdict discovery gives the same refusal.

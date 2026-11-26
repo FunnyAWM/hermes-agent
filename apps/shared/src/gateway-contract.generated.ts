@@ -572,6 +572,7 @@ export interface SessionLiveInfo {
   system_prompt?: string | null
   credential_warning?: string | null
   lazy?: boolean | null
+  read_only?: boolean
   [key: string]: unknown
 }
 /** ``tui_gateway/server.py::_project_info_for_cwd``. */
@@ -3399,6 +3400,7 @@ export interface SessionListRow {
   message_count?: number
   live_message_count?: number | null
   source?: string
+  read_only?: boolean
   _lineage_root_id?: string | null
 }
 export interface SessionMostRecentParams {
@@ -3518,6 +3520,7 @@ export interface SessionCwdSetResult {
   system_prompt?: string | null
   credential_warning?: string | null
   lazy?: boolean | null
+  read_only?: boolean
   [key: string]: unknown
 }
 export interface SessionCloseParams {
@@ -4916,6 +4919,7 @@ export interface CanonicalSessionInfo {
   tool_availability_warnings?: string[] | null
   unknown_toolsets?: string[] | null
   usage?: Usage | null
+  read_only?: boolean
   source: string
   model?: string | null
   lazy: boolean
@@ -5189,7 +5193,7 @@ export interface CanonicalGroupsPeerRegisterParams {
 export interface CanonicalCreateParams {
   profile?: string | null
   request_id?: string | null
-  source?: 'cli' | 'tui' | 'gui' | 'acp' | 'tool' | 'oneshot'
+  source?: 'cli' | 'tui' | 'gui' | 'acp' | 'tool' | 'oneshot' | 'managed_worker'
   cwd?: string | null
   row_cwd?: string | null
   model?: string | null
@@ -5287,6 +5291,7 @@ export interface CanonicalSnapshotInfo {
   tool_availability_warnings?: string[] | null
   unknown_toolsets?: string[] | null
   usage?: Usage | null
+  read_only?: boolean
   desktop_protocol: 'hermes-gateway-v1'
   source?: string | null
   model?: string | null
@@ -5346,6 +5351,7 @@ export interface CanonicalSessionListRow {
   started_at: number | null
   message_count: number
   running: boolean
+  read_only?: boolean
   model?: string | null
   resolved_id?: string | null
   root_title?: string | null

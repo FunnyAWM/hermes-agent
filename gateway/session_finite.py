@@ -60,11 +60,16 @@ def _may_run_unattended(connection, ref):
     """``hermes -z`` parity: main auto-approved only inside the one-shot's own process. Over the wire that
     is the private local bootstrap ticket (no dashboard / remote identity), the session's creator (no
     operator attach) and a CLI-surface session (never a Desktop, TUI, ACP or Bot Chat others watch)."""
-    from gateway.session_policy import policy_for_source
+    from gateway.session_policy import MANAGED_WORKER_SOURCE, policy_for_source
     source = connection.authority.sessions[ref.session_id].source
-    if not connection.native_owner or source is None or source.user_id != connection.actor.subject:
+    if source is None or source.user_id != connection.actor.subject:
         return False
     policy = policy_for_source(connection.authority.runner, source)
+    if ('session:manage-worker' in connection.actor.capabilities
+            and policy is not None and policy.source == MANAGED_WORKER_SOURCE):
+        return True
+    if not connection.native_owner:
+        return False
     return policy is not None and policy.platform == 'cli'
 
 

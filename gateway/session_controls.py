@@ -606,7 +606,8 @@ class AuthorityConnection:
                                   'root_title': root.get('title') or '', 'source': row.get('source'),
                                   'started_at': row.get('started_at'),
                                   'message_count': row.get('message_count', 0),
-                                  'running': found.session_id in self.authority.sessions}],
+                                  'running': found.session_id in self.authority.sessions,
+                                  'read_only': row.get('source') == 'managed_worker'}],
                     'scope': 'stored'}
         from hermes_state_sessions import INTERNAL_LISTING_SOURCES
         from gateway.session_live_listing import live_entries
@@ -622,7 +623,8 @@ class AuthorityConnection:
             sessions.append({'session_id': entry.session_id, 'id': entry.session_id, 'title': row.get('title') or '',
                              'source': row.get('source'), 'started_at': row.get('started_at'),
                              'message_count': row.get('message_count', 0), 'model': row.get('model'),
-                             'running': entry.handle.execution_state == 'running'})
+                             'running': entry.handle.execution_state == 'running',
+                             'read_only': row.get('source') == 'managed_worker'})
         sessions.sort(key=lambda row: row['started_at'] or 0, reverse=True)
         from gateway.session_picker_fields import live_picker_page
         return {'sessions': await asyncio.to_thread(live_picker_page, self.authority, sessions, limit, workspace, picker),
@@ -684,7 +686,9 @@ class AuthorityConnection:
         self.authority.authorize(self.actor, ref, 'session:read')
         mounted = self.authority.sessions[ref.session_id].source
         # Only a local route has a stored creation policy to refresh; a platform lane's turns read the profile.
-        if 'session:control' in self.actor.capabilities and getattr(mounted, 'platform', None) == Platform.LOCAL:
+        stored = self.authority.db.get_session(ref.session_id) or {}
+        if ('session:control' in self.actor.capabilities and stored.get('source') != 'managed_worker'
+                and getattr(mounted, 'platform', None) == Platform.LOCAL):
             # A client attaching (main's `hermes -c` was a new process) re-reads the config-derived settings
             # (CFG-2); a snapshot poll on this attachment does not. Any open still adopts a frozen Bot Chat
             # whose earlier open found it busy (Desktop's warm `session.activate` resumes on one connection).
