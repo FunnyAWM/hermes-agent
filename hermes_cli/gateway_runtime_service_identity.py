@@ -1,6 +1,6 @@
 """Read-only binding checks; unknown supervisor syntax is not profile absence.
 
-These checks recognize the installed Hermes launch formats, not arbitrary shell
+These checks recognize the installed Kouri Harness launch formats, not arbitrary shell
 programs. Manager-loaded values take precedence over filenames and disk copies.
 """
 from __future__ import annotations
@@ -47,7 +47,7 @@ class ForeignRoot(ValueError):
 
     def __init__(self, theirs: Path):
         super().__init__("foreign_root")
-        self.check = f"the service runs another Hermes home: {theirs}"
+        self.check = f"the service runs another Kouri Harness home: {theirs}"
 
 
 def _install_root(home: Path) -> Path:
@@ -122,7 +122,7 @@ def verify_gateway_argv(argv: list[str], home: Path, *, wrapped: bool = False) -
             _unverified("the stderr-timestamp wrapper's arguments are not the installer's")
         argv, own_launcher_only = args[3:], True
     if not argv or not looks_like_gateway_command_line(subprocess_command(argv)):
-        _unverified("the command is not a Hermes gateway command")
+        _unverified("the command is not a Kouri Harness gateway command")
     executable = Path(argv[0]).name.lower()
     if _PYTHON_EXECUTABLE.fullmatch(executable):
         entry = _launch_module(argv, legacy=not wrapped)

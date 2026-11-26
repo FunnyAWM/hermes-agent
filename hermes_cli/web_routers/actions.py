@@ -1,4 +1,4 @@
-"""Gateway restart/drain, Hermes update and background-action status dashboard routes.
+"""Gateway restart/drain, Kouri Harness update and background-action status dashboard routes.
 
 Extracted from ``hermes_cli.web_server``; helpers/state that tests monkeypatch on
 ``web_server`` stay there and are late-bound (cycle-safe).
@@ -55,7 +55,7 @@ _ACTION_LOG_TAIL_MAX_CHUNK_BYTES = 64 * 1024
 _UPDATE_ACTION_COMPLETED_RE = re.compile(r"^=== hermes-update completed ([0-9a-f]{32}) ===$")
 _UPDATE_ACTION_STARTED_RE = re.compile(r"^=== hermes-update started .* ([0-9a-f]{32}) ===$")
 
-_MANAGED_EXTERNALLY_MESSAGE = "Hermes updates are managed outside this dashboard in containerized environments."
+_MANAGED_EXTERNALLY_MESSAGE = "Kouri Harness updates are managed outside this dashboard in containerized environments."
 
 # Per-kind dashboard error codes the UI keys on, by admission-refusal code.
 _UPDATE_REFUSAL_ERROR_CODES = {
@@ -283,7 +283,7 @@ async def update_hermes():
 
 _NON_APPLYABLE_MESSAGES = {
     "docker": format_docker_update_message,
-    "apt": lambda: "Hermes is managed by Termux APT; run `pkg upgrade hermes-agent`.",
+    "apt": lambda: "Kouri Harness is managed by Termux APT; run `pkg upgrade hermes-agent`.",
 }
 
 
@@ -294,7 +294,7 @@ def _source_release_label(status: dict[str, Any]) -> str:
 
 @router.get("/api/hermes/update/check")
 async def check_hermes_update(force: bool = False, profile: Optional[str] = None):
-    """Report whether a Hermes update is available, without applying it.
+    """Report whether a Kouri Harness update is available, without applying it.
 
     Returns install_method ('apt'|'git'|'docker'|'nix'|'nixos'|'unknown'),
     current_version, behind (commits behind, 0 = up to date, -1 = unknown count,
@@ -340,14 +340,16 @@ async def check_hermes_update(force: bool = False, profile: Optional[str] = None
         from hermes_cli.source_check import check_for_updates
 
         with _config_profile_scope(profile):
-            status = await asyncio.to_thread(check_for_updates, force=force)
+            status = await asyncio.to_thread(check_for_updates, force=force, passive=not force)
         behind = status.get("behind")
     except Exception:
         _log.exception("Update check failed")
         behind = None
 
     payload["behind"] = behind
-    if behind is None:
+    if status.get("reason") == "disabled":
+        payload.update(reason="disabled", message=status["message"])
+    elif behind is None:
         payload["message"] = "Couldn't reach the update source — try again later."
     elif behind == 0 and status.get("held"):
         version = status.get("sourceVersion")

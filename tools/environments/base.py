@@ -1,4 +1,4 @@
-"""Base class for all Hermes execution environment backends.
+"""Base class for all Kouri Harness execution environment backends.
 
 Unified spawn-per-call model: every command spawns a fresh ``bash -c`` process.
 A session snapshot (env vars, functions, aliases) is captured once at init and
@@ -273,7 +273,7 @@ def env_uses_host_filesystem(env: object) -> bool:
 
 
 class BaseEnvironment(LongLivedProcessMixin, ABC):
-    """Common interface and unified execution flow for all Hermes backends. Subclasses
+    """Common interface and unified execution flow for all Kouri Harness backends. Subclasses
     implement ``_run_bash()`` and ``cleanup()``; the base provides ``execute()`` with
     snapshot sourcing, CWD tracking, interrupt handling and timeout enforcement, and the
     long-lived process surface (``start_process`` / ``attach_process`` / ``stop_process``,
@@ -285,7 +285,7 @@ class BaseEnvironment(LongLivedProcessMixin, ABC):
     # "heredoc" (embedded in the command; no built-in backend, plugins only).
     _stdin_mode: str = "pipe"  # "pipe" | "payload" | "heredoc"
 
-    # True only when commands execute on the SAME host as the Hermes process
+    # True only when commands execute on the SAME host as the Kouri Harness process
     # (LocalEnvironment); controller-host facts then describe the execution target.
     is_local: bool = False
 
@@ -631,7 +631,7 @@ class BaseEnvironment(LongLivedProcessMixin, ABC):
                     rendered = output.render(suffix=f"\n[Command timed out after {timeout}s]")
                     if output.total_chars == 0:
                         rendered = rendered.lstrip()
-                    # The flag tells Hermes' own deadline apart from a command's own ``exit 124``.
+                    # The flag tells Kouri Harness' own deadline apart from a command's own ``exit 124``.
                     return {**self._finalize_wait_result(output, rendered, 124), "hermes_timed_out": True}
                 touch_activity_if_due(_activity_state, "terminal command running")
                 trace.heartbeat()
@@ -714,6 +714,11 @@ class BaseEnvironment(LongLivedProcessMixin, ABC):
         result["output"] = cleaned
 
     # --- Hooks ---
+    def _posix_rewrites_enabled(self) -> bool:
+        """Whether the command may be rewritten with bash-shaped syntax rules (``A && B &``).
+        A backend whose shell for THIS command is not a POSIX shell returns False."""
+        return True
+
     def _before_execute(self) -> None:
         """Hook before each command. Remote backends (SSH, Modal, Daytona)
         trigger their FileSyncManager here; bind-mount backends and Local don't."""
@@ -769,7 +774,7 @@ class BaseEnvironment(LongLivedProcessMixin, ABC):
         exec_command, sudo_stdin = self._prepare_command(command)
         # Guard against the `A && B &` subshell-wait trap by default; callers
         # that already produce shell-safe wrappers (spawn_via_env) pass False.
-        if rewrite_compound_background:
+        if rewrite_compound_background and self._posix_rewrites_enabled():
             from tools.terminal_tool_sudo import _rewrite_compound_background
             exec_command = _rewrite_compound_background(exec_command)
         effective_timeout = timeout or self.timeout

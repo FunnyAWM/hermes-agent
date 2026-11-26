@@ -71,9 +71,9 @@ describe('grants', () => {
   })
 
   it.each([
-    ['the Hermes home', () => hermesHome],
-    ['a folder inside the Hermes home', () => path.join(hermesHome, 'skills')],
-    ['a folder that contains the Hermes home', () => path.join(scratch, 'home')],
+    ['the Kouri Harness home', () => hermesHome],
+    ['a folder inside the Kouri Harness home', () => path.join(hermesHome, 'skills')],
+    ['a folder that contains the Kouri Harness home', () => path.join(scratch, 'home')],
     ['the app data folder', () => userData],
     ['another plugin data folder', () => path.join(userData, 'plugin-files', 'data', 'other')]
   ])('refuses to grant %s', async (_label, folder) => {
@@ -90,7 +90,7 @@ describe('grants', () => {
     expect(await files.addGrant('plexus', ssh)).toMatchObject({ ok: false, error: 'protected' })
   })
 
-  it('refuses to grant a symlink that resolves into the Hermes home', async () => {
+  it('refuses to grant a symlink that resolves into the Kouri Harness home', async () => {
     const link = path.join(scratch, 'innocent')
     fs.symlinkSync(hermesHome, link)
 
@@ -119,7 +119,7 @@ describe('grants', () => {
     })
   })
 
-  it('refuses a grant whose folder was swapped for a link into the Hermes home', async () => {
+  it('refuses a grant whose folder was swapped for a link into the Kouri Harness home', async () => {
     const id = await grantVault()
     fs.rmSync(vault, { recursive: true })
     fs.symlinkSync(hermesHome, vault)
@@ -135,21 +135,22 @@ describe('path containment', () => {
     ['nested traversal', 'notes/../../.hermes/.env'],
     ['backslash traversal', 'notes\\..\\..\\.hermes\\.env'],
     ['an absolute POSIX path', '/etc/passwd'],
-    ['an absolute path into the Hermes home', ''],
+    ['an absolute path into the Kouri Harness home', ''],
     ['a Windows drive path', 'C:\\Users\\me\\.hermes\\.env'],
     ['a UNC path', '\\\\server\\share\\x'],
     ['a NUL byte', 'notes/a.md\0.png']
   ])('refuses %s', async (label, rel) => {
     const id = await grantVault()
-    const target = label === 'an absolute path into the Hermes home' ? path.join(hermesHome, '.env') : rel
+    const target = label === 'an absolute path into the Kouri Harness home' ? path.join(hermesHome, '.env') : rel
 
     expect(await files.run('plexus', { op: 'readText', folder: id, path: target })).toMatchObject({
       ok: false,
       error: 'invalid-path'
     })
-    expect(
-      await files.run('plexus', { op: 'writeText', folder: id, path: target, text: 'pwned' })
-    ).toMatchObject({ ok: false, error: 'invalid-path' })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: target, text: 'pwned' })).toMatchObject({
+      ok: false,
+      error: 'invalid-path'
+    })
     expect(fs.readFileSync(path.join(hermesHome, 'config.yaml'), 'utf8')).toBe('model: x\n')
   })
 
@@ -188,13 +189,13 @@ describe('path containment', () => {
     const outside = path.join(scratch, 'created-outside.md')
     fs.symlinkSync(outside, path.join(vault, 'dangling.md'))
 
-    expect(
-      await files.run('plexus', { op: 'writeText', folder: id, path: 'dangling.md', text: 'x' })
-    ).toMatchObject({ ok: false })
+    expect(await files.run('plexus', { op: 'writeText', folder: id, path: 'dangling.md', text: 'x' })).toMatchObject({
+      ok: false
+    })
     expect(fs.existsSync(outside)).toBe(false)
   })
 
-  it('refuses listing, renaming and trashing through a symlinked folder into the Hermes home', async () => {
+  it('refuses listing, renaming and trashing through a symlinked folder into the Kouri Harness home', async () => {
     const id = await grantVault()
     fs.symlinkSync(hermesHome, path.join(vault, 'home'))
 
@@ -221,7 +222,10 @@ describe('path containment', () => {
     const listed = await files.run('plexus', { op: 'list', folder: id, path: '' })
 
     expect(listed).toMatchObject({ ok: true })
-    expect((listed as unknown as { entries: { name: string }[] }).entries.map(e => e.name).sort()).toEqual(['alias', 'notes'])
+    expect((listed as unknown as { entries: { name: string }[] }).entries.map(e => e.name).sort()).toEqual([
+      'alias',
+      'notes'
+    ])
   })
 
   it('rename keeps the item in its folder and refuses a name with a separator or traversal', async () => {
@@ -265,9 +269,7 @@ describe('plugin data folder', () => {
       ok: true,
       text: '{"a":1}'
     })
-    expect(fs.readFileSync(path.join(userData, 'plugin-files', 'data', 'plexus', 'state.json'), 'utf8')).toBe(
-      '{"a":1}'
-    )
+    expect(fs.readFileSync(path.join(userData, 'plugin-files', 'data', 'plexus', 'state.json'), 'utf8')).toBe('{"a":1}')
   })
 
   it("cannot reach another plugin's data folder or the grants record", async () => {

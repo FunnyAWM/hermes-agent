@@ -90,6 +90,9 @@ export interface ApprovalRequest extends KeyedPrompt {
   description: string
   /** What the card asks for; absent means a command (`ApprovalRequestParams.kind`). */
   kind?: ApprovalKind
+  /** Why the backend (an automatic review or a plugin rule) wants this call; shown next to
+   *  the command so the user decides on the actual effect, not just a risk label. */
+  justification?: string
   requestId?: string
   /** One short line under the folder or site. */
   risk?: string
@@ -221,6 +224,7 @@ interface PendingApprovalPayload {
   kind?: unknown
   label?: unknown
   path?: unknown
+  justification?: unknown
   request_id?: unknown
   risk?: unknown
   smart_denied?: boolean
@@ -475,6 +479,7 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
           : undefined,
         command: typeof pending.command === 'string' ? pending.command : '',
         description: typeof pending.description === 'string' ? pending.description : 'dangerous command',
+        justification: typeof pending.justification === 'string' ? pending.justification : undefined,
         requestId: pending.request_id,
         sessionId,
         smartDenied: pending.smart_denied === true,
@@ -523,7 +528,7 @@ export async function answerApproval(
   }
 
   if (!gateway) {
-    throw new Error('Hermes gateway is not connected')
+    throw new Error('Kouri Harness gateway is not connected')
   }
 
   const params = {

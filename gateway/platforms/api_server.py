@@ -93,7 +93,7 @@ def _approval_request_event(run_id: str, approval_data: Optional[dict[str, Any]]
     from gateway.platforms.api_server_runs import _run_event
     from gateway.run import _redact_approval_command
     event = dict(approval_data or {})  # consent prompts (MCP, vault) carry server/model text in the description
-    event.update({k: _redact_approval_command(event[k]) for k in ("command", "description") if k in event})
+    event.update({k: _redact_approval_command(event[k]) for k in ("command", "description", "justification") if k in event})
     event.update(_run_event(run_id, "approval.request", **fields, choices=_approval_event_choices(
         smart_denied=bool(event.get("smart_denied")),
         allow_session=event.get("allow_session") is not False,
@@ -289,7 +289,7 @@ def _request_agent_overrides(
 
     The virtual model (``hermes-agent``) means "gateway default". A bare ``model`` without
     ``provider`` is honored only when ``allow_bare_model`` (generic clients hardcode "gpt-4o";
-    OpenAI-compatible handlers pass the ``direct_model_requests`` opt-in, Hermes-native
+    OpenAI-compatible handlers pass the ``direct_model_requests`` opt-in, Kouri Harness-native
     endpoints always allow it). An explicit ``provider`` is always honored.
     """
     if not isinstance(body, dict):
@@ -895,7 +895,7 @@ def _names_launch_profile(profile: str) -> bool:
 def _derive_chat_session_id(system_prompt: Optional[str], first_user_message: str,
                             profile: Optional[str] = None) -> str:
     """Stable session id from the system prompt + first user message (constant across all
-    turns of an Open WebUI-style conversation), so one Hermes session/sandbox is reused.
+    turns of an Open WebUI-style conversation), so one Kouri Harness session/sandbox is reused.
     A routed ``/p/<profile>/`` prefix namespaces the seed: the id keys process-wide state
     (session store, per-session sandbox), so two profiles opening with identical text must not
     collide (#123989). Default/standalone ids are unchanged so live conversations survive, and
@@ -1082,7 +1082,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         # hardcode "gpt-4o" etc., hence off by default).
         # Off by default: generic OpenAI clients routinely hardcode model names ("gpt-4o", ...), and
         # existing deployments rely on those falling back to the gateway default rather than switching the
-        # executing model. Requests that send an explicit ``provider`` — and the Hermes-native session-chat
+        # executing model. Requests that send an explicit ``provider`` — and the Kouri Harness-native session-chat
         # and /v1/runs endpoints — are always honored regardless of this flag. (Idea credit: PR #22825 by
         # @mssteuer.)
         self._direct_model_requests: bool = _coerce_request_bool(
@@ -2371,7 +2371,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             "runtime": {
                 "mode": "server_agent", "tool_execution": "server", "split_runtime": False,
                 "description": (
-                    "The API server creates a server-side Hermes AIAgent; "
+                    "The API server creates a server-side Kouri Harness AIAgent; "
                     "tools execute on the API-server host unless a future "
                     "explicit split-runtime mode is enabled.")},
             "features": features,
@@ -2522,7 +2522,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     @_require_auth
     async def _handle_list_sessions(self, request: web.Request) -> web.Response:
-        """GET /api/sessions — list persisted Hermes sessions."""
+        """GET /api/sessions — list persisted Kouri Harness sessions."""
         store = self._store_beside(await self._ensure_store_async())
         if store is None:
             return self._session_db_unavailable()
@@ -2576,7 +2576,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     @_require_auth
     async def _handle_create_session(self, request: web.Request) -> web.Response:
-        """POST /api/sessions -- create an empty Hermes session row. Existence check, insert and
+        """POST /api/sessions -- create an empty Kouri Harness session row. Existence check, insert and
         title handling run as ONE off-loop write so concurrent same-id creates can't both 201."""
         body, err = await self._read_json_body(request)
         if err:

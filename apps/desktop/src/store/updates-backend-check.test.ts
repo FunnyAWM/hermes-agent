@@ -32,6 +32,24 @@ describe('mapBackendCheck', () => {
     expect(status.targetSha).toBeUndefined()
   })
 
+  it('keeps a disabled passive check distinct from a failed or completed check', () => {
+    const status = mapBackendCheck(response({ behind: null, reason: 'disabled' }))
+
+    const view = deriveUpdateStatus({
+      apply: { applying: false, stage: 'idle', message: '', percent: null, error: null, command: null, log: [] },
+      checking: false,
+      status,
+      target: 'backend',
+      u: en.updates
+    })
+
+    expect(status.reason).toBe('disabled')
+    expect(status.error).toBeUndefined()
+    expect(view.tone).toBe('idle')
+    expect(view.supported).toBe(true)
+    expect(view.line).toBe(en.updates.tapCheck)
+  })
+
   it('still reports an up-to-date backend when the check ran and found no gap', () => {
     const status = mapBackendCheck(response({ behind: 0, message: "You're on the latest version." }))
 

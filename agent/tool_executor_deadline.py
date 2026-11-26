@@ -31,3 +31,32 @@ def batch_deadline(generic: float | None, parsed_calls) -> float | None:
         if call.parse_error is None:
             generic = deadline_with_floor(generic, declared_deadline_floor(call.name, call.args))
     return generic
+
+
+# Fallback only; the effective bound derives from approvals.timeout (authorization_gate_lock_timeout).
+_AUTHORIZATION_GATE_LOCK_TIMEOUT_S = 360.0
+
+
+def authorization_gate_lock_timeout() -> float:
+    """Authorization-lock bound = ``tools.approval_human_wait.human_wait_ceiling`` (approval timeout +
+    margin, capped so it can't overflow Lock.acquire): never break serialization while a
+    prompt is answerable, never let a wedged holder park workers forever. Deliberately NOT
+    min()'d with the fallback so the gate never gives up early.
+
+    Delegates to ``tools.approval_human_wait.human_wait_ceiling`` — the same bound that clamps a human-wait window's
+    deadline contribution — so the two can't drift. Long enough that serialization is never broken while a
+    legitimate approval prompt is still answerable; short enough that a wedged holder (hanging
+    ``pre_tool_call`` plugin, dead approval client) cannot park other workers forever (#79719). Resolved
+    once per gate (per batch), so a mid-process ``approvals.timeout`` change applies from the next batch.
+    """
+    try:
+        from tools.approval_human_wait import human_wait_ceiling
+
+        # human_wait_ceiling is platform-safety-capped (agent/deadline.py MAX_SAFE_TIMEOUT_S): a huge
+        # approvals.timeout can no longer overflow Lock.acquire's time_t on macOS (#83220). Deliberately NOT
+        # min()'d with _AUTHORIZATION_GATE_LOCK_TIMEOUT_S — the gate must never give up while a legitimate
+        # approval prompt is still answerable (#79719), so a configured approvals.timeout above 360s must
+        # extend the gate.
+        return human_wait_ceiling()
+    except Exception:
+        return _AUTHORIZATION_GATE_LOCK_TIMEOUT_S

@@ -12,7 +12,7 @@ from gateway.session_persistence import authority_persistence, owner_rule
 from gateway.session_route_recovery import _messaging_platform, mountable
 
 # Local labels (a cron run is a canonical local session whose last viewer is its own fire).
-_LOCAL_SOURCES = ('cli', 'tui', 'gui', 'desktop', 'local', 'cron')
+_LOCAL_SOURCES = ('cli', 'tui', 'gui', 'desktop', 'local', 'cron', 'managed_worker')
 _CURSOR_TAG = 'l1'
 _CURSOR_MAX_CHARS = 1024
 _QUERY_MAX_CHARS = 200
@@ -67,7 +67,8 @@ def _excluded_sources():
 def _picker_row(row_id, row, tip, sid):
     return {'id': row_id, 'session_id': sid, 'resolved_id': sid, 'title': row.title or '',
             'source': tip.source, 'started_at': row.started_at,
-            'message_count': row.message_count, 'model': tip.model, 'running': False}
+            'message_count': row.message_count, 'model': tip.model, 'running': False,
+            'read_only': tip.source == 'managed_worker'}
 
 
 def _own_profile(store):
@@ -195,7 +196,8 @@ def _closed_local_session(authority, actor, row, tip):
             return None
     return {'id': owner, 'session_id': owner, 'resolved_id': owner, 'title': tip.title or row.title or '',
             'source': tip.source, 'started_at': row.started_at,
-            'message_count': row.message_count, 'model': tip.model, 'running': False}
+            'message_count': row.message_count, 'model': tip.model, 'running': False,
+            'read_only': tip.source == 'managed_worker'}
 
 
 def _stored_closed(authority, actor, owner):
@@ -212,6 +214,13 @@ def _stored_closed(authority, actor, owner):
         row = store.sessions.get(entry.session_id)
     except (KeyError, TypeError, ValueError, AttributeError):
         return False
-    return ((same_owner(receipt['principal_id'], actor.subject) or 'session:operator' in actor.capabilities)
-            and row is not None and row.ended_at is not None
+    from gateway.session_policy import MANAGED_WORKER_SOURCE
+    manages_workers = 'session:manage-worker' in actor.capabilities
+    managed_worker = row is not None and row.source == MANAGED_WORKER_SOURCE
+    if managed_worker:
+        readable = not manages_workers or same_owner(receipt['principal_id'], actor.subject)
+    else:
+        readable = (same_owner(receipt['principal_id'], actor.subject)
+                    or 'session:operator' in actor.capabilities or manages_workers)
+    return (readable and row is not None and row.ended_at is not None
             and not store.admissions.list(session_id=owner))

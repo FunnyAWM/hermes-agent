@@ -425,16 +425,31 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         from hermes_cli.plugin_session import session_viewers
         return session_viewers()
 
-    def post_message(self, text: str) -> Any:
-        """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
-        place. Never raises (``ok=False`` + ``error`` with no conversation): ``plugin_messages.py``."""
-        from hermes_cli.plugin_messages import post
-        return post(self, text)
+    async def in_gateway_chat(self, callback: Callable) -> Any:
+        """Run an async chat-tool callback with the bound human input on its gateway's event loop."""
+        import asyncio
+        from gateway.session_context import bound_chat_input
+        from hermes_cli.plugin_messages import _gateway_loop
 
-    async def apost_message(self, text: str) -> Any:
+        chat = bound_chat_input()
+        _, loop = _gateway_loop()
+        if chat is None or loop is None:
+            raise RuntimeError("a live gateway chat turn is required")
+        if loop is asyncio.get_running_loop():
+            return await callback(chat)
+        return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(callback(chat), loop))
+
+    def post_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
+        """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
+        place. A gateway admission hook may retain its plain ``source`` snapshot and pass it from a
+        background task. Never raises (``ok=False`` + ``error``): ``plugin_messages.py``."""
+        from hermes_cli.plugin_messages import post
+        return post(self, text, source=source)
+
+    async def apost_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
         """``post_message`` for async code on the gateway loop (edit with ``await handle.aedit``)."""
         from hermes_cli.plugin_messages import apost
-        return await apost(self, text)
+        return await apost(self, text, source=source)
 
     def ask_choice(self, question: str, choices: list) -> Optional[str]:
         """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or

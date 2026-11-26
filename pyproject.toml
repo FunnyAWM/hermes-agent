@@ -4,7 +4,7 @@
 
 [project]
 name = "hermes-agent"
-version = "0.0.0"
+version = "0.3.25+kaltsit"
 description = "The self-improving AI agent — creates skills from experience, improves them during use, and runs anywhere"
 readme = "README.md"
 # 3.14 is the newest python we know we have wheels for.
@@ -708,6 +708,8 @@ exclude-newer-package = { certifi = false }
 
 [tool.setuptools.packages.find]
 include = [
+  "hermes_notes",
+  "sync",
   "agent",
   "agent.*",
   "tools",
@@ -742,6 +744,8 @@ include = [
 ]
 
 [tool.setuptools.package-data]
+sync = ["bip39_english_words.txt"]
+"plugins.super_agent" = ["locales/*.yaml"]
 hermes_cli = [
   "observability/schemas/*.json",
   "data/*.json",

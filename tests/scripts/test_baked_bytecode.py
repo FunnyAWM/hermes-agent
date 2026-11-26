@@ -193,11 +193,17 @@ def test_launcher_keeps_user_cache_redirect_without_marker(tmp_path):
     payload = _make_payload(tmp_path)
     here = payload / "bin"
     here.mkdir()
-    environ = {"HOME": str(tmp_path / "userhome")}
+    # The wrapper picks the platform's user-cache root: LOCALAPPDATA on
+    # Windows, HOME elsewhere. Seed whichever one this host reads.
+    if sys.platform == "win32":
+        environ = {"LOCALAPPDATA": str(tmp_path / "localappdata")}
+        expected = tmp_path / "localappdata" / "hermes" / "pycache"
+    else:
+        environ = {"HOME": str(tmp_path / "userhome")}
+        expected = tmp_path / "userhome" / ".cache" / "hermes-pycache"
     original = sys.pycache_prefix
     try:
         ns["configure"](str(here), environ=environ)
-        assert environ["PYTHONPYCACHEPREFIX"] == str(
-            tmp_path / "userhome" / ".cache" / "hermes-pycache")
+        assert environ["PYTHONPYCACHEPREFIX"] == str(expected)
     finally:
         sys.pycache_prefix = original

@@ -11,6 +11,19 @@ import {
   setNewChatWorkspaceTarget
 } from '@/store/session'
 
+export interface FreshSessionDraftOptions {
+  /** The rail already owns this draft request; do not supersede its activation. */
+  preserveProfileSwitch?: boolean
+  preserveRoute?: boolean
+  replaceRoute?: boolean
+  rotateFreshDraftKey?: boolean
+  workspaceTarget?: NewChatWorkspaceTarget
+}
+
+export function normalizeNewChatWorkspaceTarget(target: NewChatWorkspaceTarget): NewChatWorkspaceTarget {
+  return typeof target === 'string' ? target.trim() || null : target
+}
+
 interface WorkspaceSessionOptions {
   activeSessionIdRef: MutableRefObject<string | null>
   followActiveSessionCwd?: (cwd: string) => void | Promise<void>

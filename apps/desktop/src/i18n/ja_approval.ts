@@ -5,6 +5,7 @@ export const jaApproval: Partial<ApprovalCopy> = {
   sendFailed: '承認応答を送信できませんでした',
   run: '実行',
   command: 'コマンド',
+  justification: '理由',
   moreOptions: 'その他の承認オプション',
   allowSession: 'このセッションで許可',
   alwaysAllowMenu: '常に許可…',

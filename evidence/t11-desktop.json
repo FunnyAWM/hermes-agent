@@ -1,0 +1,24 @@
+{
+  "mode": "python-probe",
+  "duration": 12.0,
+  "loopback": [
+    "127.0.0.1"
+  ],
+  "allowed": [],
+  "violations": [],
+  "remote_endpoints": [
+    "127.0.0.1:63949",
+    "127.0.0.1:63950"
+  ],
+  "unattributed_non_loopback": [],
+  "ok": true,
+  "electron": {
+    "netlog": "E:\\userdata\\temp\\hermes-t11-netlog-l21_d4qn.json",
+    "remote_endpoints": [],
+    "ok": true,
+    "hosts": [],
+    "loopback": [],
+    "allowed": [],
+    "violations": []
+  }
+}

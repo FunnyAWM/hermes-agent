@@ -12,13 +12,39 @@ import urllib.error
 from pathlib import Path
 
 from pm import termux_libs
-from pm.install import _facts, _lockfile, _reclaim_set_aside, _store, ensure, stage_only
+from pm.install import _facts, _lockfile, _reclaim_set_aside, _store, ensure, sealed, stage_only
 from pm.operations import lock_project
 from pm.package import InstallError
 from pm.paths import repo_root
 from pm.registry import get_package, source_install_packages, tool_roots
 from pm.store import ALL_TARGETS, current_target, hash_url
 from pm.update import Resolved, resolve_package, reuse_index_responses
+
+
+# In-place writes to the sealed payload: uv.lock relock, lock repins, venv repair,
+# generation reclaim.
+_SEALED_WRITE_COMMANDS = {"repair", "gc", "update", "lock"}
+
+
+def _sealed_install_blocked(args) -> bool:
+    """Bare installs and extra/test-env installs sync the sealed venv; named tool
+    installs write the writable store (%LOCALAPPDATA%\\hermes\\tools), which is how
+    a sealed install pulls missing tools after setup."""
+    if getattr(args, "extra", None) or getattr(args, "test_environment", None) is not None:
+        return True
+    return not (getattr(args, "names", None) or getattr(args, "tools_only", False))
+
+
+def _sealed_refusal(command: str) -> int:
+    from pm import receipt
+
+    detail = (
+        "this install is sealed: the runtime ships inside the app package and cannot be "
+        "modified in place. To update the runtime, install a newer package."
+    )
+    receipt.record_refusal("sealed-install", f"{command}: {detail}")
+    print(f"✗ {detail}")
+    return 1
 
 
 def cmd_lock(args) -> int:
@@ -298,7 +324,7 @@ def _split_without(names) -> tuple[list[str], list[str], list[str]]:
 def _install_defaults(names: list[str], *, verify: bool) -> None:
     """Install the optional defaults; a failure warns and never fails the install.
 
-    They are the browser and computer-use tools, not what Hermes needs to run:
+    They are the browser and computer-use tools, not what Kouri Harness needs to run:
     a Chromium download that fails behind a proxy must not abort an install
     whose required closure and venv are fine.
     """
@@ -449,6 +475,7 @@ def _doctor_staged_tool(package, lockfile, store, target, reason) -> int:
 
 def cmd_doctor(args) -> int:
     from pm.install import _identity, _installed_location, sealed
+    from pm.local_tools import find_local
     from pm.store import digest_matches
 
     lockfile = _lockfile()
@@ -467,6 +494,10 @@ def cmd_doctor(args) -> int:
             if shipped_facts.get(name) is not None or (version and store.entry(package.store_entry(version, target)).exists()):
                 bad += _doctor_staged_tool(package, lockfile, store, target, blocker)
                 continue
+        local = find_local(package, lockfile, target)
+        if local is not None:
+            print(f"✓ {name}: local {local.version} ({local.binary})")
+            continue
         facts, store = _installed_location(package, lockfile, target) or (_facts(), _store())
         fact = facts.get(name)
         soft = package.is_optional(target) or package.internal
@@ -919,7 +950,7 @@ def cmd_repair(args) -> int:
 
     if not recover_if_needed(repo_root(), explicit=True):
         return 1
-    print("Restart Hermes to use the repaired dependency environment.")
+    print("Restart Kouri Harness to use the repaired dependency environment.")
     return 0
 
 
@@ -927,7 +958,7 @@ def _extra_requirements(project: Path, extras: list[str]) -> list[str]:
     """The pinned requirements of declared extras, self-references expanded.
 
     Pins, not the whole lock, define the environment: an identity over uv.lock
-    would build a new generation on every Hermes update, and superseded side
+    would build a new generation on every Kouri Harness update, and superseded side
     generations are never reclaimed while a caller may still run from them.
     """
     import re
@@ -958,7 +989,7 @@ def cmd_environment(args) -> int:
     """Make a named side environment current and print its interpreter.
 
     Shell callers (skills) cannot import PM: the terminal's `python` is rarely
-    Hermes's own. Concurrent callers serialize on PM's per-environment lock and
+    Kouri Harness's own. Concurrent callers serialize on PM's per-environment lock and
     a rebuild lands in a new generation, so a running caller keeps its files.
     """
     import contextlib
@@ -1056,7 +1087,7 @@ def main(argv=None) -> int:
     p = sub.add_parser(
         "environment", help="make a named side environment current and print its python",
         description="Build or reuse HERMES_HOME/environments/NAME, an isolated venv that never "
-                    "touches Hermes's own: --extra installs the pins of a declared extra, "
+                    "touches Kouri Harness's own: --extra installs the pins of a declared extra, "
                     "--requirement an ad hoc bounded requirement (both repeatable). "
                     "Prints only the interpreter path on stdout.")
     p.add_argument("name")
@@ -1093,6 +1124,9 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "lock" and (args.name is None) != (args.version is None):
         lock_parser.error("--bump NAME and VERSION go together; run with neither to relock uv.lock")
+    if sealed() and (args.cmd in _SEALED_WRITE_COMMANDS
+                     or (args.cmd == "install" and _sealed_install_blocked(args))):
+        return _sealed_refusal(args.cmd)
     from pm.runtime import is_runtime, run_cli
 
     try:

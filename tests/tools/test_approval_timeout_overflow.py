@@ -79,18 +79,18 @@ class TestApprovalTimeoutOverflowClamp:
         # and (b) still EXTEND beyond the 360s fallback when approvals.timeout
         # is legitimately larger — clamping it down to the fallback would
         # break serialization while a real prompt is still answerable (#79719).
-        from agent.tool_executor import (
+        from agent.tool_executor_deadline import (
             _AUTHORIZATION_GATE_LOCK_TIMEOUT_S,
-            _authorization_gate_lock_timeout,
+            authorization_gate_lock_timeout,
         )
 
         with _with_configured_timeout(10**18):
-            bound = _authorization_gate_lock_timeout()
+            bound = authorization_gate_lock_timeout()
         lock = threading.Lock()
         assert lock.acquire(timeout=bound)
         lock.release()
 
         with _with_configured_timeout(3600):
-            bound = _authorization_gate_lock_timeout()
+            bound = authorization_gate_lock_timeout()
         assert bound > _AUTHORIZATION_GATE_LOCK_TIMEOUT_S
         assert bound == 3600 + 60.0  # approvals.timeout + HUMAN_WAIT_MARGIN_S

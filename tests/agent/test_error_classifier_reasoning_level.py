@@ -23,6 +23,12 @@ _GROQ_400 = (
     "Error code: 400 - {'error': {'message': \"'reasoning_effort' must be one of 'low', "
     "'medium', or 'high'\", 'type': 'invalid_request_error'}}"
 )
+# Rust-fronted relay (serde): the disable is an unknown enum variant (auto_review 2026-11-17).
+_SERDE_UNKNOWN_VARIANT_400 = (
+    "Error code: 400 - {'error': {'code': 'upstream_request_rejected', 'message': 'Failed to "
+    "deserialize the JSON body into the target type: reasoning_effort: unknown variant `none`, "
+    "expected one of `low`, `medium`, `high`, `max`'}}"
+)
 
 
 class _APIError(Exception):
@@ -31,7 +37,8 @@ class _APIError(Exception):
         self.status_code = status_code
 
 
-@pytest.mark.parametrize("body", [_TOKENPLAN_400, _OFF_LOW_HIGH_MAX_400, _GROQ_400])
+@pytest.mark.parametrize("body", [_TOKENPLAN_400, _OFF_LOW_HIGH_MAX_400, _GROQ_400,
+                                 _SERDE_UNKNOWN_VARIANT_400])
 def test_closed_level_set_rejection_is_reasoning_mandatory(body):
     result = classify_api_error(_APIError(body, 400), provider="custom", model="m")
     assert result.reason == FailoverReason.reasoning_mandatory
@@ -43,6 +50,10 @@ def test_closed_level_set_rejection_is_reasoning_mandatory(body):
     "Error code: 400 - 'tool_choice' must be one of none, auto, required",
     # A paired-field constraint, not a closed level set.
     "Error code: 400 - 'reasoning_effort' must be 'none' when 'enable_thinking' is false",
+    # The serde wordings name no field: another enum's complaint with a stray "thinking"
+    # nearby must not count without `reasoning` in the text as well.
+    "Error code: 400 - 'temperature': unknown variant `hot`, expected one of `low`, `medium`, "
+    "`high`; re-run with thinking disabled",
 ])
 def test_other_enum_wording_keeps_its_classification(body):
     result = classify_api_error(_APIError(body, 400), provider="custom", model="m")

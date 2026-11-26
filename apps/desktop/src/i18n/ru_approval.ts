@@ -5,6 +5,7 @@ export const ruApproval: Partial<ApprovalCopy> = {
   sendFailed: 'Не удалось отправить ответ на подтверждение',
   run: 'Выполнить',
   command: 'Команда',
+  justification: 'Обоснование',
   moreOptions: 'Больше опций подтверждения',
   allowSession: 'Разрешить в этом сеансе',
   alwaysAllowMenu: 'Всегда разрешать…',

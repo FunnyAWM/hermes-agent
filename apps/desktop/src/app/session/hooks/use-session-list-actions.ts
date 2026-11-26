@@ -47,6 +47,7 @@ import {
 import {
   $removedSessionIds,
   captureSessionTombstoneGenerations,
+  dropTombstonedSessions,
   sessionRemovalIntersected,
   type SessionTombstoneGenerationSnapshot,
   tombstoneRowIds
@@ -97,19 +98,8 @@ const MESSAGING_EXCLUDED_SOURCES = ['cron', ...LOCAL_SESSION_SOURCE_IDS]
 // conversation has answered to (tip, root, and every intermediate lineage
 // segment) — armed on one name, it must still catch the same conversation
 // returning under another (#123685).
-function dropTombstoned(sessions: SessionInfo[]): SessionInfo[] {
-  const tombstones = $removedSessionIds.get()
-
-  if (!tombstones.size) {
-    return sessions
-  }
-
-  const tombstoned = (session: SessionInfo): boolean => tombstoneRowIds(session).some(id => tombstones.has(id))
-
-  const kept = sessions.filter(session => !tombstoned(session))
-
-  return kept.length === sessions.length ? sessions : kept
-}
+const dropTombstoned = (sessions: SessionInfo[]): SessionInfo[] =>
+  dropTombstonedSessions(sessions, $removedSessionIds.get())
 
 // A fetch whose page was READ before an archive/delete committed can land
 // after the projects.tree prune has already dropped the tombstone (the tree is

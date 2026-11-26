@@ -2,9 +2,8 @@
 # Hermes Agent Setup Script (Windows) — THE dev-environment entry point.
 # ============================================================================
 # Sets up the pm-managed development environment from a fresh clone:
-#   1. Stage the pinned uv from pm/lock.json (sha256-verified, into the pm
-#      store slot) - pm needs uv to bootstrap, so it cannot stage uv itself.
-#   2. Use uv to install and locate bootstrap Python, then let uv exit.
+#   1. Reuse compatible local uv, or stage the verified pm/lock.json artifact.
+#   2. Locate compatible local/base Python; download only if missing, then let uv exit.
 #      Run `python -m pm.cli install` directly so PM can safely replace uv.
 #      PM owns the final interpreter, tool store, and dependency generation.
 #   3. Point you at `.\activate.ps1` - the venv-style way to put the pm env
@@ -43,9 +42,20 @@ $pyVersion = if ($pyPin) { ($pyPin.version -split '\+')[0] -replace '^(\d+\.\d+)
 $store = if ($env:HERMES_RUNTIME_DIR) { $env:HERMES_RUNTIME_DIR } else { Join-Path $HOME '.hermes/tools' }
 $entry = Join-Path $store "uv-$($uvPin.version)-$target"
 $uv = Join-Path $entry 'uv.exe'
+$uvPinVersion = $null
+try { $uvPinVersion = [version]$uvPin.version } catch { }
+if ($uvPinVersion) {
+    foreach ($candidate in @(Get-Command uv -CommandType Application -All -ErrorAction SilentlyContinue)) {
+        $version = ''
+        try { $version = ((& $candidate.Source --version 2>$null) -join ' ') } catch { }
+        if ($LASTEXITCODE -eq 0 -and $version -match '^uv (\d+\.\d+\.\d+)') {
+            if ([version]$Matches[1] -ge $uvPinVersion) { $uv = $candidate.Source; break }
+        }
+    }
+}
 
 if (Test-Path $uv) {
-    Write-Host ("pinned uv found: " + (& $uv --version)) -ForegroundColor Green
+    Write-Host ("Using existing uv: " + (& $uv --version)) -ForegroundColor Green
 } else {
     Write-Host "Staging pinned uv $($uvPin.version) ($target) into the pm store..." -ForegroundColor Cyan
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("hermes-setup-" + [guid]::NewGuid().ToString('n'))
@@ -84,19 +94,29 @@ try {
     # PM can replace its uv entry only after the bootstrap uv has exited.
     # A bare version lets uv pick emulated x86_64 on Windows-on-ARM.
     $pyRequest = "cpython-$pyVersion-windows-$(if ($arch -eq 'arm64') { 'aarch64' } else { 'x86_64' })-none"
-    & $uv python install --no-bin --no-registry $pyRequest
-    if ($LASTEXITCODE -ne 0) { throw 'bootstrap Python installation failed' }
     # Like scripts/install.ps1, decode uv's UTF-8 path independently of the
     # caller's console code page. Keep this scope local: install.ps1 must also
     # work as a standalone download before a checkout (and shared files) exists.
     $previousNativeOutputEncoding = [Console]::OutputEncoding
     try {
         [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-        $bootPy = (& $uv python find --managed-python $pyRequest) -join "`n"
+        $previousErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $bootPy = (& $uv python find --system --no-managed-python --no-python-downloads --no-project $pyRequest 2>$null) -join "`n"
+        if ($LASTEXITCODE -ne 0 -or -not $bootPy) {
+            $bootPy = (& $uv python find --managed-python --no-python-downloads --no-project $pyRequest 2>$null) -join "`n"
+        }
+        if ($LASTEXITCODE -ne 0 -or -not $bootPy) {
+            & $uv python install --no-bin --no-registry $pyRequest
+            if ($LASTEXITCODE -ne 0) { throw 'bootstrap Python installation failed' }
+            $bootPy = (& $uv python find --managed-python --no-project $pyRequest) -join "`n"
+        }
     } finally {
+        $ErrorActionPreference = $previousErrorAction
         [Console]::OutputEncoding = $previousNativeOutputEncoding
     }
     if ($LASTEXITCODE -ne 0 -or -not $bootPy) { throw 'bootstrap Python lookup failed' }
+    $env:Path = "$(Split-Path $uv -Parent);$(Split-Path $bootPy.Trim() -Parent);$env:Path"
     & $bootPy.Trim() -m pm.cli install $(if ($RuntimeOnly) { '--trust-recorded' }) "--test-environment=$TestExtras"
     if ($LASTEXITCODE -ne 0) { throw 'pm install failed - see output above.' }
 } finally {

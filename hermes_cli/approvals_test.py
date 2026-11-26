@@ -102,9 +102,7 @@ def evaluate_command(command: str, env_type: str = "local") -> dict:
             detail="the hardline scan could not read the whole command, so only a human may approve "
                    "it; --yolo / approvals.mode: off (like cron/-q/unattended contexts) refuse it",
         )
-    if (approval._YOLO_MODE_FROZEN
-            or approval.is_current_session_yolo_enabled()
-            or approval_context._get_approval_mode() == "off"):
+    if bypass:
         return result(
             "allow",
             detail="approval bypass active (--yolo or approvals.mode: off); "

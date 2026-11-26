@@ -99,7 +99,7 @@ export const slashCmdCoreEn = {
     history: {
       noConversation: 'no conversation yet',
       youTag: (index: string) => `You #${index}`,
-      hermesTag: (index: string) => `Hermes #${index}`,
+      hermesTag: (index: string) => `Kouri Harness #${index}`,
       toolCallsOne: (count: string) => `(${count} tool call)`,
       toolCallsOther: (count: string) => `(${count} tool calls)`,
       empty: '(empty)',
@@ -172,7 +172,8 @@ export const slashCmdCoreEn = {
     rewind: {
       nothing: 'nothing to rewind to',
       noPrevious: 'No previous message to edit.',
-      editNotSent: '↺ edit not sent: the session changed before the rewind, so nothing was removed (↑ recalls the text)',
+      editNotSent:
+        '↺ edit not sent: the session changed before the rewind, so nothing was removed (↑ recalls the text)',
       editNotSentUnknown:
         '↺ edit not sent: the session changed while the rewind was in flight, so it may have been applied; check that session (↑ recalls the text)',
       cancelled: '↺ Rewind cancelled; nothing was removed.',
@@ -185,7 +186,7 @@ export const slashCmdCoreEn = {
     // A refused /undo or /retry: main's busy text (tui_gateway/user_messages.py::busy_message).
     busy: {
       replying: (command: string) =>
-        `session busy — Hermes is still replying. Stop the current reply first (Stop button, or Ctrl+C in a terminal), then run /${command}.`,
+        `session busy — Kouri Harness is still replying. Stop the current reply first (Stop button, or Ctrl+C in a terminal), then run /${command}.`,
       compressing: (command: string) => `session busy — a /compress is running; run /${command} when it finishes.`
     }
   },

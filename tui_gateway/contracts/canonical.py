@@ -176,6 +176,7 @@ class SessionInventoryFields(Result):
     unknown_toolsets: list[str] | None = None  # main's "Unknown toolsets" warning, judged by the gateway
     # The resident agent's status-bar usage (``gateway/session_usage.py::snapshot_usage``); absent agentless.
     usage: Usage | None = None
+    read_only: bool = False
 
 
 class CanonicalClientLabel(Result):

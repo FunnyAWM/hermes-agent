@@ -120,7 +120,7 @@ def _search_stdout_and_limit(result: ExecuteResult) -> tuple[str, Optional[str]]
 
 
 def _bundled_rg() -> Optional[str]:
-    """Hermes's pinned ripgrep, forward-slashed for the shell transports, or None."""
+    """Kouri Harness's pinned ripgrep, forward-slashed for the shell transports, or None."""
     import pm
 
     try:
@@ -172,6 +172,14 @@ _PERMISSION_DENIED_RE = re.compile(
 
 
 _SHELL_EXEC_FAILURE_CODES = frozenset({126, 127})
+
+# A confined Windows session runs commands under PowerShell, where the POSIX fallbacks
+# (find/grep/ls/head) do not exist: without rg there is no engine to fall back to, and
+# degrading silently would report "no matches" for a tree that was never walked.
+_SANDBOXED_WINDOWS_SEARCH_ERROR = (
+    "sandboxed Windows file search needs ripgrep (rg): the command sandbox runs PowerShell, "
+    "so there is no 'find'/'grep' to fall back to. Install ripgrep: "
+    "https://github.com/BurntSushi/ripgrep#installation")
 
 _FIND_QUOTES_RE = re.compile(r"^['\u2018]|['\u2019]$")
 
@@ -534,7 +542,7 @@ class SearchMixin:
         from tools.environments.base import env_uses_host_filesystem
         from tools.environments.local import _IS_WINDOWS
 
-        # A host search is Hermes's own work, so it runs the pinned ripgrep, never the
+        # A host search is Kouri Harness's own work, so it runs the pinned ripgrep, never the
         # first rg on the terminal PATH, where the user's tools come first.
         on_host = env_uses_host_filesystem(self.env)
         bundled = _bundled_rg() if on_host else None
@@ -589,7 +597,7 @@ class SearchMixin:
         self._rg_modified_capability[executable] = error
         return error
 
-    # --- native rg transport (local POSIX) --------------------------------------
+    # --- native rg transport (host filesystem) ----------------------------------
 
     def _run_rg_native(self, argv: list[str], fetch_limit: int, timeout: int,
                        merge_stderr: bool = False) -> ExecuteResult:
@@ -605,7 +613,8 @@ class SearchMixin:
         (``2>/dev/null``) for probes. Like the shell's ``2>&1``-free ``| head``, kept
         stderr is drained on its own pipe so diagnostics never use up the
         ``fetch_limit`` lines meant for results; it is prepended to stdout."""
-        from tools.environments.local import _kill_process_group_posix, _make_run_env
+        from tools.environments.local import (
+            _IS_WINDOWS, _kill_process_group_posix, _kill_process_windows, _make_run_env)
         cwd = getattr(self.env, "cwd", None) or self.cwd
         args = shlex.split(" ".join(argv))
         try:
@@ -658,7 +667,10 @@ class SearchMixin:
                 exit_code = 124
                 break
         if proc.poll() is None:
-            _kill_process_group_posix(proc)  # native lane is POSIX-only (gate above)
+            if _IS_WINDOWS:
+                _kill_process_windows(proc)
+            else:
+                _kill_process_group_posix(proc)
         proc.wait()
         drainer.join()
         proc.stdout.close()
@@ -683,9 +695,11 @@ class SearchMixin:
                         merge_stderr: bool = False, native_ok: bool = True,
                         shell_prefix: str = "") -> ExecuteResult:
         """Run an rg command (shell-quoted words) and keep the first ``fetch_limit``
-        lines: natively on a local POSIX host, else through the backend shell as
-        ``<prefix><words> | head -n N``. ``native_ok=False`` keeps a form the native
- lane cannot express (the multi-root ``cd`` prefix); ``shell_prefix`` is shell-only."""
+        lines: natively whenever the file tools may bypass the shell (a host-filesystem
+        backend, or a confined Windows session whose shell is PowerShell and so has no
+        ``| head``), else through the backend shell as ``<prefix><words> | head -n N``.
+        ``native_ok=False`` keeps a form the native lane cannot express (the multi-root
+        ``cd`` prefix); ``shell_prefix`` is shell-only."""
         if native_ok and self._native_read_enabled():
             return self._run_rg_native(words, fetch_limit, timeout, merge_stderr=merge_stderr)
         stderr = "" if merge_stderr else " 2>/dev/null"
@@ -997,6 +1011,15 @@ class SearchMixin:
         """Sort paths newest-first using metadata from the active backend."""
         if len(paths) < 2:
             return paths
+        if sys.platform == "win32" and self._native_read_enabled():
+            # A confined Windows shell is PowerShell, which has no ``stat`` loop to pipe
+            # paths through; the files are on this host, so read the timestamps directly.
+            def _mtime(item: str) -> float:
+                try:
+                    return os.stat(self._native_path(item)).st_mtime
+                except OSError:
+                    return 0.0
+            return sorted(paths, key=_mtime, reverse=True)
 
         script = (
             'while IFS= read -r item || [ -n "$item" ]; do '
@@ -1105,6 +1128,8 @@ class SearchMixin:
             finally:
                 _release_filename_search_roots(keys)
 
+        if sys.platform == "win32" and self._native_read_enabled():
+            return SearchResult(error=_SANDBOXED_WINDOWS_SEARCH_ERROR)
         # A local find rooted at/above $HOME or a filesystem root can take minutes and
         # prompt on protected paths: refuse before invoking find.
         if any(self._is_broad_local_search_root(root) for root in roots):
@@ -1295,6 +1320,8 @@ class SearchMixin:
                                           rg_executable=self._resolve_command("rg") or "rg")
         elif self._has_command('grep'):
             result = self._search_with_grep(pattern, path, file_glob, limit, offset, output_mode, context)
+        elif sys.platform == "win32" and self._native_read_enabled():
+            return SearchResult(error=_SANDBOXED_WINDOWS_SEARCH_ERROR)
         else:
             return SearchResult(
                 error="Content search requires ripgrep (rg) or grep. "

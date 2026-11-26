@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import type { PluginSettingField, PluginSettingFieldType } from '@/store/agent-plugins'
 
 import { CONTROL_TEXT } from './constants'
+import { PluginCatalogSelect } from './plugin-catalog-select'
 import { ListRow, Pill, SectionHeading } from './primitives'
 
 // A plugin manifest's `config_schema` rendered as a form. Every non-secret
@@ -284,9 +285,11 @@ export function PluginSettingsForm({
   disabled,
   intro,
   onSave,
+  scope,
   title
 }: {
   fields: PluginSettingField[]
+  scope?: null | string
   idPrefix: string
   disabled: boolean
   /** Lead copy under the page heading (the plugin's description). */
@@ -373,16 +376,39 @@ export function PluginSettingsForm({
           const Control = FIELD_CONTROLS[field.type]
           const label = fieldLabel(field)
 
-          const control = (
-            <Control
-              disabled={disabled || saving}
-              field={field}
-              id={id}
-              onChange={raw => setDraft(current => ({ ...current, [field.key]: raw }))}
-              raw={draft[field.key] ?? ''}
-              secretSetHint={s.secretSet}
-            />
-          )
+          const dependentModels = fields.filter(model => model.model_provider_key === field.key)
+          const isProvider = dependentModels.length > 0
+
+          const control =
+            isProvider || field.model_provider_key ? (
+              <PluginCatalogSelect
+                disabled={disabled || saving}
+                id={id}
+                isProvider={isProvider}
+                label={label}
+                onChange={value =>
+                  setDraft(current => ({
+                    ...current,
+                    ...(value !== current[field.key]
+                      ? Object.fromEntries(dependentModels.map(model => [model.key, '']))
+                      : {}),
+                    [field.key]: value
+                  }))
+                }
+                provider={draft[field.model_provider_key ?? field.key] ?? ''}
+                scope={scope}
+                value={draft[field.key] ?? ''}
+              />
+            ) : (
+              <Control
+                disabled={disabled || saving}
+                field={field}
+                id={id}
+                onChange={raw => setDraft(current => ({ ...current, [field.key]: raw }))}
+                raw={draft[field.key] ?? ''}
+                secretSetHint={s.secretSet}
+              />
+            )
 
           const description =
             joinSentences(field.description, field.type === 'secret' && field.env ? s.secretStoredAs(field.env) : '') ||

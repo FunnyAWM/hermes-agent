@@ -147,7 +147,11 @@ export async function connectPrimaryRemote<State extends object>(
 ) {
   options.signal?.throwIfAborted()
   options.assertCurrentAttempt()
-  await options.advanceBootProgress('backend.remote', `Connecting to remote Hermes backend at ${remote.baseUrl}`, 24)
+  await options.advanceBootProgress(
+    'backend.remote',
+    `Connecting to remote Kouri Harness backend at ${remote.baseUrl}`,
+    24
+  )
   await options.waitForRemote(remote)
   options.signal?.throwIfAborted()
   options.assertCurrentAttempt()
@@ -188,7 +192,7 @@ export async function connectPrimaryRemote<State extends object>(
 
   options.updateBootProgress({
     phase: 'backend.ready',
-    message: 'Remote Hermes backend is ready',
+    message: 'Remote Kouri Harness backend is ready',
     progress: 94,
     running: true,
     error: null

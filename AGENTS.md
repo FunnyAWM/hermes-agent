@@ -1,19 +1,14 @@
 # Hermes Agent - Development Guide
 
-This root file is a hub: what applies everywhere, then a routing table. Each area's `AGENTS.md`
-loads automatically when you work in that directory; read it before editing there.
-`python scripts/check` caps this file at 12k chars and every root-to-area chain at 30k: long form
-goes in `website/docs/developer-guide/`.
+Read each area's `AGENTS.md` before editing. `python scripts/check` caps this file at 12k chars
+and each root-to-area chain at 30k. Long form lives in `website/docs/developer-guide/`.
 
 **Never give up on the right solution.**
 
 ## What Hermes Is
 
-Hermes is a personal AI agent that runs one agent core across a CLI, a TUI, an Electron desktop
-app, a web dashboard, ACP editors and a messaging gateway (25+ platform plugins). It is extended
-through **plugins and skills**, not by growing the core.
-
-Two invariants shape almost every design decision and are the lens for reviewing any change:
+Hermes shares its agent core across CLI, TUI, Electron, dashboard, ACP and the messaging gateway.
+Extend it through plugins and skills.
 
 - **Per-conversation prompt caching is sacred.** Mutating past context, swapping toolsets,
   reloading memories or rebuilding the system prompt mid-conversation breaks the cached prefix and
@@ -29,10 +24,9 @@ A change to the stock system prompt or `tools[]` fails `tests/ci/test_prompt_sur
 
 ## Contribution rubric
 
-The project's intent layer, for contributors and for the triage sweeper (which may only close on
-`implemented_on_main`, `cannot_reproduce` or `incoherent`; taste-based closes are a maintainer's
-call, and when in doubt a PR stays open). Long form with examples:
-`website/docs/developer-guide/contributing.md` § Contribution rubric.
+The triage sweeper may close only on `implemented_on_main`, `cannot_reproduce` or `incoherent`.
+Maintainers decide taste questions. Leave uncertain PRs open. See
+`website/docs/developer-guide/contributing.md` under Contribution rubric.
 
 **Wanted:** real bug fixes (repro on `main`, the exact line, the whole class incl. sibling paths);
 reach at the edges (adapters, providers, models, UI features) wired into the existing setup UX;
@@ -83,9 +77,11 @@ hermes-agent/
 ├── cli.py                # HermesCLI (REPL, slash dispatch) + hermes_cli/cli_*_mixin.py
 ├── persistence/          # storage interface and its sqlite/ backend
 ├── hermes_constants.py   # get_hermes_home(), display_hermes_home() — profile-aware paths
-├── scripts/              # check, run_tests.sh, code_health/, ci/
-├── evals/                # live-model A/B and probe harnesses
-└── website/              # Docusaurus docs (developer-guide/ holds the long-form area docs)
+├── agent/ hermes_cli/ tools/ gateway/ plugins/ skills/ cron/
+├── ui-tui/, tui_gateway/  # Ink TUI + its JSON-RPC backend
+├── apps/desktop/  web/    # Electron app; dashboard SPA
+├── pm/, hermes_platform/  # dependency/env manager; host facts
+├── scripts/  website/  tests/  # gates, docs, pytest suite
 ```
 
 **User state:** `~/.hermes/config.yaml` (settings), `.env` (secrets only), `logs/` (`hermes logs`);
@@ -168,5 +164,11 @@ per variant and a name → variant table (`tools/environments/`, its table still
 | `hermes_platform/` | `hermes_platform/AGENTS.md` | host facts, resolvers |
 | `acp_adapter/` | `website/docs/developer-guide/acp-internals.md` | ACP server for editors |
 | `providers/` | `providers/README.md` | `ProviderProfile` registry and ABC |
+| `sync/` | `sync/AGENTS.md` | KouriChat Link device-chain sync |
 
 PR workflow: `CONTRIBUTING.md` (maintainers: the `hermes-agent-dev` skill, not shipped here).
+
+## Working constraints
+
+Fork policy: @AGENTS_PROJECT.md outranks the upstream rubric here. Baselines:
+@AGENTS_PYTHON.md (Python), @AGENTS_FRONTEND.md (`apps/`, `ui-tui/`, `web/`).

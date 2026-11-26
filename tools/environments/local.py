@@ -1,6 +1,7 @@
 """Local execution environment — spawn-per-call with session snapshot."""
 
 import contextlib
+import contextvars
 import logging
 import ntpath
 import os
@@ -19,6 +20,7 @@ from pathlib import Path
 
 from hermes_constants import get_process_hermes_home
 from tools.environments.base import BaseEnvironment, _SHELL_ENV_NAME_RE
+from tools.environments import local_command_sandbox
 from tools.environments.base_output import _pipe_stdin
 from hermes_cli._subprocess_compat import windows_hide_flags
 from hermes_cli.process_identity import own_process_groups, release_process_groups
@@ -40,6 +42,11 @@ from hermes_cli._startup_fast import project_root_str
 
 
 _IS_WINDOWS = platform.system() == "Windows"
+
+# The command-sandbox decision for the spawn in flight: set by execute(), read by
+# _prepare_command/_wrap_command/_run_bash. A ContextVar (not TLS) because base.execute
+# spawns through agent.deadline.run_bounded_sync, whose worker inherits this context.
+_CONFINED_RUN: contextvars.ContextVar = contextvars.ContextVar("hermes_confined_run", default=None)
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +289,7 @@ def _inject_session_context_env(env: dict) -> None:
 def _filter_secret_env(
     items: Mapping[str, str], out: dict, *, unwrap_force: bool,
     plugin_strip: frozenset = frozenset()) -> None:
-    """Copy *items* into *out*, dropping Hermes-managed secrets. ``_HERMES_FORCE_<NAME>``
+    """Copy *items* into *out*, dropping Kouri Harness-managed secrets. ``_HERMES_FORCE_<NAME>``
     unwraps to ``NAME`` when ``unwrap_force`` (caller extras / terminal env), else is
     dropped. Blocklisted names survive only via env_passthrough registration or as
     context-entitled first-party ``BUZZ_*`` vars; the latter are used directly, never
@@ -315,7 +322,7 @@ def _filter_secret_env(
 
 def _finalize_child_env(env: dict) -> dict:
     """Guards shared by every spawn surface: profile-home propagation, session-context
-    bridging, Hermes-owned PYTHONPATH + venv-marker strip, MSYS defaults, delegate_task
+    bridging, Kouri Harness-owned PYTHONPATH + venv-marker strip, MSYS defaults, delegate_task
     Kanban scrub. Returns the (possibly new) dict."""
     _apply_profile_home(env)
     _inject_session_context_env(env)
@@ -350,7 +357,7 @@ def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
 
 
 def _sanitize_subprocess_env(base_env: dict | None, extra_env: dict | None = None) -> dict:
-    """Filter Hermes-managed secrets from a subprocess environment (background/PTY
+    """Filter Kouri Harness-managed secrets from a subprocess environment (background/PTY
     spawn path, search workers, computer-use driver, user-script runners)."""
     return _scrubbed_env([(base_env or {}, False), (extra_env or {}, True)],
                          _plugin_terminal_env_strip_keys(), lambda p: p)
@@ -628,7 +635,7 @@ def restore_managed_env(env: dict) -> dict:
 
 # --- Shell discovery ---
 def _find_bash() -> str:
-    """Resolve the shell Hermes runs commands with. Owned by pm (the store
+    """Resolve the shell Kouri Harness runs commands with. Owned by pm (the store
     is the authority on bundled bash); this is a thin wrapper over
     pm.shell() for callers that need a bash binary."""
     import pm.shell
@@ -637,7 +644,7 @@ def _find_bash() -> str:
     if bash:
         return bash
     raise RuntimeError(
-        "No shell found. Hermes needs bash (Git for Windows on Windows). "
+        "No shell found. Kouri Harness needs bash (Git for Windows on Windows). "
         "Run `hermes pm install` or reinstall the bundle."
     )
 
@@ -677,7 +684,7 @@ def _prepend_missing_path_entries(existing_path: str, dirs: list[str]) -> str:
 
 
 def _user_tools_first(existing_path: str) -> str:
-    """*existing_path* with the user's tools before Hermes's (``pm.user_facing``) and, on
+    """*existing_path* with the user's tools before Kouri Harness's (``pm.user_facing``) and, on
     Windows, Git Bash's dirs first. They go first even when already listed: they are store
     dirs that now sit behind the user's entries, and a non-login ``bash -c`` needs its
     coreutils ahead of System32's lookalikes."""
@@ -769,11 +776,11 @@ def _prepend_hermes_bin_dir(existing_path: str) -> str:
 
 
 def _managed_runtime_path_entries() -> list[str]:
-    """Return existing Hermes-managed runtime dirs for the terminal subshell PATH.
+    """Return existing Kouri Harness-managed runtime dirs for the terminal subshell PATH.
 
     The terminal tool spawns a subshell whose PATH is the agent process's PATH
-    plus ``_SANE_PATH``. Neither carries the runtimes Hermes installs for
-    itself, so on a machine where Hermes provisioned its own toolchain a
+    plus ``_SANE_PATH``. Neither carries the runtimes Kouri Harness installs for
+    itself, so on a machine where Kouri Harness provisioned its own toolchain a
     command the agent runs resolves a system copy instead — or nothing at all:
 
     - the pm store's node/npm entries — installed to satisfy the desktop
@@ -835,7 +842,7 @@ def _apply_windows_msys_bash_env_defaults(env: dict) -> None:
 
     Git Bash rewrites arguments that look like Unix paths (``/FO``, ``/TN``, ``/Create``) into
     ``C:/.../git/FO``-style paths, which breaks native Windows commands such as ``tasklist``, ``schtasks``,
-    and ``wmic``. Hermes runs terminal commands through bash on Windows, so set the standard MSYS opt-out by
+    and ``wmic``. Kouri Harness runs terminal commands through bash on Windows, so set the standard MSYS opt-out by
     default. Refs #56700.
     MSYS2-proper and Cygwin bash (which ``_find_bash`` can still return via the final ``shutil.which``
     fallback) ignore it and honor ``MSYS2_ARG_CONV_EXCL`` instead, so set both. ``*`` disables all argv
@@ -903,11 +910,11 @@ def _make_run_env(env: dict) -> dict:
     return run_env
 
 
-# --- Hermes venv / repo-root detection (module-level, computed once) ---
+# --- Kouri Harness venv / repo-root detection (module-level, computed once) ---
 # Owned here; read lazily by tools.environments.local_pythonpath (tests patch here).
 # The Electron app prepends the repo root to PYTHONPATH so the backend can ``import
 # tools``; other subprocesses must not inherit it. Aliases: launchers may emit other
-# spellings — the Windows gateway launcher renders Hermes-owned paths under the
+# spellings — the Windows gateway launcher renders Kouri Harness-owned paths under the
 # configured HERMES_HOME spelling (possibly a junction to another drive).
 _hermes_repo_root: Path = Path(project_root_str())
 _hermes_repo_root_aliases: tuple[Path, ...] = _build_hermes_repo_root_aliases(
@@ -1142,7 +1149,7 @@ class LocalEnvironment(BaseEnvironment):
 
     _passwordless_sudo_probe_supported = True
     _profile_scoped_passthrough = True
-    # Commands run on the Hermes host itself — controller-side platform behavior
+    # Commands run on the Kouri Harness host itself — controller-side platform behavior
     # (macOS TCC pruning, etc.) legitimately applies here.
     is_local = True
     # A subclass that confines its commands (a sandbox) sets this False: see BaseEnvironment.
@@ -1183,10 +1190,51 @@ class LocalEnvironment(BaseEnvironment):
                 "secret_gen": _secret_gen_token(self._session_id), "secret_src": _secret_src_token(self._session_id),
                 "secret_restore": _secret_restore_token(self._session_id)}
 
+    # --- Command sandbox (see tools/environments/local_command_sandbox.py) ---
+    def _confined_run(self, cwd: str) -> "local_command_sandbox.ConfinedRun | None":
+        """The confinement for one command, or None when it runs directly. Fails closed:
+        an enabled gate with no launcher has no unsandboxed fallback."""
+        if not local_command_sandbox.active():
+            return None
+        cfg = local_command_sandbox.settings()
+        if local_command_sandbox.resolve_binary(cfg) is None:
+            raise RuntimeError(local_command_sandbox.missing_binary_message(cfg))
+        shell = local_command_sandbox.confined_shell()
+        if shell is None:
+            raise RuntimeError(local_command_sandbox.unsupported_shell_message())
+        return local_command_sandbox.make_run(
+            shell=shell, cfg=cfg, cwd=cwd, scratch=self.get_temp_dir(), cwd_marker=self._cwd_marker)
+
+    def execute(self, command, cwd: str = "", **kwargs):
+        # ContextVar, not thread-local: base.execute spawns on a deadline worker that inherits
+        # the caller's context (copy_context), so a TLS value would be invisible there.
+        token = _CONFINED_RUN.set(self._confined_run(cwd or self.cwd))
+        try:
+            return super().execute(command, cwd=cwd, **kwargs)
+        finally:
+            _CONFINED_RUN.reset(token)
+
+    def _posix_rewrites_enabled(self) -> bool:
+        run = _CONFINED_RUN.get()
+        return run is None or run.shell.kind == "posix"
+
+    def _prepare_command(self, command: str) -> tuple[str, str | None]:
+        # The sudo/macOS rewrites are bash-shaped; a confined PowerShell command must reach
+        # the shell exactly as the model wrote it.
+        if self._posix_rewrites_enabled():
+            return super()._prepare_command(command)
+        return command, None
+
+    def _wrap_command(self, command: str, cwd: str) -> str:
+        run = _CONFINED_RUN.get()
+        if run is None or run.shell.kind == "posix":
+            return super()._wrap_command(command, cwd)
+        return local_command_sandbox.powershell_script(command, cwd=cwd, markers=run)
+
     def get_temp_dir(self) -> str:
         """Shell-safe writable temp dir. Precedence: ``TERMINAL_TEMP_DIR``, TMPDIR/TMP/TEMP
         (Termux has no system temp dir), ``HERMES_HOME/cache/terminal`` (real storage: a
-        tmpfs system temp dir fills under Hermes load; pruned by ``cleanup_terminal_temp_cache``),
+        tmpfs system temp dir fills under Kouri Harness load; pruned by ``cleanup_terminal_temp_cache``),
         ``tempfile.gettempdir()``; backend env before process env so terminal.env
         overrides work. Windows: ``%TEMP%`` often has spaces that break unquoted bash,
         so always the HERMES_HOME cache dir with forward slashes (bash- and Python-valid)."""
@@ -1258,6 +1306,7 @@ class LocalEnvironment(BaseEnvironment):
 
     def _run_bash(self, cmd_string: str, *, login: bool = False, timeout: int = 120,
                   stdin_data: str | None = None) -> subprocess.Popen:
+        run = _CONFINED_RUN.get()
         bash = _find_bash()
         run_env = _make_run_env(self.env)
         handoff = getattr(self, "_secret_handoff", None)  # absent on bare test doubles (__new__)
@@ -1280,10 +1329,16 @@ class LocalEnvironment(BaseEnvironment):
         # Login invocations (init_session's env snapshot) source the user's rc /
         # custom init files so nvm/asdf/pyenv land on PATH in the snapshot; then the
         # spawn env's dirs a resetting profile dropped are re-appended (#56634).
-        if login:
+        if login and (run is None or run.shell.kind == "posix"):
             cmd_string = _append_dropped_path_entries(cmd_string, run_env.get("PATH", ""))
             cmd_string = _prepend_shell_init(cmd_string, _resolve_shell_init_files())
-        args = [bash, *(["-l"] if login else []), "-c", cmd_string]
+        if run is None:
+            args = [bash, *(["-l"] if login else []), "-c", cmd_string]
+        else:
+            binary = local_command_sandbox.resolve_binary(run.settings)
+            if binary is None:  # _confined_run validated it; a vanished binary still fails closed
+                raise RuntimeError(local_command_sandbox.missing_binary_message(run.settings))
+            args = local_command_sandbox.sandbox_argv(run.settings, binary, run, cmd_string, login=login)
         # Not spawn_owned: an awaited command needs no spawn-ledger entry; own_process_groups below hands
         # its group to the owner-death supervisor and _wait_for_process releases it.
         try:
@@ -1300,6 +1355,8 @@ class LocalEnvironment(BaseEnvironment):
                 if fd >= 0:
                     os.close(fd)  # the child holds its copy; the reader sees EOF once it is gone
         proc._hermes_secret_reader = secret_reader
+        if run is not None:
+            proc._hermes_confined_run = run
         if not _IS_WINDOWS:
             # The command dies with this process however it dies: a SIGKILLed / OOM-killed host left a
             # running `npm run dev` or `sleep` on init. Released once the wait returns (see below).
@@ -1323,8 +1380,10 @@ class LocalEnvironment(BaseEnvironment):
         exactly as on a graceful exit. A command that yielded to background took the group with it
         (``ProcessRegistry.adopt_local`` clears ``_hermes_owned_pgid``). The secret hand-off reader
         is joined first, so the next command sees what this one exported."""
+        run = getattr(proc, "_hermes_confined_run", None)
         try:
-            return super()._wait_for_process(proc, *args, **kwargs)
+            result = super()._wait_for_process(proc, *args, **kwargs)
+            return local_command_sandbox.finalize(result, run) if run is not None else result
         finally:
             if (reader := getattr(proc, "_hermes_secret_reader", None)) is not None:
                 reader.join(timeout=2)
@@ -1334,7 +1393,7 @@ class LocalEnvironment(BaseEnvironment):
 
     def _spawn_long_lived(self, argv: list[str], child_env: dict | None) -> subprocess.Popen:
         """A long-lived process on this host: the same run environment as a command, owned so it and
-        its group die with Hermes however Hermes dies (``spawn_owned``), stdin/stdout as byte pipes.
+        its group die with Kouri Harness however Kouri Harness dies (``spawn_owned``), stdin/stdout as byte pipes.
         ``_stop_long_lived`` kills the group and releases it."""
         from hermes_cli.process_identity import spawn_owned
         proc = spawn_owned(  # windows-footgun: ok — argv list, no shell; group kill gated on _IS_WINDOWS

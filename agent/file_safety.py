@@ -8,6 +8,7 @@ clear denial for models that respect tool errors plus a visible audit trail.
 from __future__ import annotations
 
 import ipaddress
+import logging
 import os
 import re
 import socket
@@ -27,6 +28,8 @@ from hermes_platform.host.facts import os_family
 # the skill declares in required_credential_files.
 GOOGLE_WORKSPACE_CREDENTIAL_FILES = ("google_token.json", "google_client_secret.json", "google_oauth_pending.json")
 
+logger = logging.getLogger(__name__)
+
 
 def _constants_path(getter_name: str) -> Path:
     """Call ``hermes_constants.<getter_name>()`` (local import avoids cycles); ``~/.hermes`` on any failure."""
@@ -44,7 +47,7 @@ def _hermes_home_path() -> Path:
 
 
 def _hermes_root_path() -> Path:
-    """Hermes root dir (parent of any profile, never per-profile)."""
+    """Kouri Harness root dir (parent of any profile, never per-profile)."""
     return _constants_path("get_default_hermes_root")
 
 
@@ -361,7 +364,8 @@ def _approval_paths_by_key(home: str) -> dict[str, str]:
 
 
 def _classify_write_denial(path: str, *, entry: bool = False) -> Optional[str]:
-    """Return ``'credential'``, ``'safe_root'``, ``'nt_namespace'``, or ``None`` if writes are allowed.
+    """Return ``'credential'``, ``'safe_root'``, ``'nt_namespace'``, ``'sandbox_read_only'``, or
+    ``None`` if writes are allowed.
 
     ``entry=True`` is for ops that unlink/rename the directory entry itself (a
     symlink, not its target): the entry — parent realpath'd, final component
@@ -416,7 +420,24 @@ def _classify_resolved_write_denial(homes: set[str], resolved: str) -> Optional[
     if safe_roots and not any(_is_under(resolved, root) for root in safe_roots):
         return "safe_root"
 
+    # The file tools run in-process, outside the sandbox boundary, so a read-only
+    # sandbox profile must also refuse here or edits would slip past the policy.
+    if _sandbox_read_only():
+        return "sandbox_read_only"
+
     return None
+
+
+def _sandbox_read_only() -> bool:
+    """The command sandbox is active and its profile grants no writes. Late import: the
+    gate module pulls the terminal stack, and a probe failure must not block file tools."""
+    try:
+        from tools.environments.local_command_sandbox import file_writes_read_only
+
+        return file_writes_read_only()
+    except Exception:
+        logger.debug("sandbox read-only probe failed; allowing the write", exc_info=True)
+        return False
 
 
 def is_write_denied(path: str) -> bool:
@@ -436,6 +457,12 @@ def get_write_denied_error(path: str, *, verb: str = "Write", entry: bool = Fals
         )
     if denial == "nt_namespace":
         return get_nt_namespace_error(path, verb=verb)
+    if denial == "sandbox_read_only":
+        return (
+            f"{verb} denied: '{path}' is inside a read-only workspace. The active command "
+            "sandbox profile (Read only) grants no file writes. Please pick a profile that "
+            "allows writes in Settings → Workspace → Shell."
+        )
     return f"{verb} denied: '{path}' is a protected system/credential file." if denial else None
 
 
@@ -482,20 +509,20 @@ _CREDENTIAL_FILE_NAMES = (
 # of the user's Cookies / Login Data — the same credential class as auth.json.
 _READ_DENIED_DIRS = (
     ("mcp-tokens",
-     "is the Hermes MCP token directory and cannot be read directly.",
-     "is a Hermes MCP token file and cannot be read directly."),
+     "is the Kouri Harness MCP token directory and cannot be read directly.",
+     "is a Kouri Harness MCP token file and cannot be read directly."),
     ("browser-profile",
-     "is the Hermes real-profile browser snapshot directory (copied cookies/logins) and cannot be read directly.",
-     "is inside the Hermes real-profile browser snapshot (copied cookies/logins) and cannot be read directly."),
+     "is the Kouri Harness real-profile browser snapshot directory (copied cookies/logins) and cannot be read directly.",
+     "is inside the Kouri Harness real-profile browser snapshot (copied cookies/logins) and cannot be read directly."),
     # vault.key + vault.json.enc sit side by side; key + ciphertext = plaintext, so the whole dir is one credential.
     ("vault",
-     "is the Hermes credential vault directory and cannot be read directly (secrets are filled server-side by browser_vault).",
-     "is inside the Hermes credential vault (encrypted secrets + local key) and cannot be read directly (browser_vault resolves them server-side)."),
+     "is the Kouri Harness credential vault directory and cannot be read directly (secrets are filled server-side by browser_vault).",
+     "is inside the Kouri Harness credential vault (encrypted secrets + local key) and cannot be read directly (browser_vault resolves them server-side)."),
     # session-token is the Webapp's browser credential (a bare token no redaction pattern masks); the
     # rest are its grants to native apps and its Web Access registration.
     ("webapp",
-     "is the Hermes Webapp sign-in directory and cannot be read directly.",
-     "is a Hermes Webapp sign-in file (the browser credential or its sign-in records) and cannot be read directly."),
+     "is the Kouri Harness Webapp sign-in directory and cannot be read directly.",
+     "is a Kouri Harness Webapp sign-in file (the browser credential or its sign-in records) and cannot be read directly."),
 )
 # The other credential trees (pairing, messaging-platform sessions) get a generic message.
 _READ_DENIED_DIRS += tuple(
@@ -543,7 +570,7 @@ def is_project_env_basename(name: str) -> bool:
 
 
 def get_read_block_error(path: str) -> Optional[str]:
-    """Return an error message when a read targets a denied Hermes path.
+    """Return an error message when a read targets a denied Kouri Harness path.
 
     Blocked: device/fd/proc files that hang reads or leak process state (``/dev/zero``,
     ``/proc/<pid>/environ``; the literal path and the one it resolves to), internal skill-hub
@@ -576,13 +603,13 @@ def get_read_block_error(path: str) -> Optional[str]:
         )
     elif any(deny_path_under(resolved, hd / "skills" / ".hub") for hd in hermes_dirs):
         reason = (
-            "is an internal Hermes cache file and cannot be read directly to prevent "
+            "is an internal Kouri Harness cache file and cannot be read directly to prevent "
             "prompt injection. Use the skills_list or skill_view tools instead."
         )
     elif any(deny_key(resolved) in map(deny_key, _resolve_each(hd / name for hd in hermes_dirs))
              for name in _CREDENTIAL_FILE_NAMES):
         reason = (
-            "is a Hermes credential store and cannot be read directly. Provider tools "
+            "is a Kouri Harness credential store and cannot be read directly. Provider tools "
             "consume these credentials through internal channels." + _DID_SUFFIX
         )
     else:
@@ -602,7 +629,7 @@ def get_read_block_error(path: str) -> Optional[str]:
 
 
 def raise_if_read_blocked(path: str) -> None:
-    """Raise ``ValueError`` if ``path`` is a denied Hermes read (see ``get_read_block_error``).
+    """Raise ``ValueError`` if ``path`` is a denied Kouri Harness read (see ``get_read_block_error``).
 
     Shared chokepoint for provider input-loading sites (e.g. image-gen local
     paths). Best-effort: unexpected internal errors no-op rather than break
@@ -648,7 +675,7 @@ def _mirror_info(target: Path, mirror_root: Path, inner_path: str) -> dict:
 
 
 def classify_sandbox_mirror_target(path: str) -> Optional[dict]:
-    """Classify a write target as a sandbox-mirror of authoritative Hermes state: ``None``
+    """Classify a write target as a sandbox-mirror of authoritative Kouri Harness state: ``None``
     for non-mirror paths, else ``target_path`` (resolved), ``mirror_root`` (the
     ``…/home/.hermes`` prefix) and ``inner_path`` (what the agent meant on the host)."""
     target = _resolve_target(path)
@@ -678,7 +705,7 @@ def get_sandbox_mirror_warning(path: str) -> Optional[str]:
     return _mirror_warning(
         classify_sandbox_mirror_target(path),
         "a per-task mirror created by a non-local terminal backend (docker/daytona/etc.). "
-        "Writes here land on a copy that the host Hermes process never reads — the "
+        "Writes here land on a copy that the host Kouri Harness process never reads — the "
         "authoritative file is likely {inner_path!r} under the real HERMES_HOME.",
         "this guard after explicit user direction, retry the call",
     )
@@ -699,7 +726,7 @@ def get_container_mirror_warning(path: str, mirror_prefix: str | None = None) ->
     """Model-facing soft-guard warning when ``path`` lands in the container's mirror, else ``None``."""
     return _mirror_warning(
         classify_container_mirror_target(path, mirror_prefix),
-        "the container's bind-mounted home — a per-task mirror that the host Hermes "
+        "the container's bind-mounted home — a per-task mirror that the host Kouri Harness "
         "process never reads. The authoritative file is {inner_path!r} under "
         "the real HERMES_HOME.",
         "after explicit user direction, retry",

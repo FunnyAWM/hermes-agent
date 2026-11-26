@@ -1,4 +1,5 @@
-"""Default configuration data for Hermes Agent: DEFAULT_CONFIG and OPTIONAL_ENV_VARS.
+# health: allow FILE_LINES -- pure-data config table: comments are the user-facing docs of config.yaml; the growth is the terminal.sandbox block and its per-key comments
+"""Default configuration data for Kouri Harness: DEFAULT_CONFIG and OPTIONAL_ENV_VARS.
 
 Pure-data leaf module — must not import from hermes_cli.config. Comments are the user-facing
 docs of config.yaml.
@@ -29,7 +30,7 @@ DEFAULT_CONFIG = {
     "fallback": {"min_switch_reset_seconds": 0},
     "credential_pool_strategies": {},
     "toolsets": ["hermes-cli"],
-    # journal_mode: SQLite journal mode for every Hermes DB. "wal" default; use "delete" on
+    # journal_mode: SQLite journal mode for every Kouri Harness DB. "wal" default; use "delete" on
     # weak-fsync/shared filesystems where WAL is not crash-safe (macOS virtiofs, NFS, SMB).
     "database": {
         "journal_mode": "wal",
@@ -116,7 +117,7 @@ DEFAULT_CONFIG = {
         # many slow/unreachable MCP servers.
         # See #63078.
         "build_wait_timeout": 600,
-        # Hermes-level retries for API errors (connection drops, timeouts, 5xx) around the whole call; the
+        # Kouri Harness-level retries for API errors (connection drops, timeouts, 5xx) around the whole call; the
         # SDK also retries (max_retries=2). Set 1 for fast failover to fallbacks; raise for longer hiccups.
         "api_max_retries": 3,
         "codex_request_compression": True,  # zstd to official Codex; a bare-400 frame resends as JSON
@@ -182,7 +183,7 @@ DEFAULT_CONFIG = {
         # Bot Mode teammate-messaging protocol section (silent unless desktop Bot Mode manages it).
         "bot_mode_protocol": True,
         # Embedder-supplied text appended to the system prompt's environment-hints block, so a host
-        # wrapping Hermes (sandbox runner, managed platform) can describe proxy/credential/ mount
+        # wrapping Kouri Harness (sandbox runner, managed platform) can describe proxy/credential/ mount
         # layout without editing SOUL.md. Env HERMES_ENVIRONMENT_HINT overrides it.
         "environment_hint": "",
         # Coding posture: on interactive coding surfaces (CLI, TUI, desktop, ACP) in a code
@@ -363,7 +364,7 @@ DEFAULT_CONFIG = {
         "docker_shm_size": "1g",
         # Run the container as the host uid:gid (`--user`) so files written to bind mounts
         # (docker_volumes, persistent workspace, mounted cwd) are owned by you, not root. Off by
-        # default for images whose entrypoints must start as root (e.g. the bundled Hermes image,
+        # default for images whose entrypoints must start as root (e.g. the bundled Kouri Harness image,
         # which drops to `hermes` via s6-setuidgid). When on, SETUID/SETGID caps are omitted.
         "docker_run_as_host_user": False,
         # Snap-packaged Docker under AppArmor (Ubuntu cloud images; LP#1908448) refuses to exec
@@ -375,6 +376,36 @@ DEFAULT_CONFIG = {
         # SSH: carry exported env vars between commands (cwd always carries). false = every command
         # starts from the login env, profile functions included. Local: TERMINAL_LOCAL_PERSISTENT.
         "persistent_shell": True,
+        # sandctl boundary around local command execution (tools/environments/local_command_sandbox.py).
+        # On by default once a launcher is installed (the app ships one; PATH also counts); Full
+        # Access sessions (approvals.mode: off / /yolo) are never confined.
+        "sandbox": {
+            "enabled": True,         # true = force every non-Full-Access local command through the launcher
+            "binary": "sandctl",     # Launcher path or name on PATH, resolved per spawn
+            "backend": "l1",         # Passed to `sandctl run --backend`; names the execution boundary
+            "allow_degraded": True,  # true = accept a wider-than-requested boundary instead of refusing to run
+            # Active profile name from "profiles" below. Exec is the default so builds and
+            # package managers can write their caches; network stays denied.
+            "profile": "workspace-exec",
+            # May the model ask, for ONE command, to run at a wider level? It must name the
+            # level on that call and the user is asked to approve it; the configured profile
+            # applies again to the next command.
+            "escalation": True,
+            # Named boundaries (Settings → Workspace → Shell edits these):
+            #   read-only        reads the workspace and scratch; no file writes anywhere
+            #   workspace-write  + writes the working directory and the scratch directory
+            #   workspace-exec   + writes build/package-manager caches (still no network)
+            #   full-access      no sandbox at all (the Desktop asks for consent before selecting it)
+            #   custom           a preset plus extra "read" / "write" directories (~ allowed)
+            # Network is denied by every preset except full-access, which is no sandbox.
+            # An unknown preset falls back to read-only.
+            "profiles": {
+                "read-only": {"preset": "read-only"},
+                "workspace-write": {"preset": "workspace-write"},
+                "workspace-exec": {"preset": "workspace-exec"},
+                "full-access": {"preset": "full-access"},
+            },
+        },
     },
 
     "web": {
@@ -435,9 +466,9 @@ DEFAULT_CONFIG = {
         # Cloud provider: LAN/localhost URLs open in a local Chromium (ignores allow_private_urls; False refuses)
         "auto_local_for_private_urls": True,
         "cdp_url": "",  # persistent CDP endpoint for attaching to an existing Chromium/Chrome
-        # Consent to browse with the user's REAL logins locally: runs on a Hermes-managed SNAPSHOT
+        # Consent to browse with the user's REAL logins locally: runs on a Kouri Harness-managed SNAPSHOT
         # of the ACTIVE default-Chromium profile (Local State -> profile.last_used; cookies, logins,
-        # prefs copied and re-synced per fresh session) driven by Hermes' packaged Chromium. The
+        # prefs copied and re-synced per fresh session) driven by Kouri Harness' packaged Chromium. The
         # snapshot dir sidesteps Chrome 136+'s default-profile debugging block and never contends
         # with the running browser. Turning off deletes ~/.hermes/browser-profile/ so credentials
         # don't outlive consent. Chromium-family only; a profile that can't be copied (Firefox default,
@@ -465,7 +496,7 @@ DEFAULT_CONFIG = {
         "camofox": {},
     },
     # Stale git worktree lifecycle (`hermes -w`, `/worktree new`, subagent isolation, Desktop). The
-    # sweep runs at `hermes -w` startup and every 6h from the cron ticker over every repo Hermes made
+    # sweep runs at `hermes -w` startup and every 6h from the cron ticker over every repo Kouri Harness made
     # a worktree in. Trees idle past their tier (hermes-*/subagent-* 24h, named 72h) that are clean
     # and merged are removed; dirty or unpushed ones are archived to refs/hermes/archive/<tree>
     # first (`hermes worktree restore <name>`). Live trees and Kanban t_<hex> trees are never touched.
@@ -656,7 +687,7 @@ DEFAULT_CONFIG = {
         # Show the one-time autoraise banner; False keeps the autoraise, hides the notice.
         "codex_gpt55_autoraise_notice": True,
         # Codex app-server thread compaction mode. The codex agent owns the thread context, so
-        # Hermes' summarizer cannot shrink it. native = codex decides; hermes = Hermes' threshold
+        # Kouri Harness' summarizer cannot shrink it. native = codex decides; hermes = Kouri Harness' threshold
         # triggers thread/compact/start; off = never auto-trigger.
         "codex_app_server_auto": "native",
         # Opt in to OpenAI server-side compaction on the Responses API. Only gpt-5.6-family on
@@ -750,6 +781,7 @@ DEFAULT_CONFIG = {
         # 60s default. Independent of "timeout" (the overall request budget). See #108104.
         "compression": _aux(120, no_progress_timeout=None),
         "approval": _aux(30),   # classifier — a fast/cheap model is recommended
+        "auto_review": _aux(30),   # per-tool-call risk verdict (approvals.mode: auto)
         # /review reviewer: a full subagent on the async delegation rail, credentials resolved like
         # delegation.provider pins. "auto" + "" = main agent's model. api_mode forces transport:
         # chat_completions | anthropic_messages | codex_responses.
@@ -953,7 +985,7 @@ DEFAULT_CONFIG = {
         "runtime_footer": {
             "enabled": False,
             # order shown; drop any to hide. Opt-in extras: latency, served_model (alias → the
-            # deployment a routing proxy reported / Hermes' fallback route).
+            # deployment a routing proxy reported / Kouri Harness' fallback route).
             "fields": ["model", "context_pct", "cwd"],
         },
         # CLI/TUI status bar fields. Non-empty = only listed fields show (built-in order kept,
@@ -1207,7 +1239,7 @@ DEFAULT_CONFIG = {
         "max_calls_per_image": None,
         "replay_recent_images": 3,  # newest user images re-sent on turns rebuilt from state.db; 0 = off
     },
-    # "Hey Hermes" hands-free wake word: always-on, on-device hotword detection that starts a fresh
+    # "Hey Kouri Harness" hands-free wake word: always-on, on-device hotword detection that starts a fresh
     # voice session. Off by default; toggle with /wake.
     "wake_word": {
         "enabled": False,
@@ -1266,8 +1298,8 @@ DEFAULT_CONFIG = {
         # true = foreground writes prompt inline; background writes are staged (/memory
         # pending|approve <id>|reject <id>). To disable memory: memory_enabled.
         "write_approval": False,
-        "memory_char_limit": 2200,   # ~800 tokens at 2.75 chars/token
-        "user_char_limit": 1375,     # ~500 tokens at 2.75 chars/token
+        "memory_char_limit": 3000,   # model writes only; 0 disables the cap
+        "user_char_limit": 0,        # unlimited (shared contract with Android)
         # Periodic built-in memory review; 0 when an external provider auto-extracts.
         "nudge_interval": 10,
         # One external provider: bundled (retaindb, byterover) or catalog-installed (honcho,
@@ -1566,7 +1598,7 @@ DEFAULT_CONFIG = {
     },
 
     "whatsapp": {
-        # reply_prefix: None = built-in "☤ *Hermes Agent*" header; "" disables; \n allowed.
+        # reply_prefix: None = built-in "☤ *Kouri Harness*" header; "" disables; \n allowed.
     },
 
     "telegram": {
@@ -1600,7 +1632,8 @@ DEFAULT_CONFIG = {
         "allowed_rooms": "",  # if set, ONLY respond in these room IDs (whitelist)
     },
     # Approvals for dangerous commands.
-    # mode: manual (always prompt) | smart (aux LLM auto-approves low-risk) | off (= --yolo)
+    # mode: manual (always prompt) | smart (aux LLM auto-approves low-risk)
+    #       | auto (aux LLM reviews every tool call; deny asks, high risk blocks) | off (= --yolo)
     # cron_mode / single_query_mode / unattended_mode: deny | approve — what to do when a
     #   cron job, a -q session (HERMES_INTERACTIVE=1 but nobody to answer), or an unattended
     #   platform (webhook, msgraph_webhook, api_server; no /approve channel) hits one.
@@ -1628,6 +1661,16 @@ DEFAULT_CONFIG = {
         # Extra rules appended to the smart-approval guardian's SYSTEM prompt, e.g. "Always ESCALATE
         # commands touching /etc".
         "smart_policy": "",
+        # approvals.mode: auto — the per-tool-call reviewer (tools/auto_review.py). policy: extra
+        # TRUSTED rules appended to that reviewer's system prompt. history_messages: recent user
+        # turns + tool results shown to the reviewer (0 = none). max_arg_chars: pending-call cap.
+        # skip_tools: extra tool names never reviewed (local read-only tools are always skipped).
+        "auto_review": {
+            "policy": "",
+            "history_messages": 6,
+            "max_arg_chars": 4000,
+            "skip_tools": [],
+        },
         # After this many consecutive guardian DENYs in a session, the deny message escalates to a
         # hard-stop (report to user / ask for /approve). Approval resets; 0 off.
         "denial_breaker_threshold": 3,
@@ -1665,16 +1708,16 @@ DEFAULT_CONFIG = {
         # skipped with the reason "load timed out" and the rest keep loading; the stuck worker thread is
         # abandoned. 0 = no deadline (load inline). Max 600.
         "load_timeout_seconds": 10,
-        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables). Applying stays
-        # explicit: `hermes plugins update <name>`, or auto_apply below (catalog and tracked git
-        # plugins, scan-gated by that same pipeline).
-        "auto_update_check_hours": 24,
-        # Opt-in unattended apply (`hermes plugins auto-update on`, Desktop's Plugins tab): catalog +
-        # tracked git plugins, same scan/consent pipeline as the manual update (never a widened pin).
+        # Read-only plugin update-check cadence, hours (gateway tick; 0 disables).
+        # Fork policy (PRD §8.1 隐 02): 0 unless the user opts in; applying stays
+        # explicit (`hermes plugins update <name>`), or via auto_apply below.
+        "auto_update_check_hours": 0,
+        # Opt-in unattended apply; every apply runs the manual update's scan / consent pipeline.
         "auto_apply": False,
-        # Where third-party Python plugins run. in_process: imported into Hermes (default).
-        # host: one plugin-host process per profile runs them and they reach Hermes only through
-        # ctx (a crashing or hanging plugin takes down its host, which restarts; Hermes keeps
+        "auto_apply": False,
+        # Where third-party Python plugins run. in_process: imported into Kouri Harness (default).
+        # host: one plugin-host process per profile runs them and they reach Kouri Harness only through
+        # ctx (a crashing or hanging plugin takes down its host, which restarts; Kouri Harness keeps
         # running). Bundled plugins stay in-process; `hermes plugins validate` says whether a
         # plugin can run in the host.
         "isolation": "in_process",
@@ -1697,8 +1740,8 @@ DEFAULT_CONFIG = {
     "personalities": {},
     "auth": {  # Login policy (credentials themselves live in auth.json / .env).
         # Borrow and refresh the Codex CLI (~/.codex/auth.json) and Claude Code (~/.claude/.credentials.json)
-        # logins automatically when Hermes has no usable login of its own. Their refresh tokens are single-use
-        # and rotate, so two programs on one login can log each other out; set false to make Hermes use only
+        # logins automatically when Kouri Harness has no usable login of its own. Their refresh tokens are single-use
+        # and rotate, so two programs on one login can log each other out; set false to make Kouri Harness use only
         # its own logins (`hermes auth add <provider>`). `hermes auth add openai-codex` still offers the import
         # interactively.
         "adopt_external_logins": True,
@@ -1874,7 +1917,7 @@ DEFAULT_CONFIG = {
         # fan-out workflows that would otherwise saturate one profile's local model / API quota / browser
         # pool while leaving other profiles idle. See #21582.
         "max_in_progress_per_profile": None,
-        # Per-home claim allowlist for boards shared across Hermes homes (#110995): profile names
+        # Per-home claim allowlist for boards shared across Kouri Harness homes (#110995): profile names
         # this home's dispatcher may claim (list or comma-separated string). None = any existing
         # profile is claimable. Set = fail-closed (an empty list claims nothing). Every home has a
         # root profile named "default", so on a shared kanban.db every home can otherwise claim
@@ -1999,7 +2042,7 @@ DEFAULT_CONFIG = {
     # the catalog does not know, so they never clamp known models. Unknown ids start from safe
     # defaults (200K context, tools on) and get patched; supports_vision / supports_reasoning stay
     # UNKNOWN (fail-open) unless the override sets them — a context_window-only entry must not turn
-    # into "text-only" and hide vision_analyze / reasoning controls (#112649). Provider keys: Hermes
+    # into "text-only" and hide vision_analyze / reasoning controls (#112649). Provider keys: Kouri Harness
     # or models.dev id; model ids match case-insensitively. Example: {"custom:my-local-vllm":
     # {"my-llava-model": {"context_window": 8192}}}
     # Semantics: 1. NOTE: an explicit model.context_length (global) and a custom_providers per-model
@@ -2165,12 +2208,12 @@ DEFAULT_CONFIG = {
         "trust_env": True,
         # Media delivery. False: any emitted file path is delivered natively unless under the
         # credential/system denylist (/etc, /proc, ~/.ssh, ~/.aws, ~/.hermes/.env, auth.json). True:
-        # files must be under the Hermes cache, media_delivery_allow_dirs, or fresher than
+        # files must be under the Kouri Harness cache, media_delivery_allow_dirs, or fresher than
         # trust_recent_files_seconds — recommended for public-facing gateways so prompt injection
         # can't exfiltrate host secrets. Bridged to HERMES_MEDIA_DELIVERY_STRICT.
         "strict": False,
         # Extra roots (project/scratch dirs, mounted shares) from which bare file paths may be
-        # uploaded; the Hermes cache is always trusted. List of absolute paths or one
+        # uploaded; the Kouri Harness cache is always trusted. List of absolute paths or one
         # os.pathsep-separated string; tildes expanded. Bridged to HERMES_MEDIA_ALLOW_DIRS. Honored
         # in both modes.
         "media_delivery_allow_dirs": [],
@@ -2291,8 +2334,8 @@ DEFAULT_CONFIG = {
     },
 
     "updates": {
-        # Passive version/banner checks only; explicit `hermes update --check` remains enabled.
-        "check": True,
+        # Fork privacy (PRD §8.1): passive checks opt in; explicit `hermes update --check` stays enabled.
+        "check": False,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
         # config.yaml, .env, auth.json, profile DBs) into <HERMES_HOME>/state-snapshots/, skipping
         # files >1 GiB; restore via ``/snapshot``. full = quick PLUS a ``hermes backup`` zip in
@@ -2352,7 +2395,7 @@ DEFAULT_CONFIG = {
         # TypeScript SDK, svelte.config.js, build files (cargo, Gradle, mix, ...). The worktree of
         # the launch dir or the session's workspace (hermes -w, a Desktop project, terminal.cwd) is
         # always trusted; in any other checkout (a clone the agent made) only servers that run no
-        # project code start, pinned to Hermes-side tools, and the npx tsc / rustfmt lint fallbacks
+        # project code start, pinned to Kouri Harness-side tools, and the npx tsc / rustfmt lint fallbacks
         # are skipped.
         "trusted_workspaces": [],
         # Missing server binaries: auto = install via npm/go/pip into <HERMES_HOME>/lsp/bin/ on
@@ -2456,13 +2499,13 @@ DEFAULT_CONFIG = {
     "paste_collapse_threshold_fallback": 5,
     "paste_collapse_char_threshold": 2000,
 
-    # Bot Desktop: a headless Xfce screen per profile on the gateway host (Linux), streamed to Hermes
+    # Bot Desktop: a headless Xfce screen per profile on the gateway host (Linux), streamed to Kouri Harness
     # Desktop where a human can watch, take over (logins, 2FA, CAPTCHAs) and hand back. `hermes computer-use screen`.
     "bot_desktop": {
         "geometry": "1440x900",
         # Opt-in: start the screen automatically the first time computer_use needs a display on a headless
         # host. Off by default so installing TigerVNC for other reasons never yields a screen nobody asked
-        # for; Hermes Desktop's Screen pane offers Start and this toggle.
+        # for; Kouri Harness Desktop's Screen pane offers Start and this toggle.
         "auto_start": False,
         # Refuse to start below this much free memory (MB), measured on the host or its container cgroup,
         # whichever is tighter. Xvnc + Xfce idle at ~220 MB and a takeover's browser adds 0.5-1 GB, so a
@@ -2486,7 +2529,7 @@ DEFAULT_CONFIG = {
         "placement": "auto",
     },
     "computer_use": {
-        # cua-driver's upstream PostHog telemetry defaults ON; Hermes sets
+        # cua-driver's upstream PostHog telemetry defaults ON; Kouri Harness sets
         # CUA_DRIVER_RS_TELEMETRY_ENABLED=0 in every child env unless this is true.
         "cua_telemetry": False,
         # Windows only: opt IN to the per-boot cua-driver-serve logon task. False (default)
@@ -2517,7 +2560,7 @@ DEFAULT_CONFIG = {
         # Linux/WSL2 idle spin). None = auto (off on macOS + headless/ WSL2 Linux, on elsewhere);
         # True = always disable; False = always enable.
         # The overlay shows where agent actions land but can peg a core when idle (macOS vImage redraw loop
-        # #47032; Linux/WSL2 idle spin #28152). cua-driver ≥ 0.6.x supports --no-overlay; Hermes also calls
+        # #47032; Linux/WSL2 idle spin #28152). cua-driver ≥ 0.6.x supports --no-overlay; Kouri Harness also calls
         # set_agent_cursor_enabled(false) after start_session when this is on.
         "no_overlay": None,
         # standard = cua-driver's own approval boundary; bounded = no runtime prompts, anything
@@ -2559,7 +2602,7 @@ DEFAULT_CONFIG = {
         # (`*.foo.com`) supported.
         "extra_allowed_hosts": [],
     },
-    "desktop": {  # Hermes Desktop (Electron) launch options; only affect `hermes desktop`.
+    "desktop": {  # Kouri Harness Desktop (Electron) launch options; only affect `hermes desktop`.
         # CSS font-family for the app's chat and UI text (e.g. "OpenDyslexic"). Layered in front
         # of the active theme's own sans stack so missing glyphs still fall through. Empty = the
         # theme's face. The terminal pane is terminal.font_family.
@@ -2632,7 +2675,7 @@ DEFAULT_CONFIG = {
         # 14-20% of consecutive calls in concurrent tool loops (measured 2026-09-06;
         # NousResearch/api#227), so chat is the default until that is fixed.
         "anthropic_wire": "chat",
-        # Nous free tier: with no other provider configured, Hermes sets up a free Nous identity on
+        # Nous free tier: with no other provider configured, Kouri Harness sets up a free Nous identity on
         # first use (inference on nous/welcome + connectors) and offers `/login` (terminal:
         # `hermes auth upgrade`) to sign in. false turns the free tier off entirely: nothing is set
         # up and nothing is used.
@@ -2651,7 +2694,7 @@ DEFAULT_CONFIG = {
     # Managed llama.cpp runtime (docs: user-guide/local-models): official binaries, one supervised
     # llama-server in router mode. No context/VRAM knobs by design.
     "local_runtime": {
-        # Off = detection-only (Hermes still finds an external llama-server you run).
+        # Off = detection-only (Kouri Harness still finds an external llama-server you run).
         "enabled": False,
         # Engine versions and every dependent library are pinned by pm/lock.json.
         # auto = CUDA on NVIDIA, Metal on macOS, Vulkan on other GPUs, else CPU. Explicit:
@@ -2690,7 +2733,7 @@ OPTIONAL_ENV_VARS = OptionalEnvVars({
     "GEMINI_BASE_URL": _base_url("Google AI Studio", "Gemini"),
     "VERTEX_CREDENTIALS_PATH": _prov(
         "Path to a Google Cloud service account JSON for Vertex AI (Gemini). Vertex uses "
-        "OAuth2, not a static API key — this points at the credentials Hermes mints short-lived "
+        "OAuth2, not a static API key — this points at the credentials Kouri Harness mints short-lived "
         "tokens from. Falls back to GOOGLE_APPLICATION_CREDENTIALS, then to ADC (gcloud auth "
         "application-default login). Set project/region under vertex: in config.yaml.",
         "Vertex service account JSON path (leave empty to use ADC / "
@@ -2814,7 +2857,7 @@ OPTIONAL_ENV_VARS = OptionalEnvVars({
         None, password=False, advanced=True),
     "TOOL_GATEWAY_USER_TOKEN": _tool(
         "Explicit Nous Subscriber access token for tool-gateway requests (optional; otherwise "
-        "read from the Hermes auth store)", "Tool-gateway user token", None, advanced=True),
+        "read from the Kouri Harness auth store)", "Tool-gateway user token", None, advanced=True),
     "TAVILY_API_KEY": _tool(
         "Tavily API key for AI-native web search and extract (optional — keyless works when "
         "Tavily is selected)", "Tavily API key", "https://app.tavily.com/home",
@@ -2864,7 +2907,7 @@ OPTIONAL_ENV_VARS = OptionalEnvVars({
     "MISTRAL_API_KEY": _tool("Mistral API key for Voxtral TTS and transcription (STT)",
         "Mistral API key", "https://console.mistral.ai/"),
     "PORCUPINE_ACCESS_KEY": _tool(
-        "Picovoice access key for the Porcupine 'Hey Hermes' wake word engine (optional; "
+        "Picovoice access key for the Porcupine 'Hey Kouri Harness' wake word engine (optional; "
         "openWakeWord is the free default)", "Picovoice access key",
         "https://console.picovoice.ai/"),
     "GITHUB_TOKEN": _tool("GitHub token for Skills Hub (higher API rate limits, skill publish)",
@@ -2943,7 +2986,7 @@ OPTIONAL_ENV_VARS = OptionalEnvVars({
         help=("In your Slack app, enable Socket Mode, then create Basic Information > App-Level "
         "Tokens with the connections:write scope."), password=True),
     "SLACK_ALLOWED_USERS": _msg(
-        "Comma-separated Slack member IDs allowed to use Hermes, e.g. U01ABC2DEF3. Without "
+        "Comma-separated Slack member IDs allowed to use Kouri Harness, e.g. U01ABC2DEF3. Without "
         "this, Slack may connect but deny messages by default.", "Allowed Slack member IDs",
         "https://api.slack.com/apps",
         help=("In Slack, open your profile, choose More or the three-dot menu, then Copy member "
@@ -3040,13 +3083,13 @@ OPTIONAL_ENV_VARS = OptionalEnvVars({
         "for the default profile). Useful for multi-user setups with OpenWebUI.",
         "API server model name", None, advanced=True),
     "GATEWAY_PROXY_URL": _msg(
-        "URL of a remote Hermes API server to forward messages to (proxy mode). When set, the "
+        "URL of a remote Kouri Harness API server to forward messages to (proxy mode). When set, the "
         "gateway handles platform I/O only — all agent work is delegated to the remote server. "
         "Use for Docker E2EE containers that relay to a host agent. Also configurable via "
         "gateway.proxy_url in config.yaml.",
-        "Remote Hermes API server URL (e.g. http://192.168.1.100:8642)", None, advanced=True),
+        "Remote Kouri Harness API server URL (e.g. http://192.168.1.100:8642)", None, advanced=True),
     "GATEWAY_PROXY_KEY": _msg(
-        "Bearer token for authenticating with the remote Hermes API server (proxy mode). Must "
+        "Bearer token for authenticating with the remote Kouri Harness API server (proxy mode). Must "
         "match the API_SERVER_KEY on the remote host.", "Remote API server auth key", None,
         password=True, advanced=True),
     "WEBHOOK_ENABLED": _msg(

@@ -32,6 +32,7 @@ import {
 import { markReasoningEffortPending } from '@/lib/chat-runtime'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { purgeInFlightTurnJournals, recoverInFlightTurnJournal } from '@/lib/inflight-turn-journal'
+import { invalidateSessionListQueries } from '@/lib/query-client'
 import { latestSessionTodoSnapshot } from '@/lib/todos'
 import { setSessionYolo } from '@/lib/yolo-session'
 import { $clarifyRequests, clearClarifyRequest } from '@/store/clarify'
@@ -72,7 +73,6 @@ import {
   $sessions,
   $yoloActive,
   idsShareLineage,
-  type NewChatWorkspaceTarget,
   ownerLookupSessionRows,
   resolveComposerSessionKey,
   restoreComposerModelSelection,
@@ -148,6 +148,7 @@ import type {
 
 import { navigateToWorkspacePage, NEW_CHAT_ROUTE, sessionRoute, SETTINGS_ROUTE } from '../../../routes'
 import type { ClientSessionState, SidebarNavItem } from '../../../types'
+import { type FreshSessionDraftOptions, normalizeNewChatWorkspaceTarget } from '../../workspace-session-target'
 import {
   pinStoredSessionForOwner,
   releaseStoredSessionPins,
@@ -273,19 +274,6 @@ export interface BranchLoadedSessionOptions {
 // How long we keep creatingSessionRef after create/fork navigate before giving up
 // if the router never lands on the pending stored id (stuck navigate / lost race).
 const CREATE_GUARD_RELEASE_MS = 3_000
-
-interface FreshSessionDraftOptions {
-  /** The rail already owns this draft request; do not supersede its activation. */
-  preserveProfileSwitch?: boolean
-  preserveRoute?: boolean
-  replaceRoute?: boolean
-  rotateFreshDraftKey?: boolean
-  workspaceTarget?: NewChatWorkspaceTarget
-}
-
-function normalizeNewChatWorkspaceTarget(target: NewChatWorkspaceTarget): NewChatWorkspaceTarget {
-  return typeof target === 'string' ? target.trim() || null : target
-}
 
 export function useSessionActions({
   activeSessionId,
@@ -3120,6 +3108,10 @@ export function useSessionActions({
 
         await deleteSession(storedSessionId, removedOwner)
 
+        // Other windows need the ids to evict their own cached and pinned rows.
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ removed: removedIds })
+
         dropTranscriptTailEverywhere(storedSessionId)
         // Only after the RPC lands — the optimistic eviction above can roll
         // back, and a rolled-back row must keep its watermark/marker.
@@ -3259,6 +3251,10 @@ export function useSessionActions({
 
       try {
         await setSessionArchived(storedSessionId, true, profile)
+        // Archived rows leave only this window's stores; push the ids with the
+        // invalidate so a receiver's keep set cannot resurrect the row.
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ removed: archivedIds })
         // Archived rows never reach the sidebar, so their persisted unread can
         // only rot. Dropped after the RPC so a failed archive keeps it.
         forgetSessionUnread(archivedIds, profile)
@@ -3322,6 +3318,9 @@ export function useSessionActions({
           untombstoneSessions([storedSessionId, archived._lineage_root_id])
           restoreListedSession({ ...archived, archived: false, ...(profile ? { profile } : {}) })
         }
+
+        invalidateSessionListQueries()
+        broadcastSessionsChanged({ released: [storedSessionId, archived?._lineage_root_id] })
 
         notify({ durationMs: 2_000, kind: 'success', message: copy.restored })
       } catch (err) {

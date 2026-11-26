@@ -3,6 +3,7 @@ the dashboard: the payload has no sources to build one from, so `hermes webapp` 
 from __future__ import annotations
 
 import contextlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -28,8 +29,32 @@ def _compile(argv: list[str], **_kwargs) -> None:
         (out / "index.html").write_text(script, encoding="utf-8")
 
 
+def _prepared_manifest(tmp_path: Path, subset) -> Path:
+    """A prepared manifest whose recorded tool subset matches the payload's staged tool facts.
+
+    `subset` is the lane the preparation ran (None = the full lock). That recorded
+    subset is the fact `native.bundle_tools_of` reads and cross-checks against the
+    staged tools."""
+    from pm.lock import SCHEMA
+    from scripts.bundles import native
+    from scripts.bundles.native_prepared import prepared_path
+
+    payload = tmp_path / "payload"
+    tools = payload / "tools"
+    tools.mkdir(parents=True)
+    names = sorted(native._staging_names(subset))
+    (tools / "facts.json").write_text(
+        json.dumps({"schema": SCHEMA,
+                    "packages": {name: {"entry": f"tools/{name}"} for name in names}}),
+        encoding="utf-8")
+    manifest = prepared_path(payload)
+    manifest.write_text(json.dumps({"bundle_tools": sorted(subset) if subset is not None else None}), encoding="utf-8")
+    return manifest
+
+
 @pytest.mark.parametrize("variant", ["bundled", "store"])
-def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, variant):
+@pytest.mark.parametrize("sealed", [False, True], ids=["full", "sealed-subset"])
+def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, variant, sealed):
     from scripts.build.agent import plant_surfaces
     from scripts.bundles import desktop_inputs, desktop_prepare, native
 
@@ -38,7 +63,8 @@ def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, 
                               release_epoch=None, version="1.2.3", commit="c" * 40, tag=None, workspaces=list)
     prepared = SimpleNamespace(request=request, validate=lambda: None, node=Path("node"), icon_python=Path("python"),
                                packager=tmp_path / "packager", native=tmp_path / "native",
-                               native_toolchain="fixture", payload=tmp_path / "payload.prepared.json")
+                               native_toolchain="fixture",
+                               payload=_prepared_manifest(tmp_path, {"python", "uv"} if sealed else None))
 
     def finish(prepared_payload, frontends):
         assert prepared_payload == prepared.payload
@@ -51,14 +77,37 @@ def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, 
     monkeypatch.setattr(desktop_prepare, "require_source", lambda *_a: None)
     monkeypatch.setattr(desktop_inputs, "validate_builder_identity", lambda *_a: None)
     monkeypatch.setattr(desktop_inputs, "select_variant", lambda _prepared, chosen: chosen)
-    monkeypatch.setattr(desktop_inputs, "build_environment", lambda *_a: {})
+    # A stale HERMES_BUNDLE_TOOLS in the build shell must not skew the cut: the
+    # webapp decision follows the subset the prepared payload records.
+    monkeypatch.setattr(desktop_inputs, "build_environment", lambda *_a: {"HERMES_BUNDLE_TOOLS": "python"})
     monkeypatch.setattr(desktop_inputs, "packaging_environment", lambda *_a: {})
 
     desktop._build_prepared(prepared, [], variant)
 
-    assert (payload / "apps/desktop/dist-webapp/index.html").read_text(encoding="utf-8") == "webapp.mjs"
+    if sealed:
+        # T-46: a sealed subset ships no browser-host bundle (1,086 static files);
+        # `hermes webapp` rebuilds one in a home that enables it.
+        assert not (payload / "apps/desktop/dist-webapp").exists()
+    else:
+        assert (payload / "apps/desktop/dist-webapp/index.html").read_text(encoding="utf-8") == "webapp.mjs"
     assert (payload / "hermes_cli/web_dist/index.html").read_text(encoding="utf-8") == "web.mjs"
     assert (payload / "hermes_cli/tui_dist/entry.js").read_text(encoding="utf-8") == "tui.mjs"
+
+
+def test_payload_tool_mismatch_fails_the_bundle_build(tmp_path):
+    """A payload whose staged tools disagree with its manifest's recorded subset fails closed."""
+    from pm.lock import SCHEMA
+    from scripts.bundles import native
+
+    manifest = _prepared_manifest(tmp_path, {"python"})
+    # Swap in the full lane's tool facts: the manifest still records the sealed subset.
+    names = sorted(native._staging_names(None))
+    (tmp_path / "payload/tools/facts.json").write_text(
+        json.dumps({"schema": SCHEMA,
+                    "packages": {name: {"entry": f"tools/{name}"} for name in names}}),
+        encoding="utf-8")
+    with pytest.raises(ValueError, match="manifest records"):
+        native.bundle_tools_of(manifest)
 
 
 def test_source_bundle_staging_plants_the_prebuilt_webapp(tmp_path, monkeypatch):

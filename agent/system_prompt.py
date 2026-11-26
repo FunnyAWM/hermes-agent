@@ -23,7 +23,8 @@ from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS, KANBAN_GUIDANCE,
     PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE,
-    SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
+    SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TASK_ROUTING_GUIDANCE,
+    TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
 )
 from agent import prompt_builder as _pb
@@ -37,6 +38,63 @@ _PLUGIN_SECTION_FRAME_RE = re.compile(
     re.MULTILINE,
 )
 _GATE_WORDS = {**dict.fromkeys(("true", "always", "yes", "on"), True), **dict.fromkeys(("false", "never", "no", "off"), False)}
+
+# Shared memory-root conventions (PRD §7.5 / D9). Semantically aligned with the
+# Android SystemPrompt.ROOT_PROMPT; tool names are the desktop ones. It rides in
+# the stable tier so the prefix cache sees it exactly once per conversation.
+MEMORY_ROOT_PROMPT = (
+    "You are an assistant running inside Kouri Harness' local memory system. Memory persists through "
+    "readable, maintainable files, not through model-side automatic saving. These conventions "
+    "come before any persona text below; the persona only sets identity and tone.\n\n"
+    "1. Memory layers. The chat window holds only this turn; MEMORY.md is a recent summary and "
+    "USER.md is the user profile. Long-lived preferences, habits, events, decisions and "
+    "commitments belong in notes/<category>/<topic>.md. Keep concrete facts out of the summary: "
+    "at most point to the note that holds them, and after rewriting a summary move any standalone "
+    "fact into notes/.\n\n"
+    "2. Read on demand. The notes index lists names and summaries, not bodies. Decide which notes "
+    "the current topic needs and read them with read_file before relying on them; unread content "
+    "is not known.\n\n"
+    "3. Local edits. Read a note before changing it. Use patch for a unique local replacement so "
+    "unrelated facts survive; use write_file only for a new note or a deliberate full rewrite, and "
+    "never overwrite a note just to shorten it.\n\n"
+    "4. Categories. Notes live at notes/<category>/<topic>.md with exactly work, study, life, "
+    "health, finance, people or other. notes/docs/ is imported source text: read-only, never write, "
+    "replace, merge or summarize it; read the original path when exact wording matters.\n\n"
+    "5. Fidelity. Separate what the user stated, what is confirmed, and what is inference. Never "
+    "invent experiences, preferences or agreements; when old and new records conflict, correct the "
+    "record and state the change.\n\n"
+    "6. Tool boundaries. Use only tools that are actually available and paths that are allowed. "
+    "SOUL.md is user-owned: never read or modify it through memory tools. Claim something is "
+    "remembered only after a successful write; if a write fails, say so.\n\n"
+    "7. Natural replies. Use only memory relevant to the current topic; do not let unrelated notes "
+    "crowd out the conversation. If the record is insufficient, say so instead of pretending."
+)
+
+
+# Restated at the TAIL of the prompt, not just in MEMORY_ROOT_PROMPT: the root
+# conventions sit thousands of tokens above the conversation inside a huge
+# tool-heavy prompt, and a real model test on the Android side showed the write
+# trigger is what decays (facts "remembered" in the reply, never written). Same
+# constant text every build, so the prefix cache pays for it once per session.
+# Wording stays tool-agnostic: the PC writes notes with write_file/patch and
+# MEMORY.md through the `memory` tool.
+MEMORY_WRITE_REMINDER = (
+    "Memory write trigger. When the user states — or you learn — something that must outlive this "
+    "turn (a date, place, amount, promise, preference, identity detail), write it before replying: "
+    "durable facts go to notes/<category>/<topic>.md (a name/description header, then the fact), and "
+    "MEMORY.md keeps only what this stretch of conversation was about, at most pointing at the note "
+    "that holds a fact. Claim something is remembered only after the write succeeded."
+)
+
+
+def _memory_write_reminder(agent: Any) -> Optional[str]:
+    """The trigger reminder, only when this agent can actually persist it.
+
+    Gate on a writable surface rather than on the memory feature alone: notes are
+    written with the file tools, so a file-tool-only agent still needs the trigger,
+    and a read-only agent must not be told to write at all."""
+    tools = set(agent.valid_tool_names or ())
+    return MEMORY_WRITE_REMINDER if tools & {"memory", "write_file", "patch"} else None
 
 
 def _model_gate(setting: Any, model: Optional[str], default_models) -> bool:
@@ -402,7 +460,7 @@ def _active_profile_line(agent: Any) -> str:
         # Without one, keep the ambient (patchable) resolution byte-identical.
         _root_str = str(get_default_hermes_root() if _agent_home_path is not None else get_hermes_home())
         return (
-            "Active Hermes profile: default. Other profiles (if any) live "
+            "Active Kouri Harness profile: default. Other profiles (if any) live "
             "under " + _root_str + "/profiles/<name>/. Each profile has its own "
             "skills/, plugins/, cron/, and memories/ that affect a different "
             "session than this one. Do not modify another profile's "
@@ -419,7 +477,7 @@ def _active_profile_line(agent: Any) -> str:
     # NOT get_hermes_home().
     default_root = get_default_hermes_root()
     return (
-        f"Active Hermes profile: {active_profile}. This session reads "
+        f"Active Kouri Harness profile: {active_profile}. This session reads "
         f"and writes {profile_home}/. The default "
         f"profile's data lives at {default_root}/skills/, {default_root}/plugins/, "
         f"{default_root}/cron/, {default_root}/memories/ — those belong to a "
@@ -558,6 +616,18 @@ def _memory_parts(agent: Any) -> list[str]:
     # External memory provider system prompt block (additive to built-in). Gated on the same check
     # ``inject_memory_provider_tools`` uses so we never advertise provider tools that the agent's toolset
     # configuration has already gated off (#81014).
+    try:
+        from hermes_notes import NotesStore
+        from hermes_notes.settings import load_notes_settings
+        from hermes_constants import get_hermes_home
+        settings = load_notes_settings()
+        notes_index = NotesStore(
+            get_hermes_home(), soft_limit=settings.soft_limit, hard_limit=settings.hard_limit,
+        ).render_index()
+    except (ImportError, OSError, ValueError):
+        notes_index = ""
+    if notes_index:
+        parts.append(notes_index)
     if agent._memory_manager:
         try:
             from agent.memory_manager_tools import memory_provider_tools_exposed as _mem_exposed
@@ -595,6 +665,8 @@ def _guidance_parts(agent: Any) -> list[str]:
     parts.append(_tool_guidance_block(agent))  # None/empty entries are dropped by _join_tier
     if not agent.valid_tool_names:
         return parts
+    if {"todo_list", "cronjob_manage"} <= set(agent.valid_tool_names):
+        parts.append(TASK_ROUTING_GUIDANCE)
     # Steering only lands inside tool results, so only reachable with tools; a one-shot has nobody to steer it.
     from agent.oneshot_footprint import agent_is_oneshot
     if not agent_is_oneshot(agent):
@@ -752,7 +824,7 @@ def _context_files_part(agent: Any, ctx_len: Optional[int], soul_loaded: bool) -
     install-tree fallback is only legitimate for cli/tui where the launch dir
     IS the user's shell cwd. Desktop launch artifacts skip the session cwd but
     still honor the profile-scoped TERMINAL_CWD; without one, the fallback guard
-    can reject Hermes's bundled AGENTS.md."""
+    can reject Kouri Harness's bundled AGENTS.md."""
     if agent.skip_context_files:
         return []
     launch_artifact = getattr(agent, "_context_cwd_is_launch_artifact", False)
@@ -779,7 +851,8 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     _cc_len = getattr(getattr(agent, "context_compressor", None), "context_length", None)
     _ctx_len = _cc_len if isinstance(_cc_len, int) and _cc_len > 0 else None
     # ── Stable tier ────────────────────────────────────────────────
-    stable_parts, _soul_loaded = _identity_parts(agent, _ctx_len)
+    _identity, _soul_loaded = _identity_parts(agent, _ctx_len)
+    stable_parts: list[str] = [MEMORY_ROOT_PROMPT, *_identity]
     # The skill_view() pointer dangles without skill tools OR without the
     # hermes-agent skill installed, so the variant is chosen after the skills
     # index is built; this slot holds its position.
@@ -816,7 +889,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # ── Volatile tier (most likely to differ on a rebuild; kept last so the stable prefix stays reusable) ──
     # Skills are runtime-mutable, so the index leads the volatile band: on a longest-prefix
     # backend an unchanged index stays inside the reused prefix; a changed one re-prefills from here.
-    volatile_parts: list[str] = [skills_prompt, *_memory_parts(agent)]
+    volatile_parts: list[str] = [*_memory_parts(agent), skills_prompt]
     # Plugin sections are confined to one coarse anchor in the volatile tail so
     # a resumed process can reconstruct the stable prefix without re-running plugins.
     volatile_parts.extend(_plugin_section_blocks(_frozen_plugin_prompt_sections(agent), "after_memory"))
@@ -830,6 +903,9 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
         # Embedder hints are prose too; reserve the delimiter for the renderer.
         environment_hints = environment_hints.replace(_pb.RUNTIME_ENVIRONMENT_HEADING, "> " + _pb.RUNTIME_ENVIRONMENT_HEADING)
         volatile_parts.append(f"{_pb.RUNTIME_ENVIRONMENT_HEADING}\n\n{environment_hints}\n\n{_pb.RUNTIME_ENVIRONMENT_END}")
+    # Deliberately the LAST block: the write trigger has to be the freshest thing
+    # in context, not a rule buried above thousands of tokens of tool guidance.
+    volatile_parts.append(_memory_write_reminder(agent))
     return {"stable": _join_tier(stable_parts), "context": _join_tier(context_parts), "volatile": _join_tier(volatile_parts)}
 
 

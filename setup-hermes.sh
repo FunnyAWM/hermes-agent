@@ -3,9 +3,8 @@
 # Hermes Agent Setup Script — THE dev-environment entry point.
 # ============================================================================
 # Sets up the pm-managed development environment from a fresh clone:
-#   1. Stage the pinned uv from pm/lock.json (sha256-verified, into the pm
-#      store slot) — pm needs uv to bootstrap, so it cannot stage uv itself.
-#   2. Use uv to install and locate bootstrap Python, then let uv exit.
+#   1. Reuse compatible local uv, or stage the verified pm/lock.json artifact.
+#   2. Locate compatible local/base Python; download only if missing, then let uv exit.
 #      Run `python -m pm.cli install` directly so PM can safely replace uv.
 #      PM owns the final interpreter, tool store, and dependency generation.
 #   3. Point you at `source ./activate` — the venv-style way to put the pm
@@ -109,9 +108,20 @@ py_version="$(pin version python | cut -d+ -f1 | cut -d. -f1,2)"
 store="${HERMES_RUNTIME_DIR:-$HOME/.hermes/tools}"
 entry="$store/uv-$uv_version-$target"
 uv="$entry/uv"; [ "$os" = win32 ] && uv="$entry/uv.exe"
+local_uv="$(command -v uv 2>/dev/null || true)"
+local_uv_version=""
+[ -n "$local_uv" ] && local_uv_version="$("$local_uv" --version 2>/dev/null | awk '{print $2}')"
+# A non-numeric pin (a fixture, a channel name) is not a version: reuse nothing.
+if [ -n "$local_uv_version" ] && awk -v have="$local_uv_version" -v need="$uv_version" 'BEGIN {
+    if (have !~ /^[0-9]+(\.[0-9]+)+$/ || need !~ /^[0-9]+(\.[0-9]+)+$/) exit 1
+    split(have,h,"."); split(need,n,".");
+    for(i=1;i<=3;i++) { if(h[i]+0>n[i]+0) exit 0; if(h[i]+0<n[i]+0) exit 1 } exit 0
+}'; then
+  uv="$local_uv"
+fi
 
 if [ -x "$uv" ]; then
-  echo -e "${GREEN}✓${NC} pinned uv found ($("$uv" --version 2>/dev/null))"
+  echo -e "${GREEN}✓${NC} Using existing uv ($("$uv" --version 2>/dev/null))"
 else
   url="$(pin url)"; sha="$(pin sha256)"
   [ -n "$url" ] && [ -n "$sha" ] || { echo -e "${RED}✗${NC} no uv artifact for $target" >&2; exit 1; }
@@ -171,9 +181,13 @@ if [ "$os" = win32 ]; then
   case "$arch" in arm64) py_request="cpython-$py_version-windows-aarch64-none" ;;
                   *) py_request="cpython-$py_version-windows-x86_64-none" ;; esac
 fi
-"$uv" python install --no-bin --no-registry "$py_request"
-boot_py="$("$uv" python find --managed-python "$py_request")"
+if ! boot_py="$("$uv" python find --system --no-managed-python --no-python-downloads --no-project "$py_request" 2>/dev/null)" \
+    && ! boot_py="$("$uv" python find --managed-python --no-python-downloads --no-project "$py_request" 2>/dev/null)"; then
+  "$uv" python install --no-bin --no-registry "$py_request"
+  boot_py="$("$uv" python find --managed-python --no-project "$py_request")"
+fi
 boot_py="${boot_py%$'\r'}"
+export PATH="$(dirname "$uv"):$(dirname "$boot_py"):$PATH"
 # Activation trusts the recorded tool digest; a direct setup re-checks it
 # (setup-hermes.ps1 draws the same line).
 pm_args=("$test_environment")

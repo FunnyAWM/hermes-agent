@@ -8,7 +8,7 @@ processes, sandbox lifecycle (per-task cache, idle reaper, atexit teardown)
 and sudo password plumbing.
 Cloud-sandbox persistent filesystems preserve working state across sandbox
 recreation but do NOT guarantee the same live sandbox or long-running
-processes survive cleanup, idle reaping, or Hermes exit.
+processes survive cleanup, idle reaping, or Kouri Harness exit.
 
 Companion modules (re-exported here, so ``tools.terminal_tool.<name>`` stays the
 import/patch target): ``terminal_tool_config`` (TERMINAL_* reads, ``_quiet``),
@@ -26,6 +26,7 @@ import sys
 import time
 import threading
 import atexit
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
 
@@ -112,7 +113,7 @@ def _current_session_key() -> str:
 
 
 def _current_session_profile() -> str:
-    """Active session's Hermes profile name, or "" (same lookup discipline as
+    """Active session's Kouri Harness profile name, or "" (same lookup discipline as
     :func:`_current_session_key`)."""
     from gateway.session_context import get_session_env
 
@@ -201,11 +202,11 @@ def _maybe_reap_docker_orphans(container_config: dict[str, Any]) -> None:
     """Run the docker orphan reaper once per process, if enabled.
 
     Sweeps Exited containers labeled ``hermes-agent=1`` for the current
-    profile — leftovers of Hermes processes that died without firing
+    profile — leftovers of Kouri Harness processes that died without firing
     ``atexit`` (SIGKILL, OOM, closed terminal). Conservative: only containers
     older than ``2 × lifetime_seconds``, profile-scoped. Gates:
     ``terminal.docker_orphan_reaper: false`` (operator opt-out, e.g. several
-    Hermes processes sharing a profile) and the once-per-interpreter flag so
+    Kouri Harness processes sharing a profile) and the once-per-interpreter flag so
     parallel subagent / RL-rollout calls don't re-sweep.
     """
     global _docker_orphan_reaper_ran
@@ -301,7 +302,7 @@ def _sanitize_cwd_for_live_env(env: Any, new_cwd: str) -> Optional[str]:
     are already rejected on the creation paths. This write classifies the
     directory mounted at ``/workspace`` as unusable before that prefix
     heuristic, then remaps the match (or a child of it) to its container mount
-    instead of storing the host path. SSH maps the Hermes subprocess home onto
+    instead of storing the host path. SSH maps the Kouri Harness subprocess home onto
     the peer's home, as environment creation already does. Other backends apply
     the override verbatim (ACP project-root switching must keep working).
     """
@@ -508,7 +509,7 @@ def _sessionless_container_key(profile_scoped: bool) -> str:
     session-bound work of that profile uses. Dispatcher workers set
     ``HERMES_HOME`` and clear session vars, so they are not a routed override;
     without this they collapsed onto ``default`` and missed the profile sandbox.
-    The default profile, non-persistent backends, and a home outside the Hermes
+    The default profile, non-persistent backends, and a home outside the Kouri Harness
     root stay ``default`` (:func:`~tools.terminal_tool_config.home_profile_name` names the profile).
     """
     routed = _routed_home_task_key(profile_scoped)
@@ -1174,6 +1175,100 @@ class _Rejected(Exception):
         self.result_json = result_json
 
 
+_SANDBOX_LEVELS = ("read-only", "workspace-write", "workspace-exec", "full-access")
+
+
+def _sandbox_escalation_scope(level: Optional[str], env_type: str, command: str):
+    """Apply the requested command boundary; ask before widening and persist explicit grants by command and level."""
+    from contextlib import nullcontext
+
+    level = (level or "").strip().lower()
+    if not level:
+        return nullcontext()
+    from tools.environments import local_command_sandbox as gate
+
+    if level not in _SANDBOX_LEVELS:
+        raise _Rejected(_error_json(
+            f"sandbox must be one of {', '.join(_SANDBOX_LEVELS)}.", status="error"))
+    if env_type != "local":
+        raise _Rejected(_error_json(
+            "sandbox levels apply to the local backend only; this session runs commands "
+            "in its own sandbox.", status="error"))
+    cfg = gate.settings()
+    if not cfg.enabled:
+        raise _Rejected(_error_json(
+            "sandbox levels need terminal.sandbox.enabled: the command sandbox is off, so "
+            "every command already runs unconfined and a level cannot be applied.", status="error"))
+    active = gate.active_profile(cfg)
+    if level == active.preset:
+        # Nothing to change: keep the active profile verbatim. Swapping in a bare preset
+        # would silently drop a custom profile's policy/backend (network, syscall filter,
+        # caps) — a quiet widening of the boundary the user configured.
+        return nullcontext()
+    if gate.tightening(level):
+        return gate.escalation(level)
+    if not cfg.escalation:
+        raise _Rejected(_error_json(
+            f"Escalating to the {level} sandbox level is turned off (terminal.sandbox.escalation); "
+            "run the command inside the active profile or ask the user to change it.", status="error"))
+    # ``approvals.mode: auto`` delegates the decision to the automatic reviewer, which ruled on
+    # this exact call (with its ``sandbox`` argument and the conversation) before dispatch: an
+    # allow gets here, a deny/unknown verdict asks the human and never reaches this point. Asking
+    # a human again would double-gate one decision. When terminal is excluded from review
+    # (``skip_tools``) nothing ruled on it, so the human gate stays the only check.
+    from tools.approval_context import _get_approval_mode
+
+    if _get_approval_mode() == "auto":
+        from tools.auto_review import should_review
+
+        if should_review("terminal"):
+            return gate.escalation(level)
+    import hashlib
+
+    from tools.approval import request_tool_approval
+
+    current = gate.active_profile(cfg).preset
+    normalised = " ".join(command.split())
+    preview = normalised[:160]
+    approval = request_tool_approval(
+        "terminal",
+        f"run one command at the wider '{level}' sandbox level (active: '{current}'): {preview}",
+        # The rule identity hashes the full command: a preview-truncated key would let one
+        # "[a]lways" cover every command sharing its first 160 characters.
+        rule_key=f"sandbox_escalation:{level}:{hashlib.sha1(normalised.encode('utf-8')).hexdigest()}",
+        approval_callback=_get_approval_callback(),
+    )
+    if not approval.get("approved"):
+        raise _Rejected(_error_json(
+            approval.get("message") or "The user did not approve the wider sandbox level.",
+            status="blocked"))
+    return gate.escalation(level)
+
+
+@contextmanager
+def _sandbox_execution_scope(
+    level: Optional[str], env_type: str, command: str, *, mandatory: bool = False,
+):
+    from tools.environments import local_command_sandbox as gate
+
+    if mandatory and (not isinstance(level, str) or level.strip().lower() not in _SANDBOX_LEVELS[:-1]):
+        raise _Rejected(_error_json(
+            "a mandatory sandbox requires read-only, workspace-write, or workspace-exec.", status="error"))
+    if mandatory:
+        if env_type != "local":
+            raise _Rejected(_error_json(
+                "a mandatory sandbox requires the local terminal backend.", status="error"))
+        cfg = gate.settings()
+        if not cfg.enabled:
+            raise _Rejected(_error_json(
+                "a mandatory sandbox requires terminal.sandbox.enabled.", status="error"))
+        scope = gate.escalation(level.strip().lower())
+    else:
+        scope = _sandbox_escalation_scope(level, env_type, command)
+    with gate.mandatory(mandatory), scope:
+        yield
+
+
 @dataclass
 class _ApprovalVerdict:
     """Outcome of the pre-exec guard pass.
@@ -1422,7 +1517,7 @@ def _run_foreground(
     metered: bool = True,
 ) -> str:
     """Execute in the foreground with retry on transient errors, then finalize. ``metered``
-    is False for Hermes' own control-plane commands (``_host_local``)."""
+    is False for Kouri Harness' own control-plane commands (``_host_local``)."""
     from hermes_cli.observability.shared_metrics_harness import record_terminal_outcome
     max_retries = 3
     env_type, eff, effective_timeout = plan.env_type, plan.effective_task_id, plan.effective_timeout
@@ -1457,7 +1552,7 @@ def _run_foreground(
             break
         except Exception as e:
             # A backend exception (e.g. an SSH connect timeout) never reached an exit status, so it
-            # is not a terminal outcome; Hermes' own deadline arrives as ``hermes_timed_out``.
+            # is not a terminal outcome; Kouri Harness' own deadline arrives as ``hermes_timed_out``.
             if "timeout" in str(e).lower():
                 return _error_json(f"Command timed out after {effective_timeout} seconds", exit_code=124)
             # Retry on transient errors
@@ -1578,9 +1673,11 @@ def terminal_tool(
     notify_on_complete: bool = False,
     watch_patterns: Optional[list[str]] = None,
     _host_local: bool = False,
+    _sandbox_required: bool = False,
     _completion_output_chars: int = 0,
     heartbeat: int = 0,
     persist_on_release: bool = False,
+    sandbox: Optional[str] = None,
 ) -> str:
     """Execute *command* in the configured terminal environment; returns a JSON string.
 
@@ -1600,8 +1697,11 @@ def terminal_tool(
     process_manage kill, and the user from the process UI (#41225).
     ``_completion_output_chars`` (internal) sizes the completion notification's output for a
     spawner whose output is the payload (a bot DM's reply); 0 keeps the usual tail.
-    ``_host_local`` forces the local backend for Hermes-owned control-plane
+    ``_host_local`` forces the local backend for Kouri Harness-owned control-plane
     children (kept in a separate env cache from the configured backend).
+    ``sandbox`` is a one-command level override for the local command sandbox
+    (``read-only`` / ``workspace-write`` / ``workspace-exec`` / ``full-access``);
+    a wider level needs the user's approval and never outlives this call.
     """
     from hermes_cli.observability.shared_metrics_loop import record_terminal_backend as _metered
     plan = None
@@ -1674,28 +1774,29 @@ def terminal_tool(
                 # Promotion implies notify_on_complete; watch_patterns is a background-only flag the
                 # caller could not have meant for a foreground call, and the two are exclusive anyway.
                 background, notify_on_complete, watch_patterns = True, True, None
-            if background:
-                result = spawn_background_process(
-                    command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
-                    task_id=task_id, session_key=session_key, cwd_key=cwd_key, workdir=workdir, cwd=cwd,
-                    mounted_host=getattr(env, "host_cwd", None) or plan.host_cwd,
-                    effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
-                    watch_patterns=watch_patterns, approval_note=verdict.note,
-                    pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
-                    completion_output_chars=_completion_output_chars,
-                    heartbeat_seconds=heartbeat,
-                    persist_on_release=persist_on_release,
-                    auto_backgrounded=auto_bg is not None and plan.promoted_from_foreground_timeout is None,
-                )
-                if plan.promoted_from_foreground_timeout is not None:
-                    result = _with_promoted_note(result, plan.promoted_from_foreground_timeout)
-                return _metered(None if _host_local else plan, result)
-            return _metered(None if _host_local else plan, _run_foreground(
-                command, env, plan,
-                task_id=task_id, session_id=session_id, session_key=session_key, cwd_key=cwd_key,
-                workdir=workdir, approval_note=verdict.note, clear_interrupt=verdict.approved_run,
-                metered=not _host_local,
-            ))
+            with _sandbox_execution_scope(sandbox, env_type, command, mandatory=_sandbox_required):
+                if background:
+                    result = spawn_background_process(
+                        command=command, env=env, env_type=env_type, effective_task_id=effective_task_id,
+                        task_id=task_id, session_key=session_key, cwd_key=cwd_key, workdir=workdir, cwd=cwd,
+                        mounted_host=getattr(env, "host_cwd", None) or plan.host_cwd,
+                        effective_pty=pty and not pty_disabled, notify_on_complete=notify_on_complete,
+                        watch_patterns=watch_patterns, approval_note=verdict.note,
+                        pty_disabled_reason=_PTY_DISABLED_REASON if pty_disabled else None,
+                        completion_output_chars=_completion_output_chars,
+                        heartbeat_seconds=heartbeat,
+                        persist_on_release=persist_on_release,
+                        auto_backgrounded=auto_bg is not None and plan.promoted_from_foreground_timeout is None,
+                    )
+                    if plan.promoted_from_foreground_timeout is not None:
+                        result = _with_promoted_note(result, plan.promoted_from_foreground_timeout)
+                    return _metered(None if _host_local else plan, result)
+                return _metered(None if _host_local else plan, _run_foreground(
+                    command, env, plan,
+                    task_id=task_id, session_id=session_id, session_key=session_key, cwd_key=cwd_key,
+                    workdir=workdir, approval_note=verdict.note, clear_interrupt=verdict.approved_run,
+                    metered=not _host_local,
+                ))
     except _Rejected as r:
         return r.result_json
     except EnvironmentConnectionError as e:
@@ -1762,6 +1863,11 @@ TERMINAL_SCHEMA = {
                 "type": "boolean",
                 "default": False,
                 "description": "With background=true: survive session end, /new, compression and other cleanup (not host exit). Only for jobs the user explicitly wants to outlive the conversation."
+            },
+            "sandbox": {
+                "type": "string",
+                "enum": ["read-only", "workspace-write", "workspace-exec", "full-access"],
+                "description": "Local command sandbox: the level for THIS command. Use the active level, or a WIDER one when the active profile blocks what you need — the user must approve a wider level, and the configured profile applies again to the next call. Do NOT pass a level tighter than the active one: narrowing a sandbox never fixes a command that was blocked for needing more access. 'full-access' runs this one command outside the sandbox."
             }
             # Legacy aliases (unadvertised, still accepted): notify_on_complete
             # (bool) and watch_patterns (list). notify=true|[...] maps onto
@@ -1846,6 +1952,7 @@ def _handle_terminal(args, **kw):
         watch_patterns=watch_patterns,
         heartbeat=heartbeat,
         persist_on_release=persist_on_release,
+        sandbox=args.get("sandbox"),
     )
 
 

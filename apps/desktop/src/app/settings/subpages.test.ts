@@ -90,6 +90,8 @@ describe('settings subpage routing', () => {
 
     const cases: [SettingsView, string, string][] = [
       ['config:model', 'aux=vision', 'auxiliary'],
+      ['config:chat', 'setting=context.session_window_turns', 'bot'],
+      ['config:chat', 'setting=context.frozen_window_turns', 'bot'],
       ['keybinds', 'setting=keybinds.hud-modifier', 'hud-gesture'],
       ['keybinds', 'page=shortcuts&setting=keybinds.hud-modifier', 'hud-gesture'],
       ['notifications', 'setting=notifications.completion-sound', 'sounds'],

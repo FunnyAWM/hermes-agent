@@ -18,16 +18,16 @@ import pytest
 def _installed_vbs(home, configured, *, extra_env="", extra_line=""):
     script = home / "gateway.vbs"
     script.write_text("\n".join([
-        "' Hermes Agent Gateway", "Option Explicit", "Dim sh, env, existing_pp",
+        "' Kouri Harness Gateway", "Option Explicit", "Dim sh, env, existing_pp",
         'Set sh = CreateObject("WScript.Shell")', 'Set env = sh.Environment("PROCESS")',
         f'env.Item("HERMES_HOME") = "{configured}"',
         'env.Item("HERMES_SUPERVISED_CHILD") = "1"',
         *([f'env.Item("{extra_env}") = "1"'] if extra_env else []),
         *([extra_line] if extra_line else []),
-        'env.Item("VIRTUAL_ENV") = "C:\\\\Hermes"',
+        'env.Item("VIRTUAL_ENV") = "C:\\\\Kouri Harness"',
         'existing_pp = env.Item("PYTHONPATH")', 'If Len(existing_pp) > 0 Then',
-        '  env.Item("PYTHONPATH") = "C:\\\\Hermes;" & existing_pp', 'Else',
-        '  env.Item("PYTHONPATH") = "C:\\\\Hermes"', 'End If',
+        '  env.Item("PYTHONPATH") = "C:\\\\Kouri Harness;" & existing_pp', 'Else',
+        '  env.Item("PYTHONPATH") = "C:\\\\Kouri Harness"', 'End If',
         f'sh.CurrentDirectory = "{home}"',
         f'sh.Run "{sys.executable} -m hermes_cli.main gateway run", 0, False',
     ]) + "\n", encoding="utf-8")
@@ -81,7 +81,7 @@ def test_an_unexpected_whoami_answer_is_named(tmp_path, monkeypatch):
 @pytest.mark.parametrize("case,needles", [
     ("elevated", ["RunLevel", "HighestAvailable"]),
     ("launcher_env", ["PYTHONSTARTUP"]),
-    ("foreign_home", ["another Hermes home", "elsewhere"]),
+    ("foreign_home", ["another Kouri Harness home", "elsewhere"]),
 ])
 def test_a_task_that_breaks_a_rule_names_the_rule(case, needles, tmp_path, monkeypatch):
     refused = _windows_refusal(

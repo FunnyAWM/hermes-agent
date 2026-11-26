@@ -1,4 +1,4 @@
-"""Cloud peer access: ``/api/peer/...`` on the dashboard carries a local Hermes agent's API calls to
+"""Cloud peer access: ``/api/peer/...`` on the dashboard carries a local Kouri Harness agent's API calls to
 this agent's gateway api_server on loopback.
 
 The caller holds a short-lived pass minted for this one agent, never the agent's

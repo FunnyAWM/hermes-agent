@@ -1672,7 +1672,7 @@ _ENV_DUMP_COMMANDS = frozenset({"env", "printenv", "set", "export", "declare"})
 
 # Commands that read file contents to stdout, plus the filter readers (``grep``/``awk``/``sed``)
 # the model reaches for on config files. A secret-bearing target (``.env`` per AGENTS.md,
-# a shell rc/profile, Hermes' own ``config.yaml`` where ``hermes mcp add --env`` writes
+# a shell rc/profile, Kouri Harness' own ``config.yaml`` where ``hermes mcp add --env`` writes
 # tokens) is a credential dump, so the ENV/YAML assignment pass must run. Arbitrary
 # ``config.yaml`` / source files stay on the code_file path (``MAX_TOKENS: 100``).
 _FILE_READ_COMMANDS = frozenset({
@@ -1699,7 +1699,7 @@ def _is_secret_file_arg(arg: str) -> bool:
     """``.env``-style, shell rc or credential-store basename (``.netrc``, ``.pgpass``, ...)
     anywhere; ``credentials`` / ``config`` only under ``.aws`` (the bare names are too generic), and
     ``config.yaml`` only under a ``.hermes`` directory, ``$HERMES_HOME``, or the resolved
-    Hermes home (never arbitrary YAML). The resolved-home arm is what covers native Windows,
+    Kouri Harness home (never arbitrary YAML). The resolved-home arm is what covers native Windows,
     where the home directory is ``%LOCALAPPDATA%\\hermes`` and carries no ``.hermes`` segment."""
     path = arg.strip("\"'").replace("\\", "/")
     hermes_home = False
@@ -1721,7 +1721,7 @@ def _is_secret_file_arg(arg: str) -> bool:
         return True
     if parts[-1] in HOME_CREDENTIAL_FILES or parts[-2:] in ([".aws", "credentials"], [".aws", "config"]):
         return True
-    # ``config.yaml`` plus the ``config.yaml.good.<stamp>`` / ``.corrupt.<stamp>`` copies Hermes
+    # ``config.yaml`` plus the ``config.yaml.good.<stamp>`` / ``.corrupt.<stamp>`` copies Kouri Harness
     # writes under ``backups/config/`` — same contents, same secrets.
     if parts[-1] != "config.yaml" and not parts[-1].startswith(("config.yaml.good.", "config.yaml.corrupt.")):
         return False
@@ -1805,7 +1805,7 @@ def redact_for_egress(text: str, *, urls: bool = False, keep_phone_numbers: bool
 def redact_terminal_output(output: str, command: str | None = None, *, force: bool = False) -> str:
     """Single redaction policy for ALL terminal-output surfaces: the ENV/YAML-assignment
     pass runs only when ``command`` is an env dump or reads a secret-bearing file (``.env``,
-    shell rc, a credential store like ``.netrc``, Hermes ``config.yaml``); otherwise
+    shell rc, a credential store like ``.netrc``, Kouri Harness ``config.yaml``); otherwise
     code_file=True avoids false positives on source/config dumps."""
     if not output:
         return output

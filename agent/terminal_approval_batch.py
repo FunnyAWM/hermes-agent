@@ -85,7 +85,7 @@ class _TerminalSlot:
                 return te._run_agent_tool_execution_middleware(
                     batch.agent, **ref.middleware_kwargs(), execute=dispatch.execute,
                     scope_block=pc.scope_block, display_index=self.index + 1,
-                    authorization_gate=batch.authorization_gate,
+                    authorization_gate=batch.authorization_gate, messages=batch.messages,
                 )
         finally:
             self.ready.set()
@@ -182,7 +182,7 @@ def bind_prepared_dispatch(dispatch):
         nonlocal claimed
         with lock:
             if claimed:
-                raise RuntimeError("Hermes tool execution callback invoked more than once")
+                raise RuntimeError("Kouri Harness tool execution callback invoked more than once")
             claimed = True
         return invoke(*args, **kwargs)
 

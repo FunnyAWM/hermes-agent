@@ -15,7 +15,7 @@ from agent.checkpoints import maintenance
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
-    """Isolate profile paths and the process-level Hermes root."""
+    """Isolate profile paths and the process-level Kouri Harness root."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     default_home = tmp_path / ".hermes"
     default_home.mkdir(exist_ok=True)

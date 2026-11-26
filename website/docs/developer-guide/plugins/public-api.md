@@ -30,6 +30,7 @@ with a name allows that one name only.
 | `hermes_cli.auth_model_picker` | `prompt_model_selection` | developer-guide / plugins docs |
 | `hermes_cli.auth` | `resolve_external_process_provider_credentials` | developer-guide / plugins docs |
 | `hermes_cli.model_setup` | whole module | developer-guide / plugins docs |
+| `agent.i18n` | `t` | developer-guide / plugins docs |
 | `agent.image_gen_provider` | whole module | developer-guide / plugins docs |
 | `agent.memory_manager` | whole module | developer-guide / plugins docs |
 | `agent.memory_provider` | whole module | developer-guide / plugins docs |
@@ -179,12 +180,12 @@ with a name allows that one name only.
 | `hermes_cli.plugin_session` | `session_client` | user-guide/features/plugins.md § Plugin code inside the gateway: which client created the session |
 | `hermes_cli.plugin_session` | `turn_client` | user-guide/features/plugins.md § Plugin code inside the gateway: which client sent the turn and who is attached |
 | `hermes_cli.plugin_session` | `session_viewers` | user-guide/features/plugins.md § Plugin code inside the gateway: which client sent the turn and who is attached |
-| `agent.file_safety` | `get_read_block_error` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
-| `agent.file_safety` | `raise_if_read_blocked` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
-| `agent.file_safety` | `is_write_denied` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
-| `agent.file_safety` | `get_write_denied_error` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
-| `hermes_yaml` | `safe_load` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
-| `hermes_yaml` | `safe_dump` | plugins/index.md § Check file paths and read YAML with Hermes's own helpers |
+| `agent.file_safety` | `get_read_block_error` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
+| `agent.file_safety` | `raise_if_read_blocked` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
+| `agent.file_safety` | `is_write_denied` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
+| `agent.file_safety` | `get_write_denied_error` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
+| `hermes_yaml` | `safe_load` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
+| `hermes_yaml` | `safe_dump` | plugins/index.md § Check file paths and read YAML with Kouri Harness's own helpers |
 | `hermes_cli.urllib_security` | `open_credentialed_url` | plugins/index.md § Send a credentialed HTTP request without leaking it on redirect |
 | `agent.retry_utils` | `parse_retry_after_seconds` | plugins/index.md § Read a Retry-After header the way Hermes does |
 | `hermes_cli.version_info` | `hermes_user_agent` | plugins/index.md § Send the Hermes User-Agent header |
@@ -197,3 +198,7 @@ with a name allows that one name only.
 | `hermes_cli.profiles_run_elsewhere` | `mark_profile_run_elsewhere` | user-guide/multi-profile-gateways.md § Profiles a plugin runs elsewhere |
 | `hermes_cli.profiles_run_elsewhere` | `clear_profile_run_elsewhere` | user-guide/multi-profile-gateways.md § Profiles a plugin runs elsewhere |
 | `hermes_cli.profiles_run_elsewhere` | `run_elsewhere` | user-guide/multi-profile-gateways.md § Profiles a plugin runs elsewhere |
+| `agent.runtime_session_store` | `is_worker_process` | plugins/super_agent/README.md — Super Agent managed Worker lifecycle and sandbox preflight |
+| `hermes_cli.gateway_client` | `connect_gateway` | plugins/super_agent/README.md — Super Agent managed Worker lifecycle and sandbox preflight |
+| `tools.environments.local_command_sandbox` | `resolve_binary` | plugins/super_agent/README.md — Super Agent managed Worker lifecycle and sandbox preflight |
+| `tools.environments.local_command_sandbox` | `settings` | plugins/super_agent/README.md — Super Agent managed Worker lifecycle and sandbox preflight |

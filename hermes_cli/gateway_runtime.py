@@ -387,9 +387,9 @@ def _fenced_verdict(home: Path, timeout: float) -> GatewayDiscovery:
     return GatewayDiscovery("draining", reason_code="update_paused")
 
 
-_REPLACE_FAILED_DETAIL = "an older Hermes gateway still owns this profile after a stop; run: hermes gateway stop"
+_REPLACE_FAILED_DETAIL = "an older Kouri Harness gateway still owns this profile after a stop; run: hermes gateway stop"
 # ``draining`` reasons after which the owner is going away by itself: its own idle exit, or the
-# older-Hermes owner this call just stopped. Ensure waits it out and starts the current owner.
+# older-Kouri Harness owner this call just stopped. Ensure waits it out and starts the current owner.
 _RETIRING = frozenset({"idle_exit", "replaced"})
 
 
@@ -402,7 +402,7 @@ def run_elsewhere_verdict(home: str | Path) -> GatewayDiscovery | None:
 
 
 def _observe_replacing_stale(home: Path, deadline: float, replaced: set[Path]) -> GatewayDiscovery:
-    """Discovery, except that a gateway an older Hermes left on this home is stopped once (like
+    """Discovery, except that a gateway an older Kouri Harness left on this home is stopped once (like
     ``hermes gateway stop``) and reported as retiring; a refusal keeps ``incompatible`` + its remedy.
     A profile a plugin runs elsewhere is refused before discovery, so ``ensure`` neither starts it
     nor attaches to a host gateway that has not dropped it yet."""
@@ -431,10 +431,10 @@ def ensure_gateway_runtime(profile_home: str | Path, *, timeout: float | None = 
     burning CPU (a starved host), never past ``gateway_runtime_progress.MAX_ADAPTIVE_TIMEOUT``. An
     explicit ``timeout`` is a hard deadline (``hermes_cli.gateway_runtime_progress``).
 
-    Never installs anything. The one owner it replaces is a gateway an older Hermes left running on
+    Never installs anything. The one owner it replaces is a gateway an older Kouri Harness left running on
     this install's own home (``incompatible``/``runtime_protocol``, the upgrade case): it is stopped
     the way ``hermes gateway stop`` stops it, once, and the current one started like any absent
-    owner. Another install's or a newer Hermes's gateway stays refused, with the reason in ``detail``
+    owner. Another install's or a newer Kouri Harness's gateway stays refused, with the reason in ``detail``
     (``hermes_cli.gateway_runtime_replace``). A profile a plugin runs elsewhere is never started or
     attached to (``inaccessible``/``profile_runs_elsewhere``, the profile and plugin in ``detail``).
 

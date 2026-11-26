@@ -1,6 +1,6 @@
 """Resumable, hash-verified, multi-connection downloads.
 
-Every large fetch in Hermes goes through this one downloader: pm
+Every large fetch in Kouri Harness goes through this one downloader: pm
 packages (pinned sha256 from lock.json) and local models (deliberately
 unverified — catalog sizes may lag an upstream re-upload, so sha256 is
 optional per source).
@@ -408,6 +408,8 @@ class Download:
         return [source.dest for source in self.sources]
 
     def _try_sources(self, source: Source, operation, failures: list[DownloadTransportError]):
+        # Sources rotate on transport failure only: a HashError (wrong bytes) is
+        # deliberately not caught here and aborts the install fail-closed.
         urls = tuple(dict.fromkeys((source.url, *source.fallbacks)))
         for index, url in enumerate(urls):
             self._check_pause()

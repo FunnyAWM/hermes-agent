@@ -17,6 +17,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import socket
 import stat
 import sys
@@ -154,12 +155,21 @@ def _detect_supervisor() -> str:
 
 
 def _structured_login_subject(value: str) -> bool:
-    """Whether ``value`` is ``authenticated_subject``'s namespaced login form
-    ``auth:v1:[provider, issuer, user]`` (gateway.session_identity) — the only identity
-    a same-user peer may forward a ticket for. Bare labels (``admin``, ``uid:501``) fail:
-    they can collide with another stored owner representation."""
+    """Whether the forwarded subject is a namespaced dashboard login."""
     from gateway.session_identity import parse_authenticated_subject
     return parse_authenticated_subject(value) is not None
+
+
+def _ticket_subject(params: dict, peer_subject: str) -> str:
+    subject = params.get("subject", peer_subject)
+    if not isinstance(subject, str) or not subject or len(subject) > 256:
+        raise PermissionError("invalid bootstrap subject")
+    if "subject" not in params or _structured_login_subject(subject):
+        return subject
+    # Router ownership survives reconnects. Its plugin ID is nameable only on a worker grant.
+    if params["purpose"] == "managed-session" and re.fullmatch(r"plugin:[a-z0-9_-]{1,64}", subject):
+        return subject
+    raise PermissionError("invalid bootstrap subject")
 
 
 def launch_supervisor(identity: dict[str, Any]) -> Optional[str]:
@@ -397,17 +407,7 @@ class GatewayControlServer:
             raise PermissionError("invalid bootstrap parameters")
         if params["instance_id"] != self.ticket_store.instance_id:
             raise PermissionError("stale runtime instance")
-        # A verified same-user peer may name the principal it acts for (a standalone dashboard
-        # forwarding a mutation for its authenticated user, #138915): the socket's peer gate
-        # stays the trust boundary — the forwarded subject only relabels who that same peer is,
-        # it never admits a less-verified caller. Only a structured login subject is nameable
-        # (``authenticated_subject``'s ``auth:v1:[provider, issuer, user]`` form); a bare label
-        # like ``admin`` could collide with another stored owner representation, so it fails closed.
-        subject = params.get("subject", peer_subject)
-        if not isinstance(subject, str) or not subject or len(subject) > 256:
-            raise PermissionError("invalid bootstrap subject")
-        if subject is not peer_subject and not _structured_login_subject(subject):
-            raise PermissionError("invalid bootstrap subject")
+        subject = _ticket_subject(params, peer_subject)
         ticket = self.ticket_store.mint(profile_id=params["profile_id"], subject=subject,
                                        purpose=params["purpose"], scope=params.get("scope", "profile"),
                                        refuse_restart_wait="restart_wait" in params)

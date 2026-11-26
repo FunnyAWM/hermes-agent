@@ -1,4 +1,4 @@
-"""Admission lint: name a plugin's imports of private Hermes core modules (a warning, never a refusal).
+"""Admission lint: name a plugin's imports of private Kouri Harness core modules (a warning, never a refusal).
 
 Catalog rule 9 ("public surfaces only") is enforced for runtime rebinds by
 ``plugin_validate_core_override``; an import of a core internal (``tools.tirith_security``,
@@ -39,7 +39,7 @@ _SHOWN = 10
 
 @lru_cache(maxsize=1)
 def _hermes_packages() -> frozenset:
-    """Hermes-owned top-level names: pyproject's ``packages.find`` includes plus the root modules
+    """Kouri Harness-owned top-level names: pyproject's ``packages.find`` includes plus the root modules
     setup.py ships as ``py-modules`` (every root ``*.py``)."""
     root = Path(project_root_str())
     try:
@@ -89,7 +89,7 @@ def _core_module_exists(module: str) -> bool:
 
 
 def _is_own_module_path(module: str, local: set[str]) -> bool:
-    """A Hermes-shaped path that core does not ship but whose tail is one of the plugin's own modules:
+    """A Kouri Harness-shaped path that core does not ship but whose tail is one of the plugin's own modules:
     the fallback spelling of the plugin's install location (``plugins.memory.openltm._db`` beside
     ``from . import _db``). A path core DOES ship stays a core import."""
     parts = module.split(".")
@@ -114,13 +114,13 @@ def is_public_import(module: str, name: str, public_api: frozenset | None = None
 
 
 def _private_target(module: str, name: str, core: frozenset, local: set[str]) -> str:
-    """The dotted target to report, or "" when the import is public, local or not Hermes's."""
+    """The dotted target to report, or "" when the import is public, local or not Kouri Harness's."""
     target = f"{module}.{name}" if name else module
     return target if _is_hermes_import(module, name, core, local) and not is_public_import(module, name) else ""
 
 
 def _parsed_files(plugin_dir: Path) -> list[tuple[Path, ast.AST]]:
-    """``(rel, tree)`` for every plugin module that can load inside Hermes. Hidden dirs (``.github/``
+    """``(rel, tree)`` for every plugin module that can load inside Kouri Harness. Hidden dirs (``.github/``
     CI helpers) never do; tests and vendored envs are skipped by ``_python_files``."""
     parsed = []
     for path, rel in _python_files(plugin_dir):
@@ -231,7 +231,7 @@ def hermes_import_sites(plugin_dir: Path) -> CoreImports:
 
 
 def private_import_findings(plugin_dir: Path) -> list[str]:
-    """``["<rel>:<line> <module>[.<name>]", ...]`` for every import of a private Hermes core module:
+    """``["<rel>:<line> <module>[.<name>]", ...]`` for every import of a private Kouri Harness core module:
     the first site of each distinct module first (so a truncated list still shows the breadth),
     then the rest, each group in file/line order."""
     files = _parsed_files(Path(plugin_dir))
@@ -394,7 +394,7 @@ def _warn_sites(report, label: str, hits: list[str]) -> None:
 
 
 def check_private_imports(report, plugin_dir: Path) -> None:
-    """Warn (never fail) when the plugin imports private Hermes core modules or calls private
+    """Warn (never fail) when the plugin imports private Kouri Harness core modules or calls private
     methods on the core objects it is handed."""
     if hits := private_import_findings(plugin_dir):
         _warn_sites(report, "private core imports", hits)

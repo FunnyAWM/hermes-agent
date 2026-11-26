@@ -101,7 +101,13 @@ export function renderRosterDialogs({
         }}
         open={Boolean(editing)}
       />
-      {grouping ? <GroupDialog bot={grouping} onClose={() => setGrouping(null)} onCreated={(group, origin) => openGroupChat(group, origin)} /> : null}
+      {grouping ? (
+        <GroupDialog
+          bot={grouping}
+          onClose={() => setGrouping(null)}
+          onCreated={(group, origin) => openGroupChat(group, origin)}
+        />
+      ) : null}
       <ConfirmDialog
         busyLabel="Deleting…"
         confirmLabel={t.common.delete}
@@ -110,7 +116,7 @@ export function renderRosterDialogs({
             <span>
               {'This will permanently delete the bot '}
               <span className="font-medium text-foreground">{deleting.name}</span>
-              {' and its associated Hermes profile at '}
+              {' and its associated Kouri Harness profile at '}
               <span className="font-mono text-xs">{deleting.path}</span>. This cannot be undone.
             </span>
           ) : null
@@ -138,9 +144,13 @@ export function renderRosterDialogs({
         busyLabel={b.group.disbanding}
         confirmLabel={b.group.disbandAction}
         description={
-          deletingGroup
-            ? <span>{b.group.disbandDescPrefix}<span className="font-medium text-foreground">{deletingGroup.name}</span>{b.group.disbandDescSuffix(deletingGroup.members.length)}</span>
-            : null
+          deletingGroup ? (
+            <span>
+              {b.group.disbandDescPrefix}
+              <span className="font-medium text-foreground">{deletingGroup.name}</span>
+              {b.group.disbandDescSuffix(deletingGroup.members.length)}
+            </span>
+          ) : null
         }
         destructive
         doneLabel={b.group.disbandDone}

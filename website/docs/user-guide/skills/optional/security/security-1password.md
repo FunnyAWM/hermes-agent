@@ -17,7 +17,7 @@ Set up op CLI, sign in, and read or inject secrets.
 | Source | Optional — install with `hermes skills install official/security/1password` |
 | Path | `optional-skills/security/1password` |
 | Version | `1.1.0` |
-| Author | arceus77-7, enhanced by Hermes Agent |
+| Author | arceus77-7, enhanced by Kouri Harness |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `security`, `secrets`, `1password`, `op`, `cli` |
@@ -25,7 +25,7 @@ Set up op CLI, sign in, and read or inject secrets.
 ## Reference: full SKILL.md
 
 :::info
-The following is the complete skill definition that Hermes loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
+The following is the complete skill definition that Kouri Harness loads when this skill is triggered. This is what the agent sees as instructions when the skill is active.
 :::
 
 # 1Password CLI
@@ -36,8 +36,8 @@ Use this skill when the user wants secrets managed through 1Password instead of 
 
 - 1Password account
 - 1Password CLI (`op`) installed
-- One of: desktop app integration or a Connect server for `op` in the Hermes terminal
-- `tmux` available for stable authenticated sessions during Hermes terminal calls (desktop app flow only)
+- One of: desktop app integration or a Connect server for `op` in the Kouri Harness terminal
+- `tmux` available for stable authenticated sessions during Kouri Harness terminal calls (desktop app flow only)
 
 Hermes never passes `OP_SERVICE_ACCOUNT_TOKEN` to the terminal or `execute_code`, even when it is in
 `.env` or `terminal.env_passthrough`: it unlocks every secret the service account can read. A service
@@ -53,7 +53,7 @@ account is still the right way to feed provider keys to Hermes itself (`hermes s
 
 ## Authentication Methods
 
-### Service Account (Hermes's own secret resolution, or your own shell)
+### Service Account (Kouri Harness's own secret resolution, or your own shell)
 
 A service-account token in `${HERMES_HOME:-~/.hermes}/.env` lets Hermes resolve `op://` references for
 its own provider keys at startup (`hermes secrets onepassword setup`). It is stripped from the processes the
@@ -101,9 +101,9 @@ op --version
 
 3. Choose an auth method above and configure it.
 
-## Hermes Execution Pattern (desktop app flow)
+## Kouri Harness Execution Pattern (desktop app flow)
 
-Hermes terminal commands are non-interactive by default and can lose auth context between calls.
+Kouri Harness terminal commands are non-interactive by default and can lose auth context between calls.
 For reliable `op` use with desktop app integration, run sign-in and secret operations inside a dedicated tmux session.
 
 Note: a service-account token is never available here (see Requirements), so headless `op` use from the

@@ -517,8 +517,9 @@ function Invoke-DownloadWithProgress {
 # (<store>\uv-<version>-<target>\), sha256-verified, so pm adopts the same
 # bytes — no astral-latest, no irm|iex. Returns the uv.exe path.
 function Get-Uv {
-    # Always the pinned artifact, never a uv already on PATH: Hermes runs only
-    # its own packaged toolchain.
+    foreach ($candidate in @(Get-Command uv -CommandType Application -All -ErrorAction SilentlyContinue)) {
+        if (Test-UvAtLeastPin $candidate.Source) { return $candidate.Source }
+    }
     $target = "win32-$(Get-WindowsArch)"
     $pin = $script:UvPinFiles[$target]
     if (-not $pin) {
@@ -662,7 +663,21 @@ function Get-PinnedGit {
 # Each -Stage is a new PowerShell process. Restore the pinned pm store Git
 # PATH in every stage that invokes git; never inherit an unpinned system Git.
 function Ensure-Git {
-    $g = Get-PinnedGit
+    $g = $null
+    foreach ($candidate in @(Get-Command git -CommandType Application -All -ErrorAction SilentlyContinue)) {
+        $version = (Invoke-Native { & $candidate.Source --version 2>$null }) -join ' '
+        if ($LASTEXITCODE -or $version -notmatch 'git version (\d+\.\d+\.\d+)') { continue }
+        $actual = [version]$Matches[1]
+        $minimum = [version](($script:GitPinVersion -split '\+')[0])
+        $root = Split-Path (Split-Path $candidate.Source -Parent) -Parent
+        $bash = Join-Path $root 'usr\bin\bash.exe'
+        if ($actual -lt $minimum -or -not (Test-Path $bash)) { continue }
+        Invoke-Native { & $bash --version 2>$null } | Out-Null
+        if ($LASTEXITCODE) { continue }
+        $g = $candidate.Source
+        break
+    }
+    if (-not $g) { $g = Get-PinnedGit }
     if (-not $g) { return $false }
     # The same dirs pm's git package env() composes.
     $gitEntry = Split-Path (Split-Path $g -Parent) -Parent
@@ -1370,7 +1385,10 @@ function Get-BootstrapPython {
     # A bare version lets uv pick emulated x86_64 on Windows-on-ARM.
     $pyArch = if ((Get-WindowsArch) -eq 'arm64') { 'aarch64' } else { 'x86_64' }
     $pyRequest = "cpython-$pyVersion-windows-$pyArch-none"
-    $bootPy = (Invoke-Native -Utf8Output { & $uv python find --managed-python --no-project $pyRequest 2>$null }) -join "`n"
+    $bootPy = (Invoke-Native -Utf8Output { & $uv python find --system --no-managed-python --no-python-downloads --no-project $pyRequest 2>$null }) -join "`n"
+    if ($LASTEXITCODE -or -not $bootPy) {
+        $bootPy = (Invoke-Native -Utf8Output { & $uv python find --managed-python --no-python-downloads --no-project $pyRequest 2>$null }) -join "`n"
+    }
     if ($LASTEXITCODE -or -not $bootPy) {
         Invoke-Logged "Downloading Python $pyVersion" { & $uv python install --no-bin --no-registry $pyRequest }
         if ($LASTEXITCODE) { Fail "bootstrap Python installation failed" python_install_failed }
@@ -1378,6 +1396,7 @@ function Get-BootstrapPython {
     }
     if ($LASTEXITCODE -or -not $bootPy) { Fail "bootstrap Python lookup failed" python_install_failed }
     $script:BootstrapPython = $bootPy.Trim()
+    $env:Path = "$(Split-Path $uv -Parent);$(Split-Path $script:BootstrapPython -Parent);$env:Path"
     return $script:BootstrapPython
 }
 

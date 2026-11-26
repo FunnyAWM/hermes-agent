@@ -48,12 +48,31 @@ def _str_attr(agent: Any, name: str) -> str:
     return getattr(agent, name, "") or ""
 
 
+def _window_start_index(agent: Any, messages: list[dict[str, Any]]) -> int:
+    """First message the request keeps under the conversation windows; 0 = full history."""
+    from agent.session_window import request_start_index
+
+    return request_start_index(
+        messages,
+        int(getattr(agent, "_session_window_turns", 0) or 0),
+        int(getattr(agent, "_frozen_window_turns", 0) or 0),
+    )
+
+
 def _preflight_request_tokens(
     agent: Any, messages: list[dict[str, Any]], system_prompt: str
 ) -> int:
     """Token estimate for automatic preflight compression: a valid provider usage anchor,
     else the checkpoint-pruned native wire payload, else the generic estimator."""
-    anchored = anchored_context_tokens(messages, getattr(agent, "_usage_anchor", None))
+    _window_start = _window_start_index(agent, messages)
+    if _window_start > 0:
+        # A windowed request ships less than the transcript, so the usage anchor (priced over
+        # the full history) and the full-transcript estimate would both overstate pressure.
+        messages = messages[_window_start:]
+    anchored = (
+        None if _window_start > 0
+        else anchored_context_tokens(messages, getattr(agent, "_usage_anchor", None))
+    )
     agent._request_pressure_anchored = anchored is not None
     if anchored is not None:
         return anchored
@@ -815,6 +834,40 @@ def _hydrate_from_history(agent: Any, conversation_history: Optional[list[Any]])
                 agent._turns_since_memory = prior_user_turns % agent._memory_nudge_interval
 
 
+def _tick_notes_lifecycle(agent: Any) -> None:
+    """One notes pass per user turn: publish the turn number and clear explicitly expired notes.
+
+    The turn number is what ``notes/docs`` reads stamp as ``lastUsed`` and what the stale-document
+    prompt counts against (Android 设 13). Cleanup only fires above the soft limit and never
+    deletes a note it could not archive first.
+    """
+    from hermes_notes.lifecycle import remove_expired_notes, set_current_turn
+    from hermes_notes.settings import load_notes_settings
+
+    set_current_turn(int(getattr(agent, "_user_turn_count", 0) or 0))
+    with suppress(Exception):
+        from hermes_constants import get_hermes_home
+
+        # ponytail: one O(n) scan per user turn; move to a background tick if a large
+        # notes/ tree starts showing up in turn latency.
+        settings = load_notes_settings()
+        remove_expired_notes(
+            get_hermes_home(),
+            soft_limit=settings.soft_limit,
+            enabled=settings.remove_expired_notes,
+        )
+
+
+def _tick_notes_organizer(agent: Any, final_response: str, interrupted: bool) -> None:
+    """Spawn the notes organizer when due; called after a delivered answer (记 06)."""
+    if not final_response or interrupted:
+        return
+    with suppress(Exception):
+        from agent.notes_organizer import maybe_spawn
+
+        maybe_spawn(agent)
+
+
 def _tick_memory_nudge(agent: Any) -> bool:
     """Advance the turn-based memory nudge counter; ``True`` when the review should fire."""
     if (agent._memory_nudge_interval > 0
@@ -1309,6 +1362,10 @@ def build_turn_context(
     agent._user_turn_count += 1
     # cache_ttl auto: a person's chat moves from 5m to 1h once this message ends its first pause past 5m.
     maybe_upgrade_cache_tier(agent)
+    _tick_notes_lifecycle(agent)
+    # The notes organizer is NOT ticked here: 记 06 counts a send-time slot but runs the
+    # pass only after the answer is delivered (turn_finalizer, matching Android
+    # finishStream). A failed, interrupted or vetoed turn drops the slot.
     # Turn-initiator state for per-request provider headers: the first API call of this
     # user turn is user-initiated; tool-loop follow-ups are agent-initiated.
     agent._is_user_initiated_turn = True
@@ -1475,6 +1532,43 @@ def build_api_messages(
     turn_now = agent._current_turn_timestamp
     split = current_turn_user_idx if has_current else 0
     canonical_messages = canonicalize_replay_history(messages[:split], now=turn_now) + messages[split:]
+    # Sliding / frozen window (config: context.session_window_turns / frozen_window_turns).
+    # Applied to the wire copy only — the persisted transcript keeps every turn — and never
+    # ahead of this turn's user row, so retries/continues always keep their own prompt.
+    window_start = _window_start_index(agent, canonical_messages)
+    if has_current:
+        window_start = min(window_start, split)
+    if window_start > 0:
+        canonical_messages = canonical_messages[window_start:]
+    # Token budget (Android ChatContextTrimmer.trim; config: context.window_token_budget).
+    # Runs after the turn window and still on the wire copy only: the system prompt pays for
+    # itself, the newest rows win, and the newest row survives even when it alone overruns.
+    _budget = int(getattr(agent, "_window_token_budget", 0) or 0)
+    if _budget > 0 and canonical_messages:
+        from agent.chat_completion_helpers import estimate_request_context_tokens
+        from agent.session_window import budget_start_index
+
+        _system_text = active_system_prompt or ""
+        if getattr(agent, "ephemeral_system_prompt", None):
+            _system_text = (_system_text + "\n\n" + agent.ephemeral_system_prompt).strip()
+        # Fixed request cost pays for itself: the system prompt and the tool schemas.
+        _tools = getattr(agent, "tools", None) or None
+        _system_tokens = (estimate_request_context_tokens(
+            {"messages": [{"role": "system", "content": _system_text}], "tools": _tools})
+            if (_system_text or _tools) else 0)
+        budget_start = budget_start_index(
+            canonical_messages, budget=_budget, system_tokens=_system_tokens,
+            # Price the wire shape: ``api_content`` is bookkeeping that is popped from
+            # every outgoing copy below, so it must not count against the budget either.
+            estimate=lambda message: estimate_request_context_tokens(
+                [{k: v for k, v in message.items() if k != "api_content"}]),
+        )
+        if budget_start > 0:
+            if has_current:
+                # Never cut into the turn being replayed: the question the user just asked
+                # must survive the budget pass (the window clamp above agrees).
+                budget_start = min(budget_start, split - window_start)
+            canonical_messages = canonical_messages[budget_start:]
 
     api_messages = []
     for idx, msg in enumerate(canonical_messages):

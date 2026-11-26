@@ -9,6 +9,7 @@ export const deApproval: Partial<ApprovalCopy> = {
   openSafetySettings: 'Sicherheitseinstellungen öffnen',
   run: 'Ausführen',
   command: 'Befehl',
+  justification: 'Begründung',
   moreOptions: 'Weitere Genehmigungsoptionen',
   allowSession: 'Diese Session erlauben',
   alwaysAllowMenu: 'Immer erlauben…',

@@ -24,7 +24,7 @@ def _ctx(name: str, default: str | None = "") -> contextvars.ContextVar:
 _approval_session_key: contextvars.ContextVar[str] = _ctx("approval_session_key")
 _approval_turn_id: contextvars.ContextVar[str] = _ctx("approval_turn_id")
 _approval_tool_call_id: contextvars.ContextVar[str] = _ctx("approval_tool_call_id")
-# Hermes session id (observability identity, distinct from the gateway routing session_key), forwarded to approval
+# Kouri Harness session id (observability identity, distinct from the gateway routing session_key), forwarded to approval
 # hooks so observer plugins attach marks to the REAL session scope — otherwise they fall back to a synthetic "default"
 # session whose scope never closes, so close-time exporters never ship them.
 _approval_session_id: contextvars.ContextVar[str] = _ctx("approval_session_id")
@@ -273,13 +273,13 @@ def _should_fall_through_to_cli_approval(*, is_cli: bool, approval_callback, not
     return bool(is_cli and approval_callback is not None and notify_cb is None)
 
 
-_VALID_MODES = ("manual", "smart", "off")
+_VALID_MODES = ("manual", "smart", "auto", "off")
 
 
 def _normalize_approval_mode(mode) -> str:
     """Normalize approval mode values loaded from YAML/config. YAML 1.1 parses a
     bare ``off`` as False, so ``mode: off`` arrives as a bool; treat it as the
-    intended string mode. Unknown strings (e.g. 'auto') warn and fall back to
+    intended string mode. Unknown strings (e.g. 'yolo') warn and fall back to
     'manual' instead of silently failing every mode check."""
     if isinstance(mode, bool):
         return "off" if mode is False else "manual"
@@ -305,7 +305,7 @@ def _get_approval_config() -> dict:
 
 
 def _get_approval_mode() -> str:
-    """Return 'manual', 'smart', or 'off' (a hosted-room policy overrides config).
+    """Return 'manual', 'smart', 'auto', or 'off' (a hosted-room policy overrides config).
 
     A subagent routed to another profile runs as that profile, but the room policy was signed for the
     room MEMBER's profile: under the profile route's own mark the stricter of the two modes governs.

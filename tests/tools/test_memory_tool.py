@@ -110,7 +110,9 @@ def store(tmp_path, monkeypatch):
     return s
 
 
+@pytest.mark.platforms("posix")
 class TestMemoryFileLockPermissions:
+    """POSIX mode bits: Windows only models the read-only bit, so chmod(0o600) reads back 0o666."""
     def test_new_lock_file_is_owner_only_under_permissive_umask(self, tmp_path):
         memory_path = tmp_path / "MEMORY.md"
         previous_umask = os.umask(0o002)

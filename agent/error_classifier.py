@@ -400,7 +400,7 @@ _REQUEST_VALIDATION_PATTERNS = (
     "invalid_request_error", "unknown_parameter", "unsupported_parameter",
 )
 
-# Parameters Hermes sends on SOME routes only → hosts where that is deliberate.
+# Parameters Kouri Harness sends on SOME routes only → hosts where that is deliberate.
 # A rejection from any other host means the provider's gateway injected the
 # field itself: a server-side flake, not our request shape. prompt_cache_retention
 # is only sent for api.meta.ai / bedrock-mantle (agent/transports/codex.py).
@@ -638,7 +638,17 @@ _REASONING_REQUIRED_MARKERS = (
 # only the disabled level is invalid, so the floor step-up (the weakest accepted level) is the
 # right recovery. Neither the strip rung nor its "unsupported" wording matches this message, so
 # without these markers the title lane fails outright instead of retrying at the floor.
-_REASONING_LEVEL_REJECTION_MARKERS = ("must be one of", "invalid value for")
+_REASONING_LEVEL_REJECTION_MARKERS = (
+    "must be one of", "invalid value for",
+    # serde-style enum complaint from Rust-fronted relays (``reasoning_effort: unknown variant
+    # `none`, expected one of `low`, `medium`, `high`, `max`"): same closed-level-set rejection
+    # of the disable, same floor step-up.
+    "unknown variant", "expected one of",
+)
+# The two serde wordings name no field, so a closed-set complaint about any other enum
+# ("tool_choice: unknown variant `autoo`") would match on a stray "thinking" nearby;
+# these two count only when the error text says ``reasoning`` as well.
+_REASONING_FIELDLESS_MARKERS = ("unknown variant", "expected one of")
 
 
 def is_reasoning_level_rejection(error_msg: str) -> bool:
@@ -654,7 +664,10 @@ def is_reasoning_level_rejection(error_msg: str) -> bool:
     if token is None:
         return False
     near = msg[max(0, token.start() - 48):token.end() + 96]
-    return any(m in near for m in _REASONING_LEVEL_REJECTION_MARKERS)
+    for marker in _REASONING_LEVEL_REJECTION_MARKERS:
+        if marker in near and (marker not in _REASONING_FIELDLESS_MARKERS or "reasoning" in msg):
+            return True
+    return False
 
 
 def is_reasoning_required_rejection(error_msg: str) -> bool:

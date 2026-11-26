@@ -28,9 +28,9 @@ if (values.desktop === 'absent') {
   fs.rmSync(path.join(values.out, `desktop-chat-${values.phase}.json`), { force: true });
   const release = path.join(values.root, 'apps', 'desktop', 'release');
   const candidates = {
-    linux: ['linux-unpacked/Hermes', 'linux-unpacked/hermes'],
-    darwin: [process.arch === 'arm64' ? 'mac-arm64/Hermes.app/Contents/MacOS/Hermes' : 'mac/Hermes.app/Contents/MacOS/Hermes'],
-    win32: [process.arch === 'arm64' ? 'win-arm64-unpacked/Hermes.exe' : 'win-unpacked/Hermes.exe'],
+    linux: ['linux-unpacked/Kouri Harness', 'linux-unpacked/hermes'],
+    darwin: [process.arch === 'arm64' ? 'mac-arm64/Kouri Harness.app/Contents/MacOS/Kouri Harness' : 'mac/Kouri Harness.app/Contents/MacOS/Kouri Harness'],
+    win32: [process.arch === 'arm64' ? 'win-arm64-unpacked/Kouri Harness.exe' : 'win-unpacked/Kouri Harness.exe'],
   }[process.platform];
   if (!candidates) throw new Error(`unsupported source smoke host: ${process.platform}`);
   const executables = candidates.map(p => path.join(release, p)).filter(p => fs.existsSync(p));

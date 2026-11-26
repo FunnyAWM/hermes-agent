@@ -32,22 +32,23 @@ export function useApprovalModeStatusbarItem(
   const mode = modes[profile.trim() || 'default'] ?? 'smart'
 
   const labels = useMemo<Record<ApprovalMode, string>>(
-    () => ({ manual: copy.manual, smart: copy.smart, off: copy.off }),
-    [copy.manual, copy.off, copy.smart]
+    () => ({ manual: copy.manual, smart: copy.smart, auto: copy.auto, off: copy.off }),
+    [copy.auto, copy.manual, copy.off, copy.smart]
   )
 
   const descriptions = useMemo<Record<ApprovalMode, string>>(
     () => ({
       manual: copy.manualDescription,
       smart: copy.smartDescription,
+      auto: copy.autoDescription,
       off: copy.offDescription
     }),
-    [copy.manualDescription, copy.offDescription, copy.smartDescription]
+    [copy.autoDescription, copy.manualDescription, copy.offDescription, copy.smartDescription]
   )
 
   useEffect(() => {
     // The shell (and this chip) mount before the gateway socket opens at
-    // boot, and a sync issued that early rejects with "Hermes gateway
+    // boot, and a sync issued that early rejects with "Kouri Harness gateway
     // unavailable" — the swallow below then leaves the chip on its
     // optimistic 'smart' default until some later session event reconciles
     // it. Gate on the open socket and re-run when it opens (or a reconnect
@@ -76,7 +77,7 @@ export function useApprovalModeStatusbarItem(
           }}
           value={mode}
         >
-          {(['manual', 'smart', 'off'] as const).map(value => (
+          {(['manual', 'smart', 'auto', 'off'] as const).map(value => (
             <DropdownMenuRadioItem className="items-start gap-2" key={value} value={value}>
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-xs text-foreground">{labels[value]}</span>

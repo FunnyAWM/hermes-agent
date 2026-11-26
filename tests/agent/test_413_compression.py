@@ -192,7 +192,7 @@ class TestHTTP413Compression:
 
         Browser vision tool results can contain base64 image parts. A 413 can
         persist even after summarisation when the remaining recent tool result
-        still carries binary data; Hermes should evict the image payload and
+        still carries binary data; Kouri Harness should evict the image payload and
         keep the text/placeholder context instead of failing immediately.
         """
         err_413 = _make_413_error()
@@ -630,7 +630,7 @@ class TestPreflightCompression:
         agent._user_profile_enabled = False
         agent._memory_manager = None
         agent._cached_system_prompt = (
-            "system prompt\n\nMEMORY (your personal notes) [1% — 10/2,200 chars]\nold fact"
+            "system prompt\n\nMEMORY (your personal notes) [1% — 10/3,000 chars]\nold fact"
         )
         memory_store = MagicMock()
         memory_store.format_for_system_prompt.return_value = None  # emptied

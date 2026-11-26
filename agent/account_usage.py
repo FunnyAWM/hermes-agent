@@ -50,7 +50,7 @@ class AccountUsageSnapshot:
     # fetcher cannot tell accounts apart, so the snapshot belongs to the provider's legacy slot.
     identity: Optional[str] = None
     # Exact decoded provider response body (no headers/credentials) for integrations that need
-    # fields Hermes does not normalize yet. Only populated by providers that fetch a JSON body.
+    # fields Kouri Harness does not normalize yet. Only populated by providers that fetch a JSON body.
     raw: Optional[dict] = None
     # Usage-window plans only: the stacked bar layout. Every other snapshot
     # renders exactly as before.

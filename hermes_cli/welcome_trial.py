@@ -2,7 +2,7 @@
 
 Two surfaces may claim it: the backend the desktop spawned on this machine, and first-run ``hermes
 setup`` when a person answers it in a real terminal (``_CLAIM_SURFACES``; never a container, CI, a
-piped or spawned run). Either way only when this OS user has never used Hermes here (``install_state``)
+piped or spawned run). Either way only when this OS user has never used Kouri Harness here (``install_state``)
 and with no provider and no Nous identity yet. The claim
 mints a guest stamped with ``WELCOME_CLAIM_FLAG`` in the mint's own write and writes the OS user's
 marker, so the trial is never claimed twice for that user. Another OS account on the same computer is
@@ -96,7 +96,7 @@ _CLAIM_BLOCKERS: tuple[tuple[str, Callable[[_Ask], bool]], ...] = (
     ("a Nous identity exists", lambda _ask: _has_nous_identity()),
     ("a provider is configured",
      lambda ask: provider_configured() if ask.configured is None else ask.configured),
-    ("Hermes was used on this machine", lambda ask: _machine_is_used(ask.assume_fresh)),
+    ("Kouri Harness was used on this machine", lambda ask: _machine_is_used(ask.assume_fresh)),
 )
 
 

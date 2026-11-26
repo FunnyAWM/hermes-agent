@@ -209,6 +209,10 @@ def render(out: Path) -> int:
         for key in ("HERMES_RUNTIME_DIR", "SYSTEMROOT"):
             if os.environ.get(key):
                 env[key] = os.environ[key]
+        if os.name == "nt":
+            # pathlib reads USERPROFILE for ~ on Windows; HOME alone leaves the child
+            # unable to resolve a home directory.
+            env["USERPROFILE"] = str(home)
         proc = subprocess.run(
             [sys.executable, str(Path(__file__).resolve()), "_child", str(staging)],
             env=env, cwd=tmp, capture_output=True, text=True, encoding="utf-8", timeout=600, check=False,

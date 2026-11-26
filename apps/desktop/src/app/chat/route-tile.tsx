@@ -18,6 +18,7 @@ import {
   ARTIFACTS_ROUTE,
   CAPABILITIES_ROUTE,
   contributedRoutes,
+  MEMORY_ROUTE,
   MESSAGING_ROUTE,
   ROUTES_AREA
 } from '../routes'
@@ -25,6 +26,7 @@ import {
 import { paneMirror } from './pane-mirror'
 
 const CapabilitiesView = lazy(async () => ({ default: (await import('../capabilities')).CapabilitiesView }))
+const MemoryView = lazy(async () => ({ default: (await import('../memory')).MemoryView }))
 const MessagingView = lazy(async () => ({ default: (await import('../messaging')).MessagingView }))
 const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
 
@@ -32,7 +34,8 @@ const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')
 const BUILTIN_PAGES: Record<string, { render: () => ReactNode; title: string }> = {
   [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, title: 'Artifacts' },
   [MESSAGING_ROUTE]: { render: () => <MessagingView />, title: 'Messaging' },
-  [CAPABILITIES_ROUTE]: { render: () => <CapabilitiesView />, title: 'Capabilities' }
+  [CAPABILITIES_ROUTE]: { render: () => <CapabilitiesView />, title: 'Capabilities' },
+  [MEMORY_ROUTE]: { render: () => <MemoryView />, title: 'Memory' }
 }
 
 /** Humanize a route path into a tab title: `/my-atlas` → `My Atlas`. */

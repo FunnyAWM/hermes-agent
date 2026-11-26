@@ -10,6 +10,7 @@ export const esApproval: Partial<ApprovalCopy> = {
   openSafetySettings: 'Abrir configuración de seguridad',
   run: 'Ejecutar',
   command: 'Comando',
+  justification: 'Justificación',
   moreOptions: 'Más opciones de aprobación',
   allowSession: 'Permitir esta sesión',
   alwaysAllowMenu: 'Permitir siempre…',

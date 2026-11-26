@@ -19,6 +19,7 @@ from tests.pm._fixtures import (
 )
 
 
+@pytest.mark.require_symlinks
 def test_stage_tools_copies_verified_closure_without_acquiring_or_live_state(tmp_path, client, monkeypatch, served):
     import importlib.util
     import pm
@@ -328,7 +329,14 @@ def test_requirements_build_installs_offline_markers_and_seals_only_build_pth(tm
          "print(json.dumps([app_dep.__version__, leaf_dep.__version__, sys.base_prefix, "
          "importlib.util.find_spec('missing_dep') is None]))"], cwd=tmp_path, env=build_tools,
     ))
-    assert result == ["1.0", "1.0", sys.base_prefix, True]
+    # The build may select any same-minor interpreter the host has installed
+    # (uv keeps both a `3.14` and a `3.14.2` prefix); the contract is that it
+    # did not fall back to the poisoned ambient path, not that base_prefix is
+    # byte-identical to this pytest process's one.
+    assert result[:2] == ["1.0", "1.0"]
+    assert result[3] is True
+    assert Path(result[2]).is_dir()
+    assert Path(result[2]) != poison
     assert executable.parent.parent == out
     assert bool(list(out.rglob("__editable__.app_dep-1.0.pth"))) is not sealed
     assert list(out.rglob("app_dep.pth")), "load-bearing .pth must survive sealing"

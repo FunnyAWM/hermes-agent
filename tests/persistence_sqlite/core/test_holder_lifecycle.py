@@ -213,7 +213,7 @@ class TestWriteLockReplay:
         finally:
             sibling.join(10.0)
         text = str(excinfo.value)
-        assert text.startswith("database is locked (another Hermes process held the state.db write lock")
+        assert text.startswith("database is locked (another Kouri Harness process held the state.db write lock")
         assert "the database itself is healthy" in text
         assert holder.get_meta("k") is None
 

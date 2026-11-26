@@ -362,8 +362,19 @@ uv_bootstrap_target() {
 UV_CMD=""
 ensure_uv() {
     [ -n "$UV_CMD" ] && return 0
-    # Always the pinned artifact, never a uv already on PATH: Hermes runs only
-    # its own packaged toolchain.
+    local _local_uv _local_version
+    _local_uv="$(command -v uv 2>/dev/null || true)"
+    _local_version=""
+    [ -n "$_local_uv" ] && _local_version="$("$_local_uv" --version 2>/dev/null | awk '{print $2}')"
+    # A non-numeric pin (a fixture, a channel name) is not a version: stage the artifact.
+    if [ -n "$_local_version" ] && awk -v have="$_local_version" -v need="$UV_PIN_VERSION" 'BEGIN {
+        if (have !~ /^[0-9]+(\.[0-9]+)+$/ || need !~ /^[0-9]+(\.[0-9]+)+$/) exit 1
+        split(have,h,"."); split(need,n,".");
+        for(i=1;i<=3;i++) { if(h[i]+0>n[i]+0) exit 0; if(h[i]+0<n[i]+0) exit 1 } exit 0
+    }'; then
+        UV_CMD="$_local_uv"
+        return 0
+    fi
     local _target
     if ! _target="$(uv_bootstrap_target)"; then
         fail "no pinned uv build for this platform ($(uname -s) $(uname -m)); Hermes does not support this host" unsupported_platform
@@ -1020,18 +1031,16 @@ bootstrap_python() {
         path[2] == "packages" && path[3] == "python" && $2 == "version" && depth == 3 { print $4; exit }
     ' "$INSTALL_DIR/pm/lock.json" | cut -d+ -f1 | cut -d. -f1,2)"
     [ -n "$_py" ] || _py="3.14"
-    # Only base interpreters qualify: an activated app venv must not become
-    # PM's bootstrap parent. Prefer the existing managed Python, then a host
-    # Python of the same supported minor before attempting a download (#10778).
-    # This interpreter only boots PM; PM still owns the exact runtime pin.
-    if ! boot_py="$(UV_SYSTEM_PYTHON=1 UV_NO_PROJECT=1 "$UV_CMD" python find --managed-python "$_py" 2>/dev/null)" \
-        && ! boot_py="$("$UV_CMD" python find --system --no-project "$_py" 2>/dev/null)"; then
+    # Ignore activated/project venvs; reuse a base interpreter before downloading.
+    if ! boot_py="$("$UV_CMD" python find --system --no-managed-python --no-python-downloads --no-project "$_py" 2>/dev/null)" \
+        && ! boot_py="$(UV_SYSTEM_PYTHON=1 UV_NO_PROJECT=1 "$UV_CMD" python find --managed-python --no-python-downloads "$_py" 2>/dev/null)"; then
         run_logged "Downloading Python $_py" "$UV_CMD" python install --no-bin --no-registry "$_py" \
             || fail "bootstrap Python installation failed" python_install_failed
         boot_py="$(UV_SYSTEM_PYTHON=1 UV_NO_PROJECT=1 "$UV_CMD" python find --managed-python "$_py")" || fail "bootstrap Python lookup failed" python_install_failed
     fi
     boot_py="${boot_py%$'\r'}"
     [ -x "$boot_py" ] && "$boot_py" --version >/dev/null 2>&1 || fail "bootstrap Python is not executable: $boot_py" python_install_failed
+    export PATH="$(dirname "$UV_CMD"):$(dirname "$boot_py"):$PATH"
 }
 
 # uv exits before PM can replace its tool entry. pm.cli then prepares and

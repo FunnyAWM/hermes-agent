@@ -18,15 +18,15 @@ def _allow(monkeypatch, root):
 
 def test_spaced_path_through_a_symlink_is_one_attachment(tmp_path, monkeypatch):
     real = tmp_path / "real"
-    (real / "Hermes Agent").mkdir(parents=True)
-    (real / "Hermes Agent" / "notes.md").write_text("hi", encoding="utf-8")
+    (real / "Kouri Harness").mkdir(parents=True)
+    (real / "Kouri Harness" / "notes.md").write_text("hi", encoding="utf-8")
     link = tmp_path / "link"
     link.symlink_to(real)
     _allow(monkeypatch, tmp_path)
 
-    media, cleaned = BasePlatformAdapter.extract_media(f"Done.\nMEDIA:{link}/Hermes Agent/notes.md\n")
+    media, cleaned = BasePlatformAdapter.extract_media(f"Done.\nMEDIA:{link}/Kouri Harness/notes.md\n")
 
-    assert media == [(f"{link}/Hermes Agent/notes.md", False)]
+    assert media == [(f"{link}/Kouri Harness/notes.md", False)]
     assert cleaned == "Done."
 
 

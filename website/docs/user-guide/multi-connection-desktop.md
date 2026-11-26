@@ -2,9 +2,9 @@
 sidebar_position: 5
 ---
 
-# Connecting Desktop to Many Hermes Instances
+# Connecting Desktop to Many Kouri Harness Instances
 
-Register every Hermes backend you own — the local runtime, remote gateways on
+Register every Kouri Harness backend you own — the local runtime, remote gateways on
 your LAN or VPS, SSH hosts, and Hermes Cloud instances — in one desktop app,
 and use the agents on all of them side by side. Every registered gateway is
 connected all the time: Desktop dials each one when it starts, keeps its
@@ -26,7 +26,7 @@ redirect there). Three doors lead to it:
   **Gateways** in the settings nav). The connections registry is a section
   of that page, below the machine-level connection-mode controls.
 - **The sidebar profile rail** — the plug button at the right end of the rail
-  (tooltip: **"Connect another Hermes gateway…"**) deep-links straight to
+  (tooltip: **"Connect another Kouri Harness gateway…"**) deep-links straight to
   the Gateways page. It is always visible, even before you have created
   a second profile or a second connection.
 - **The command palette** — **Cmd/Ctrl+K**, then type *Gateways* (also
@@ -35,15 +35,15 @@ redirect there). Three doors lead to it:
 ## The gateway registry
 
 The **Registered gateways** section of **Settings → Gateways** manages a named
-list of Hermes gateways. Its intro says it plainly: *"Manage this device and
-every Hermes gateway it can reach through remote, SSH, or Cloud connections."*
+list of Kouri Harness gateways. Its intro says it plainly: *"Manage this device and
+every Kouri Harness gateway it can reach through remote, SSH, or Cloud connections."*
 Each entry is a *connection*:
 
 | Kind | What it is | Auth |
 |---|---|---|
-| **Local** | "The Hermes runtime managed by this app." | automatic |
-| **Remote gateway** | "A Hermes gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
-| **SSH** | "A Hermes install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
+| **Local** | "The Kouri Harness runtime managed by this app." | automatic |
+| **Remote gateway** | "A Kouri Harness gateway reachable over HTTP(S) — LAN, Tailscale, or the internet." | session token or OAuth |
+| **SSH** | "A Kouri Harness install reached over SSH." The app opens the tunnel and starts the dashboard for you | SSH key + adopted token |
 | **Hermes Cloud** | "A hosted instance discovered through your Hermes Cloud account." | portal sign-in |
 
 Rules worth knowing:
@@ -141,10 +141,10 @@ authentication; manage sign-in from the registered connection controls.
        shell; on a `zsh` login shell the probe watchdog cannot kill the whole
        process group, so a hung probe's grandchildren may linger on the remote
        (bash/sh remotes reap them).
-     - **Hermes path (optional)** — full path to the `hermes` executable on
+     - **Kouri Harness path (optional)** — full path to the `hermes` executable on
        the remote (for example `/opt/hermes/bin/hermes`). Leave blank to
        auto-detect. Set it when the remote's non-interactive shell does not
-       have `hermes` on its `PATH` and **Test** reports *"Hermes is not
+       have `hermes` on its `PATH` and **Test** reports *"Kouri Harness is not
        installed on the remote host"*; clearing the field restores
        auto-detection.
 5. Click **Save connection** (or **Cancel**).
@@ -190,7 +190,7 @@ The union roster is what multi-gateway surfaces (and the built-in
   stays connected: its default profile holds one open connection for the life
   of the window and is redialed every 30 seconds while it is down. An
   unreachable gateway reports per-row instead of breaking the roster. With a
-  remote primary, **This device** is kept connected too when Hermes is
+  remote primary, **This device** is kept connected too when Kouri Harness is
   installed here, so its local gateway starts with Desktop. Terminals and
   running work on a gateway keep going when you pick another one.
 - Opening an agent dials **its own gateway** — chats, sessions, and memory
@@ -217,7 +217,7 @@ an obsolete backend.
 ### Gateways, profiles and scope
 
 The sidebar foot follows one hierarchy: **gateway → profile → sessions**.
-Gateways are machines or hosted backends; profiles are isolated Hermes agents
+Gateways are machines or hosted backends; profiles are isolated Kouri Harness agents
 that live on one gateway.
 
 - With one registered gateway, no gateway control is added. Local-only Desktop
@@ -249,7 +249,7 @@ that live on one gateway.
   square offers **Open**, **Color**, **Rename**, **Edit SOUL.md** and
   **Delete**, all executed on the square's own gateway; the delete
   confirmation names the machine. Picking **This device** asks for
-  confirmation only when Hermes is not installed on this computer yet.
+  confirmation only when Kouri Harness is not installed on this computer yet.
 - A gateway the last enumeration could not reach keeps its squares, marked
   with an amber dot on its glyph — a sleeping box is still yours. Two
   registrations of one backend collapse to a single group. Past thirteen
@@ -327,7 +327,7 @@ with their own message, per row.
 
 You rarely need the Settings button, though: once more than one update target
 exists, the app's regular update affordances (**Update now** on the About
-panel, ⌘K **Update Hermes**, the update-ready toast) run the same fan-out
+panel, ⌘K **Update Kouri Harness**, the update-ready toast) run the same fan-out
 automatically — active backend first, then every other eligible gateway, then
 the desktop app itself last. See
 [Updating](./desktop.md#updating) in the desktop guide.
@@ -335,7 +335,7 @@ the desktop app itself last. See
 ## Security notes
 
 - **Where connections and tokens live.** The saved list is
-  `gateway-connections.json` in your Hermes home (beside `ui-preferences.json`):
+  `gateway-connections.json` in your Kouri Harness home (beside `ui-preferences.json`):
   labels, URLs, SSH hosts, and each connection's session token and extra
   headers. Sign-in (OAuth) credentials, keyed by connection, are in
   `gateway-connection-tokens.json` next to it. Both are owner-only (0600)
@@ -386,7 +386,7 @@ multi-gateway roster is the reference consumer.
 - **A remote gateway is missing from the roster** — its backend is down or
   unreachable; the roster lists it under gateways with the error, and Desktop
   keeps redialing it in the background.
-- **"Update Hermes Desktop to chat with agents on other connections"** — the
+- **"Update Kouri Harness Desktop to chat with agents on other connections"** — the
   app predates the multi-connection stack; update the desktop app itself.
 - **Duplicate device names** — not possible; names are enforced unique at
   save time. If a migrated name collided, it was suffixed (`Homelab 2`).

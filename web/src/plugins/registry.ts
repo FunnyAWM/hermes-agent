@@ -8,59 +8,60 @@
  * to register their tab component.
  */
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-  useContext,
-  createContext,
-} from "react";
-import { api, fetchJSON, authedFetch, buildWsUrl, buildWsAuthParam } from "@/lib/api";
-import { cn, timeAgo, isoTimeAgo } from "@/lib/utils";
-import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
-import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
+import React, { useState, useEffect, useCallback, useMemo, useRef, useContext, createContext } from 'react'
+import { api, fetchJSON, authedFetch, buildWsUrl, buildWsAuthParam } from '@/lib/api'
+import { cn, timeAgo, isoTimeAgo } from '@/lib/utils'
+import { Badge } from '@nous-research/ui/ui/components/badge'
+import { Button } from '@nous-research/ui/ui/components/button'
+import { Checkbox } from '@nous-research/ui/ui/components/checkbox'
+import { ConfirmDialog } from '@nous-research/ui/ui/components/confirm-dialog'
 import {
-  Dialog, DialogClose, DialogContent, DialogDescription,
-  DialogFooter, DialogHeader, DialogTitle,
-} from "@nous-research/ui/ui/components/dialog";
-import { Toast } from "@nous-research/ui/ui/components/toast";
-import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
-import { Card, CardHeader, CardTitle, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
-import { Label } from "@nous-research/ui/ui/components/label";
-import { Separator } from "@nous-research/ui/ui/components/separator";
-import { Tabs, TabsList, TabsTrigger } from "@nous-research/ui/ui/components/tabs";
-import { useI18n } from "@/i18n";
-import { clearPluginSlots, registerSlot, PluginSlot } from "./slots";
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@nous-research/ui/ui/components/dialog'
+import { Toast } from '@nous-research/ui/ui/components/toast'
+import { useConfirmDelete } from '@nous-research/ui/hooks/use-confirm-delete'
+import { useToast } from '@nous-research/ui/hooks/use-toast'
+import { Select, SelectOption } from '@nous-research/ui/ui/components/select'
+import { Card, CardHeader, CardTitle, CardContent } from '@nous-research/ui/ui/components/card'
+import { Input } from '@nous-research/ui/ui/components/input'
+import { Label } from '@nous-research/ui/ui/components/label'
+import { Separator } from '@nous-research/ui/ui/components/separator'
+import { Tabs, TabsList, TabsTrigger } from '@nous-research/ui/ui/components/tabs'
+import { useI18n } from '@/i18n'
+import { clearPluginSlots, registerSlot, PluginSlot } from './slots'
 
 // ---------------------------------------------------------------------------
 // Plugin registry — plugins call register() to add their component.
 // ---------------------------------------------------------------------------
 
-type RegistryListener = () => void;
+type RegistryListener = () => void
 
-const _registered: Map<string, React.ComponentType> = new Map();
-const _loadErrors: Map<string, string> = new Map();
-const _listeners: Set<RegistryListener> = new Set();
+const _registered: Map<string, React.ComponentType> = new Map()
+const _loadErrors: Map<string, string> = new Map()
+const _listeners: Set<RegistryListener> = new Set()
 
 function _notify() {
   for (const fn of _listeners) {
-    try { fn(); } catch { /* ignore */ }
+    try {
+      fn()
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 /** Re-run registry subscribers (e.g. after a plugin script onload, or dev HMR re-inject). */
 export function notifyPluginRegistry() {
-  _notify();
+  _notify()
 }
 
-let _profile = "";
+let _profile = ''
 
 /**
  * Select the management profile whose plugin bundles the dashboard shows
@@ -69,56 +70,56 @@ let _profile = "";
  * next microtask, never during the render that switched.
  */
 export function selectPluginProfile(profile: string): void {
-  if (profile === _profile) return;
-  _profile = profile;
-  _registered.clear();
-  _loadErrors.clear();
-  clearPluginSlots();
-  queueMicrotask(_notify);
+  if (profile === _profile) return
+  _profile = profile
+  _registered.clear()
+  _loadErrors.clear()
+  clearPluginSlots()
+  queueMicrotask(_notify)
 }
 
 export function getPluginProfile(): string {
-  return _profile;
+  return _profile
 }
 
 /** Whether the bundle now running was loaded for a profile no longer selected. */
 function _fromOtherProfile(): boolean {
-  const script = typeof document === "undefined" ? null : document.currentScript;
-  const owner = script?.getAttribute("data-hermes-profile");
-  return owner != null && owner !== _profile;
+  const script = typeof document === 'undefined' ? null : document.currentScript
+  const owner = script?.getAttribute('data-hermes-profile')
+  return owner != null && owner !== _profile
 }
 
 /** Register a plugin component. Called by plugin JS bundles. */
 function registerPlugin(name: string, component: React.ComponentType) {
-  if (_fromOtherProfile()) return;
-  _loadErrors.delete(name);
-  _registered.set(name, component);
-  _notify();
+  if (_fromOtherProfile()) return
+  _loadErrors.delete(name)
+  _registered.set(name, component)
+  _notify()
 }
 
 /** Get a registered component by plugin name. */
 export function getPluginComponent(name: string): React.ComponentType | undefined {
-  return _registered.get(name);
+  return _registered.get(name)
 }
 
 export function getPluginLoadError(name: string): string | undefined {
-  return _loadErrors.get(name);
+  return _loadErrors.get(name)
 }
 
 export function setPluginLoadError(name: string, message: string) {
-  _loadErrors.set(name, message);
-  _notify();
+  _loadErrors.set(name, message)
+  _notify()
 }
 
 /** Subscribe to registry changes (returns unsubscribe fn). */
 export function onPluginRegistered(fn: RegistryListener): () => void {
-  _listeners.add(fn);
-  return () => _listeners.delete(fn);
+  _listeners.add(fn)
+  return () => _listeners.delete(fn)
 }
 
 /** Get current count of registered plugins. */
 export function getRegisteredCount(): number {
-  return _registered.size;
+  return _registered.size
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ export function getRegisteredCount(): number {
  * Exposed at runtime as ``window.__HERMES_PLUGIN_SDK__.sdkVersion`` so a
  * plugin (or a future host-side compatibility gate) can read it.
  */
-export const SDK_CONTRACT_VERSION = "1.1.0";
+export const SDK_CONTRACT_VERSION = '1.1.0'
 
 // Window globals for the plugin SDK are declared in ``plugins/sdk.d.ts`` —
 // the single source of truth for the public contract. Don't redeclare them
@@ -142,9 +143,9 @@ export function exposePluginSDK() {
   window.__HERMES_PLUGINS__ = {
     register: registerPlugin,
     registerSlot: (plugin, slot, component) => {
-      if (!_fromOtherProfile()) registerSlot(plugin, slot, component);
-    },
-  };
+      if (!_fromOtherProfile()) registerSlot(plugin, slot, component)
+    }
+  }
 
   window.__HERMES_PLUGIN_SDK__ = {
     // Contract version of the plugin SDK surface (see plugins/sdk.d.ts).
@@ -166,10 +167,10 @@ export function exposePluginSDK() {
       // machine (requestDelete / confirm / cancel / isOpen / isDeleting /
       // pendingId) for single-id delete confirmations.
       useToast,
-      useConfirmDelete,
+      useConfirmDelete
     },
 
-    // Hermes API client
+    // Kouri Harness API client
     api,
     // Raw fetchJSON for plugin-specific JSON endpoints
     fetchJSON,
@@ -211,13 +212,13 @@ export function exposePluginSDK() {
       TabsList,
       TabsTrigger,
       Toast,
-      PluginSlot,
+      PluginSlot
     },
 
     // Utilities
     utils: { cn, timeAgo, isoTimeAgo },
 
     // Hooks
-    useI18n,
-  };
+    useI18n
+  }
 }

@@ -334,6 +334,12 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         byte-exact read below: this sample is the binary-admission gate in FRONT of that read, so
         backend noise decoded into it decides whether a file is editable at all.
         """
+        if self._native_read_enabled():
+            try:
+                with open(self._native_path(path), "rb") as fh:  # windows-footgun: ok — binary mode, no decoding
+                    return fh.read(length)
+            except OSError:
+                return None
         segments, read_rc, _ = self._fenced_read(
             f"head -c {length} {self._escape_shell_arg(path)} 2>/dev/null | base64")
         if segments is None or read_rc != 0:
@@ -356,8 +362,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             exit_code=1)
         if self._native_read_enabled():
             import stat as _stat
-            full = path if os.path.isabs(path) else os.path.join(
-                getattr(self.env, "cwd", None) or self.cwd, path)
+            full = self._native_path(path)
             try:
                 # One lookup, not two: a stat-then-open pair can have the path swapped for a FIFO in
                 # between, and that open blocks this thread forever (no backend timeout covers it).
@@ -535,6 +540,10 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         translated = translate_mounted_host_path(path, host_root or "", container_root)
         if translated:
             return translated
+        if sys.platform == "win32" and self._native_read_enabled():
+            # The files are the host's and a confined session's shell may be PowerShell:
+            # the host's own expansion is the one that names them.
+            return os.path.expanduser(path)
         if not path or not path.startswith('~'):
             return path
         result = self._exec("echo $HOME")
@@ -581,7 +590,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
 
     def _escape_native_tool_arg(self, arg: str) -> str:
         """Quote a path for a NATIVE Windows binary (rg, node, git ...): those don't
-        understand the MSYS ``/c/...`` form and Hermes disables MSYS argument
+        understand the MSYS ``/c/...`` form and Kouri Harness disables MSYS argument
         conversion, so nothing translates it back (→ ``os error 3``). ``C:/Users/x``
         is accepted by every layer. Identical to ``_escape_shell_arg`` off Windows."""
         from tools.environments.local import _IS_WINDOWS, _msys_to_windows_path
@@ -680,6 +689,8 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         is a stat (symlinks followed) so it answers without touching content. A dangling
         symlink is ``not_regular``, never ``missing``: the entry exists, and a writer
         told the path is free would follow the link and create its target."""
+        if self._native_read_enabled():
+            return self._probe_regular_file_native(path)
         arg = self._escape_shell_arg(path)
         # A missing path ECHOES its sentinel: a non-zero exit with no sentinel means the shell itself did
         # not run (container still starting, removed out-of-band, transport down) — not a missing file.
@@ -699,6 +710,20 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             return int(stat_output), "ok"
         except ValueError:
             return 0, "bad_size"
+
+    def _probe_regular_file_native(self, path: str) -> tuple[int, str]:
+        """``_probe_regular_file`` in-process: ``os.stat`` is the ``[ -f ]`` guard AND the
+        size, so no content is touched; same ``ok``/``missing``/``not_regular`` statuses."""
+        import stat as _stat
+
+        full = self._native_path(path)
+        try:
+            st = os.stat(full)
+        except (FileNotFoundError, NotADirectoryError):
+            return 0, "not_regular" if os.path.islink(full) else "missing"
+        except OSError:
+            return 0, "env_unavailable"
+        return (st.st_size, "ok") if _stat.S_ISREG(st.st_mode) else (0, "not_regular")
 
     def _env_unavailable_error(self, path: str, status: str = "env_unavailable") -> ReadResult:
         if status != "env_unavailable":
@@ -933,20 +958,52 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             file_size=file_size, file_ends_with_newline=file_ends_with_newline)
 
     def _native_read_enabled(self) -> bool:
-        """Whether ``read_file`` and ``search_files`` may bypass the shell: only POSIX + a backend whose
-        files are the host's (``uses_host_filesystem``: the file is on this host, path already native;
-        Windows keeps the shell path since file_operations holds Git-Bash-style paths there).
-        ``HERMES_NATIVE_FILE_READ=0`` turns the fast path off."""
+        """Whether the file tools may bypass the shell. ``HERMES_NATIVE_FILE_READ=0`` turns the
+        fast path off and outranks every other condition.
+
+        POSIX: only with a backend whose files are the host's (``uses_host_filesystem``: the
+        file is on this host, path already native). Windows: only while the command sandbox
+        confines this session (``local_command_sandbox.file_tools_native()``) — a confined
+        Windows command runs under PowerShell, which has none of ``head``/``sed``/``base64``/
+        ``mktemp``/``mv``, so the POSIX shell path cannot work there. Gate off (or Full
+        Access) keeps the existing shell path, which Windows file operations need for their
+        Git-Bash-style paths. The in-process path does NOT go through the sandbox — this
+        slice's explicit limit: the gate covers command execution, and a confined Windows
+        session has no shell to run file work in.
+        """
         flag = os.environ.get("HERMES_NATIVE_FILE_READ", "1").strip().lower()
         if flag in ("0", "false", "no", "off"):
             return False
-        # Same "are these the host's files" test the LSP path uses; an attribute read
-        # and self.env is never rebound, so nothing to memoize.
-        return sys.platform != "win32" and self._lsp_local_only()
+        if sys.platform != "win32":
+            # Same "are these the host's files" test the LSP path uses; an attribute read
+            # and self.env is never rebound, so nothing to memoize.
+            return self._lsp_local_only()
+        from tools.environments import local_command_sandbox
+
+        return local_command_sandbox.file_tools_native()
 
     def _native_path(self, path: str) -> str:
-        """``path`` resolved the way the shell resolves it: against the live backend cwd."""
-        return path if os.path.isabs(path) else os.path.join(getattr(self.env, "cwd", None) or self.cwd, path)
+        """``path`` as this host's filesystem sees it: resolved against the live backend cwd
+        when relative, MSYS ``/c/Users/x`` → ``C:\\Users\\x`` on Windows (the confined session
+        is handed model paths in either form and ``open()`` only understands the native one)."""
+        cwd = getattr(self.env, "cwd", None) or self.cwd
+        if sys.platform == "win32":
+            from tools.environments.local import _msys_to_windows_path
+
+            # Convert BEFORE the isabs test: ntpath calls ``/c/Users/x`` relative.
+            path = _msys_to_windows_path(path)
+            if not os.path.isabs(path):
+                path = os.path.join(_msys_to_windows_path(cwd), path)
+            return path
+        return path if os.path.isabs(path) else os.path.join(cwd, path)
+
+    def _native_dir_entries(self, dir_path: str) -> Optional[list[str]]:
+        """Entry names in ``dir_path`` without a shell; None when it cannot be listed (the
+        caller then keeps the ``ls`` probe)."""
+        try:
+            return sorted(os.listdir(self._native_path(dir_path)))
+        except OSError:
+            return None
 
     def _read_file_native(self, path: str, offset: int, limit: int) -> ReadResult:
         """``read_file`` without a shell — same contract as the shell path, byte for
@@ -960,8 +1017,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         unexpected OSError hands over to the shell path."""
         import stat as _stat
 
-        full = path if os.path.isabs(path) else os.path.join(
-            getattr(self.env, "cwd", None) or self.cwd, path)
+        full = self._native_path(path)
         try:
             st = os.stat(full)
         except (FileNotFoundError, NotADirectoryError):
@@ -1208,11 +1264,14 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         if not filename:
             return None
         target = filename_match_key(filename)
-        ls_result = self._exec(f"ls -1 -- {self._escape_shell_arg(dir_path)} 2>/dev/null")
-        if ls_result.exit_code != 0 or not ls_result.stdout.strip():
-            return None
+        entries = self._native_dir_entries(dir_path) if self._native_read_enabled() else None
+        if entries is None:
+            ls_result = self._exec(f"ls -1 -- {self._escape_shell_arg(dir_path)} 2>/dev/null")
+            if ls_result.exit_code != 0 or not ls_result.stdout.strip():
+                return None
+            entries = _strip_terminal_fence_leaks(ls_result.stdout).splitlines()
         candidates = [
-            entry for entry in _strip_terminal_fence_leaks(ls_result.stdout).splitlines()
+            entry for entry in entries
             if entry and entry != filename and filename_match_key(entry) == target]
         if len(candidates) == 1:
             return os.path.join(dir_path, candidates[0]) if dir_path != "." or "/" in path else candidates[0]
@@ -1225,10 +1284,14 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         basename_no_ext = os.path.splitext(filename)[0].lower()
         ext = os.path.splitext(filename)[1].lower()
         lower_name = filename.lower()
-        ls_result = self._exec(f"ls -1 -- {self._escape_shell_arg(dir_path)} 2>/dev/null | head -50")
+        entries = self._native_dir_entries(dir_path) if self._native_read_enabled() else None
+        if entries is None:
+            ls_result = self._exec(f"ls -1 -- {self._escape_shell_arg(dir_path)} 2>/dev/null | head -50")
+            entries = _strip_terminal_fence_leaks(ls_result.stdout).split('\n') \
+                if ls_result.exit_code == 0 and ls_result.stdout.strip() else []
         scored: list = []  # (score, filepath) — higher is better
-        if ls_result.exit_code == 0 and ls_result.stdout.strip():
-            for f in ls_result.stdout.strip().split('\n'):
+        if entries:
+            for f in entries[:50]:
                 if not f:
                     continue
                 lf = f.lower()
@@ -1305,6 +1368,14 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             return ReadResult(
                 file_size=file_size,
                 error=f"File is too large ({file_size:,} bytes, limit is {max_bytes:,})")
+        if self._native_read_enabled():
+            try:
+                with open(self._native_path(path), "rb") as fh:  # windows-footgun: ok — binary mode, no decoding
+                    data = fh.read()
+            except OSError as exc:
+                return ReadResult(error=f"Failed to read binary file: {exc.strerror or exc}")
+            return ReadResult(base64_content=base64.b64encode(data).decode("ascii"),
+                              file_size=file_size, is_binary=True)
         encoded = self._exec(f"base64 < {self._escape_shell_arg(path)}")
         if encoded.exit_code != 0:
             return ReadResult(error=f"Failed to read binary file: {encoded.stdout}")
@@ -1317,13 +1388,17 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
 
     def delete_file(self, path: str) -> WriteResult:
         """Delete a single file (directories rejected) via the backend's ``python -c``
-        so one code path works on local/docker/ssh AND Windows shells (no ``rm``)."""
+        so one code path works on local/docker/ssh AND Windows shells (no ``rm``).
+        On the in-process path it is ``os.remove`` — a confined Windows session has no
+        ``python3`` to run the snippet in."""
         path = self._expand_path(path)
         # Delete removes the directory entry (a symlink itself, not its target), so
         # the guards vet the entry as well as the target it resolves to.
         denied = get_write_denied_error(path, verb="Delete", entry=True)
         if denied:
             return WriteResult(error=denied)
+        if self._native_read_enabled():
+            return self._delete_file_native(path)
         # Path baked in via repr() for shell-independent quoting; no
         # ``unlink(missing_ok=True)`` (a 3.7 remote interpreter lacks it).
         snippet = (
@@ -1355,6 +1430,20 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             return WriteResult(error=f"Failed to delete {path}: {(result.stdout or '').strip() or 'unknown error'}")
         return WriteResult()
 
+    def _delete_file_native(self, path: str) -> WriteResult:
+        """``delete_file`` in-process: same contract as the snippet (a directory is refused,
+        a missing entry is already deleted), same message style."""
+        full = self._native_path(path)
+        try:
+            if os.path.isdir(full) and not os.path.islink(full):
+                return WriteResult(error=f"Failed to delete {path}: is a directory: {path}")
+            os.remove(full)
+        except FileNotFoundError:
+            return WriteResult()
+        except OSError as exc:
+            return WriteResult(error=f"Failed to delete {path}: {exc.strerror or exc}")
+        return WriteResult()
+
     def move_file(self, src: str, dst: str) -> WriteResult:
         src = self._expand_path(src)
         dst = self._expand_path(dst)
@@ -1363,9 +1452,26 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             denied = get_write_denied_error(p, verb="Move", entry=True)
             if denied:
                 return WriteResult(error=denied)
+        if self._native_read_enabled():
+            return self._move_file_native(src, dst)
         result = self._exec(f"mv {self._escape_shell_arg(src)} {self._escape_shell_arg(dst)}")
         if result.exit_code != 0:
             return WriteResult(error=f"Failed to move {src} -> {dst}: {result.stdout}")
+        return WriteResult()
+
+    def _move_file_native(self, src: str, dst: str) -> WriteResult:
+        """``move_file`` in-process: ``os.replace`` is ``mv -f`` (same-FS rename, overwrites),
+        including ``mv``'s "an existing directory destination means move INTO it"."""
+        src_full = self._native_path(src)
+        dst_full = self._native_path(dst)
+        try:
+            if os.path.isdir(dst_full) and not os.path.islink(dst_full):
+                dst_full = os.path.join(dst_full, os.path.basename(src_full.rstrip("\\/")))
+            os.replace(src_full, dst_full)
+        except FileNotFoundError:
+            return WriteResult(error=f"Failed to move {src} -> {dst}: No such file or directory")
+        except OSError as exc:
+            return WriteResult(error=f"Failed to move {src} -> {dst}: {exc.strerror or exc}")
         return WriteResult()
 
     # --- WRITE --------------------------------------------------------------

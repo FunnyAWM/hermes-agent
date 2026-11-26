@@ -44,7 +44,7 @@ def provider(monkeypatch):
 
 @pytest.fixture
 def host_dir(tmp_path):
-    """A workspace-looking host directory, apart from the test's HERMES_HOME (Hermes reading its
+    """A workspace-looking host directory, apart from the test's HERMES_HOME (Kouri Harness reading its
     own state is not a tool touching the host)."""
     path = tmp_path / "host-workspace"
     path.mkdir()
@@ -155,7 +155,7 @@ def test_another_agents_process_never_makes_a_prefix_ambiguous(provider):
 @pytest.mark.platforms("posix")
 def test_local_long_lived_process_dies_with_hermes_until_stopped(tmp_path, monkeypatch):
     """A long-lived local process is owned (its group is covered by the owner-death supervisor, so a
-    SIGKILLed Hermes takes it down) from start until ``stop_process`` releases it."""
+    SIGKILLed Kouri Harness takes it down) from start until ``stop_process`` releases it."""
     from hermes_cli import process_identity
     from tools.environments.local import LocalEnvironment
 

@@ -18,6 +18,7 @@ from . import (
     prompt_voice,
     server_requests,
     sessions,
+    sync,
     tools_commands,
     tools_mcp_plugins,
 )

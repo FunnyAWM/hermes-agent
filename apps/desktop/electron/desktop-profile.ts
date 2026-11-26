@@ -248,7 +248,11 @@ export function createDesktopProfilePreferences(
 
     const existing = readConnectionProfiles()
 
-    if (!DESKTOP_PROFILE_NAME_RE.test(profile) || existing[connectionId] === profile || !isKnownConnection(connectionId)) {
+    if (
+      !DESKTOP_PROFILE_NAME_RE.test(profile) ||
+      existing[connectionId] === profile ||
+      !isKnownConnection(connectionId)
+    ) {
       return
     }
 
@@ -318,7 +322,7 @@ export function createDesktopProfilePreferences(
     }
   }
 
-  // userData outlives HERMES_HOME: a reinstall that wiped the Hermes home, or a
+  // userData outlives HERMES_HOME: a reinstall that wiped the Kouri Harness home, or a
   // `hermes profile delete` while the app was closed, never reaches
   // afterProfileRequest. A remembered local profile that is gone would launch
   // `--profile <gone>` on every boot, which the backend refuses, so apply the

@@ -1,6 +1,7 @@
 // The desktop product identity — THE single source for every name-shaped
-// value a variant owns. HERMES_DESKTOP_VARIANT=light builds "Hermes
-// Light", the remote-only client; everything else is full "Hermes".
+// value a variant owns. This fork ships as "Kouri Harness"; the kebab and
+// pascal names stay "hermes" on purpose so appId, userData and the CLI
+// launcher keep upgrading in place.
 //
 // Consumed at build time by electron-builder.config.cjs (packaging
 // identity). electron/product-identity.ts is the typed runtime accessor.
@@ -9,22 +10,33 @@
 'use strict'
 
 const variants = {
-  '': { display: 'Hermes', kebab: 'hermes', pascal: 'Hermes' },
+  '': { display: 'Kouri Harness', kebab: 'hermes', pascal: 'Hermes' },
   light: {
-    display: 'Hermes Light',
+    display: 'Kouri Harness Light',
     kebab: 'hermes-light',
     pascal: 'HermesLight'
   },
   bundled: {
-    display: 'Hermes Agent',
+    display: 'Kouri Harness',
     kebab: 'hermes-bundled',
     pascal: 'HermesBundled'
+  },
+  headless: {
+    // The installed face carries NO "Headless" suffix (user request): same display
+    // name as the regular app, while the disk artifacts stay suffixed (the package
+    // files keep the HermesHeadless prefix) and appId stays hermes-headless so a
+    // regular + headless side-by-side install keeps separate identities. The
+    // userData dir is pinned (userDataDirName below) to the historical directory so
+    // an in-place upgrade of an existing headless install keeps its preferences.
+    display: 'Kouri Harness',
+    kebab: 'hermes-headless',
+    pascal: 'HermesHeadless'
   }
 }
 
 const variant = process.env.HERMES_DESKTOP_VARIANT || ''
-if (!['', 'light', 'bundled', 'store'].includes(variant)) {
-  throw new Error(`Unknown HERMES_DESKTOP_VARIANT ${variant}. expected one of (empty), light, bundled, store`)
+if (!['', 'light', 'bundled', 'headless', 'store'].includes(variant)) {
+  throw new Error(`Unknown HERMES_DESKTOP_VARIANT ${variant}. expected one of (empty), light, bundled, headless, store`)
 }
 
 // 'store' is a Store-submission packaging identity layered on the bundled
@@ -33,7 +45,7 @@ if (!['', 'light', 'bundled', 'store'].includes(variant)) {
 // MSIX package identity. The Store re-signs on submission.
 const store = variant === 'store'
 const light = variant === 'light'
-const name = variants[store ? 'bundled' : (variant || '')]
+const name = variants[store ? 'bundled' : variant || '']
 
 // The electron-updater feed channel this build PUBLISHES to. A canary
 // tag (canary.YYYYMMDDTHHMMSSZ-vX.Y.Z) writes canary.yml / light-canary.yml;
@@ -74,8 +86,14 @@ const identity = {
   light,
   displayName,
   appId: `com.nousresearch.${name.kebab}${kebabSuffix}`,
+  // Stable headless pins its userData to the historical directory: its display
+  // name now matches the regular app, and Electron derives userData from the
+  // product name — without the pin, an existing headless install would silently
+  // start reading the regular app's state (and vice versa). Commit/canary builds
+  // keep their suffixed appNamePascal directory via the existing branch.
+  ...(variant === 'headless' && !buildCommit && !canary ? { userDataDirName: 'KouriChat Next Headless' } : {}),
   // Store and commit builds do not publish a release feed.
-  channel: store || buildCommit ? null : light ? (canary ? 'light-canary' : 'light') : (canary ? 'canary' : 'latest'),
+  channel: store || buildCommit ? null : light ? (canary ? 'light-canary' : 'light') : canary ? 'canary' : 'latest',
   appNamePascal: `${name.pascal}${pascalSuffix}`,
   artifactNamePascal: name.pascal,
   windowsExecutableName: kebabSuffix ? cliName : displayName,
@@ -105,9 +123,15 @@ const request = channelBuildRequest()
 // The updater reads the token from the stamped request, not from this export.
 const officialChannel =
   request !== null &&
-  ['appId', 'displayName', 'appNamePascal', 'artifactNamePascal', 'windowsExecutableName', 'cliName', 'msixAppIdWithOrg'].every(
-    key => request.identity[key] === identity[key]
-  )
+  [
+    'appId',
+    'displayName',
+    'appNamePascal',
+    'artifactNamePascal',
+    'windowsExecutableName',
+    'cliName',
+    'msixAppIdWithOrg'
+  ].every(key => request.identity[key] === identity[key])
 
 module.exports = !request
   ? identity

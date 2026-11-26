@@ -150,7 +150,7 @@ export function createBrowserSavedConnections({
     const read = await api<DesktopConnectionsRegistry | null>({ path: ROUTE })
 
     if (!Array.isArray(read?.connections)) {
-      throw new Error('Hermes did not return the saved connections')
+      throw new Error('Kouri Harness did not return the saved connections')
     }
 
     return publish(read)
@@ -188,7 +188,7 @@ export function createBrowserSavedConnections({
     const ticket = String(minted?.ticket || '').trim()
 
     if (!ticket) {
-      throw new Error('Hermes did not return a relay ticket')
+      throw new Error('Kouri Harness did not return a relay ticket')
     }
 
     const url = new URL(websocketUrl(relayed.basePath, path, {}, profile))
@@ -324,11 +324,12 @@ export function createBrowserSavedConnections({
     setLastUsed: connectionId => mutated({ body: { id: connectionId }, method: 'POST', path: `${ROUTE}/last-used` }),
     setLaunchMode: mode => mutated({ body: { mode }, method: 'POST', path: `${ROUTE}/launch-mode` }),
     setPrimary: connectionId => mutated({ method: 'POST', path: `${ROUTE}/${id(connectionId)}/primary` }),
-    test: connectionId => api({
-      method: 'POST',
-      path: `${ROUTE}/${id(connectionId)}/test`,
-      timeoutMs: gateway(connectionId)?.kind === 'ssh' ? BACKEND_BOOT_WAIT_TIMEOUT_MS : 20_000
-    })
+    test: connectionId =>
+      api({
+        method: 'POST',
+        path: `${ROUTE}/${id(connectionId)}/test`,
+        timeoutMs: gateway(connectionId)?.kind === 'ssh' ? BACKEND_BOOT_WAIT_TIMEOUT_MS : 20_000
+      })
   }
 
   // Another window or native Desktop may have edited the list while this tab was in the background.

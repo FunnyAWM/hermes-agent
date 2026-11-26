@@ -349,11 +349,15 @@ def _file_version(resolved: str) -> tuple | None:
             if not stat.S_ISREG(before.st_mode):
                 return None
             digest = hashlib.file_digest(stream, "sha256").digest()
+            if os.fstat(stream.fileno()).st_ctime_ns != before.st_ctime_ns:
+                return None
             after = os.stat(resolved)
-        fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns")
-        version = tuple(getattr(before, name) for name in fields)
-        if version == tuple(getattr(after, name) for name in fields):
-            return (*version, digest)
+        # On Windows path stat can report creation time in ctime while fstat reports change time.
+        fields = ("st_dev", "st_ino", "st_size", "st_mtime_ns")
+        version = tuple(getattr(after, name) for name in fields)
+        if version == tuple(getattr(before, name) for name in fields):
+            if os.name == "nt" or before.st_ctime_ns == after.st_ctime_ns:
+                return (*version, after.st_ctime_ns, digest)
         return None
     except OSError:
         return None

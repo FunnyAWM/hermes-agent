@@ -13,7 +13,10 @@ whole-file overwrite of content this task never saw or that changed since.
 import fnmatch
 import os
 import unicodedata
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
+from typing import Iterator
 
 from agent.file_safety import deny_key, get_nt_namespace_error
 from hermes_constants import get_hermes_home, named_profile_home
@@ -39,7 +42,7 @@ _SENSITIVE_PATH_PREFIXES = (
 _SENSITIVE_EXACT_PATHS = {"/var/run/docker.sock", "/run/docker.sock"}
 
 def _get_hermes_config_resolved() -> str | None:
-    """Resolved absolute path of the Hermes config file for the ACTIVE profile.
+    """Resolved absolute path of the Kouri Harness config file for the ACTIVE profile.
 
     Resolved per call, never memoised: a multiplexed gateway serves many profiles
     in one process, and a memo would let a later profile rewrite its own
@@ -52,7 +55,7 @@ def _get_hermes_config_resolved() -> str | None:
 
 
 def _get_real_hermes_home() -> str | None:
-    """Realpath of the authoritative Hermes home for the ACTIVE profile.
+    """Realpath of the authoritative Kouri Harness home for the ACTIVE profile.
 
     Resolved per call so it tracks the per-turn ``HERMES_HOME`` scope (#107327).
     ``None`` fails closed at the consumer: the ``~/.hermes`` exemption is skipped,
@@ -66,8 +69,8 @@ def _get_real_hermes_home() -> str | None:
 
 
 def _hermes_exempt_homes() -> tuple[str, ...]:
-    """Realpaths of the Hermes home tree(s) the protected-instruction gate must stay out of:
-    the ACTIVE profile's home, plus the Hermes ROOT when that home is a named profile
+    """Realpaths of the Kouri Harness home tree(s) the protected-instruction gate must stay out of:
+    the ACTIVE profile's home, plus the Kouri Harness ROOT when that home is a named profile
     (``<root>/profiles/<name>``). Exempting only the profile dir left the root's DIRECT files
     (LEDGER.md / MEMORY.md / USER.md ...) to the ``.hermes`` component rule, which
     gated them like a project-local ``<repo>/.hermes/config.yaml`` — fail-closed headless
@@ -115,6 +118,68 @@ def _same_existing_file(path: str, other: str) -> bool:
         return False
 
 
+#: Set only by the notes organizer fork: the actual write target must then be
+#: ``notes/<category>/*.md`` and nothing else (never ``memories/``, ``SOUL.md``,
+#: ``notes/docs/`` or ``notes/.versions/``), so an auxiliary model can maintain notes
+#: without any path to the memory files.
+_NOTES_WRITE_SCOPE: ContextVar[bool] = ContextVar("hermes_notes_write_scope", default=False)
+
+
+@contextmanager
+def bind_notes_write_scope() -> Iterator[None]:
+    token = _NOTES_WRITE_SCOPE.set(True)
+    try:
+        yield
+    finally:
+        _NOTES_WRITE_SCOPE.reset(token)
+
+
+def _check_notes_write_scope(filepath: str, task_id: str = "default") -> str | None:
+    """Inside the organizer fork, only ``notes/<category>/*.md`` files are addressable.
+
+    Judged by the path the write actually resolves to — one category level, a Markdown
+    file, never ``notes/docs`` (imported source text, read-only) or ``notes/.versions``
+    (archives). A path shaped like the target but pointing somewhere else cannot pass.
+    """
+    if not _NOTES_WRITE_SCOPE.get():
+        return None
+    home = _get_real_hermes_home()
+    if not home:
+        return f"Refusing to write {filepath}: the profile home is unresolved in note-organizer mode."
+    notes = os.path.normcase(os.path.realpath(os.path.join(home, "notes")))
+    try:
+        real = os.path.normcase(os.path.realpath(_resolved_or_raw(filepath, task_id)))
+    except (OSError, ValueError):
+        real = ""
+    if real.startswith(notes + os.sep):
+        parts = real[len(notes) + 1:].split(os.sep)
+        if (len(parts) == 2 and parts[0] not in ("docs", ".versions")
+                and parts[1].lower().endswith(".md")):
+            return None
+    return (f"Refusing to write {filepath}: the note organizer may only change Markdown notes "
+            "under notes/<category>/ (one category level; not notes/docs, notes/.versions, "
+            "notes/ top-level files, memories/ or SOUL.md).")
+
+
+def _check_notes_docs_readonly(filepath: str, task_id: str = "default") -> str | None:
+    """Imported source text under ``<home>/notes/docs`` is read-only for the model."""
+    home = _get_real_hermes_home()
+    if not home:
+        return None
+    docs = os.path.normcase(os.path.realpath(os.path.join(home, "notes", "docs")))
+    for candidate in (_resolved_or_raw(filepath, task_id), os.path.normpath(_expand_tilde(filepath))):
+        try:
+            real = os.path.normcase(os.path.realpath(candidate))
+        except (OSError, ValueError):
+            continue
+        if real == docs or real.startswith(docs + os.sep):
+            return (
+                f"Refusing to write to {filepath}: notes/docs holds imported source text and is "
+                "read-only. Write new notes under notes/<category>/ instead."
+            )
+    return None
+
+
 def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None:
     """Return an error message if the path targets a sensitive system location."""
     # NT/device-namespace guard on the RAW string, BEFORE the task-base join:
@@ -145,7 +210,7 @@ def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None
     if hermes_config and (deny_key(hermes_config) in keys or (
             _writes_host_filesystem(task_id) and _same_existing_file(candidates[0], hermes_config))):
         return (
-            f"Refusing to write to Hermes config file: {filepath}\n"
+            f"Refusing to write to Kouri Harness config file: {filepath}\n"
             "Agent cannot modify security-sensitive configuration. "
             "Edit ~/.hermes/config.yaml directly or use 'hermes config' instead.")
     # A hosted path names the tenant's sandbox, and its skills are not this host's: resolving it
@@ -422,7 +487,7 @@ def _check_approval_required_write(paths: list[str], task_id: str = "default") -
 
 
 def _get_container_mirror_prefix_for_task(task_id: str = "default") -> str | None:
-    """Return the container-side Hermes mirror prefix for persistent Docker file tools."""
+    """Return the container-side Kouri Harness mirror prefix for persistent Docker file tools."""
     try:
         from tools.terminal_tool import (
             _active_environments, _env_lock, _get_env_config, _resolve_container_task_id)
@@ -443,7 +508,7 @@ def _get_container_mirror_prefix_for_task(task_id: str = "default") -> str | Non
 
 def _check_cross_profile_path(filepath: str, task_id: str = "default") -> str | None:
     """Soft-guard: warn when ``filepath`` lands on a host-side or Docker sandbox MIRROR of
-    Hermes state (a write the host never reads). Not profile isolation — that guard was
+    Kouri Harness state (a write the host never reads). Not profile isolation — that guard was
     removed; ``cross_profile=True`` keeps bypassing this one for replay compat. Fails open."""
     try:
         from agent.file_safety import get_container_mirror_warning, get_sandbox_mirror_warning

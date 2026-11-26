@@ -47,7 +47,9 @@ const RT_COOKIE_VARIANTS = ['__Host-hermes_session_rt', '__Secure-hermes_session
 const GATEWAY_COOKIE_SUFFIX = /_[0-9a-f]{16}$/
 
 function isCookieVariant(name: unknown, variants: string[]): boolean {
-  return typeof name === 'string' && (variants.includes(name) || variants.includes(name.replace(GATEWAY_COOKIE_SUFFIX, '')))
+  return (
+    typeof name === 'string' && (variants.includes(name) || variants.includes(name.replace(GATEWAY_COOKIE_SUFFIX, '')))
+  )
 }
 
 // Keep this aligned with hermes_cli.profiles.validate_profile_name(). `default`
@@ -138,7 +140,7 @@ export function gatewayTicketTransportMessage(error: unknown): string {
 
   if (['ETIMEDOUT', 'ETIMEOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'EAI_AGAIN', 'ENOTFOUND'].includes(code)) {
     return (
-      'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket: ' +
+      'Could not reach the remote Kouri Harness gateway while refreshing its WebSocket ticket: ' +
       'the connection timed out or the host could not be resolved. ' +
       'Check your network/VPN path and the gateway URL, then reconnect.'
     )
@@ -146,13 +148,13 @@ export function gatewayTicketTransportMessage(error: unknown): string {
 
   if (code === 'ECONNREFUSED') {
     return (
-      'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket: ' +
+      'Could not reach the remote Kouri Harness gateway while refreshing its WebSocket ticket: ' +
       'the connection was refused. The gateway process is likely down or listening on another port. ' +
       'Start the gateway (or fix its URL), then reconnect.'
     )
   }
 
-  return 'Could not reach the remote Hermes gateway while refreshing its WebSocket ticket. Try reconnecting.'
+  return 'Could not reach the remote Kouri Harness gateway while refreshing its WebSocket ticket. Try reconnecting.'
 }
 
 function gatewayTicketFailure(error, authMessage, transportMessage) {
@@ -311,7 +313,7 @@ function connectionScopeKey(profile) {
   return String(profile ?? '').trim() || null
 }
 
-/** Which Hermes profile the remote SSH dashboard should actually run as.
+/** Which Kouri Harness profile the remote SSH dashboard should actually run as.
  *  Registry pool keys (`conn:mac-mini::default`) are desktop routing labels —
  *  they must never be sent to the remote as a profile name. `default` and
  *  empty mean the remote root home. */
@@ -514,8 +516,8 @@ function normalizeSshConfig(entry) {
   }
 
   // A Desktop profile can be a local routing label rather than the profile
-  // name used by the remote Hermes installation. Preserve an explicit mapping
-  // when it is a valid Hermes profile identifier; otherwise fall back to the
+  // name used by the remote Kouri Harness installation. Preserve an explicit mapping
+  // when it is a valid Kouri Harness profile identifier; otherwise fall back to the
   // historical same-name behavior in the caller.
   Object.assign(out, normalizeRemoteProfileName(entry.remoteProfile))
 
@@ -663,7 +665,7 @@ function profileRemoteOverride(config, profile) {
 }
 
 // Validate a remote profile mapping the same way the SSH path does (a valid
-// Hermes profile identifier, never a reserved alias). Invalid/blank → no
+// Kouri Harness profile identifier, never a reserved alias). Invalid/blank → no
 // mapping, so callers fall back to the historical same-name behavior.
 function normalizeRemoteProfileName(value) {
   const remoteProfile = String(value || '').trim()
@@ -1108,8 +1110,10 @@ function pathWithProfileScope(path, profile, method?: string) {
 
   // A path that already names its profile never also carries the ambient one: the two disagree
   // whenever the sidebar is on another profile or "All profiles", and the gateway refuses the pair.
-  if (parsed.searchParams.has('profile')
-      || (profileRouteSuffix(parsed.pathname) && !profileCollectionRoute(parsed.pathname, method))) {
+  if (
+    parsed.searchParams.has('profile') ||
+    (profileRouteSuffix(parsed.pathname) && !profileCollectionRoute(parsed.pathname, method))
+  ) {
     return path
   }
 

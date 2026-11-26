@@ -1,4 +1,4 @@
-"""Offline, non-destructive recovery for a damaged Hermes session database.
+"""Offline, non-destructive recovery for a damaged Kouri Harness session database.
 
 The store admin's ``recover_transcripts`` runs it: the source is never opened by SQLite (it and its WAL/SHM/journal
 sidecars are copied to a disposable work dir first), canonical rows are copied into a fresh current-schema database,

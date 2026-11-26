@@ -56,6 +56,8 @@ function NewGroupChatItem({ elsewhereNote, label, onSelect, roster }: NewGroupCh
 
 interface renderRosterToolbarProps {
   b: ReturnType<typeof useBots>
+  /** Fork rule: one assistant leaves nothing to create, search or filter. */
+  singleBot?: boolean
   activityToasts: boolean
   activeSourceRoster: RosterRow[]
   /** Full roster; New Group Chat seats only `seatableGroupBots` of it. */
@@ -82,6 +84,7 @@ interface renderRosterToolbarProps {
 
 export function renderRosterToolbar({
   b,
+  singleBot = false,
   activityToasts,
   activeSourceRoster,
   roster,
@@ -102,6 +105,16 @@ export function renderRosterToolbar({
   gatewayFilter,
   setGatewayFilter
 }: renderRosterToolbarProps) {
+  if (singleBot) {
+    return (
+      <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">
+        <span className="text-[0.6875rem] font-semibold uppercase tracking-wider text-(--ui-text-quaternary)">
+          Bots
+        </span>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">

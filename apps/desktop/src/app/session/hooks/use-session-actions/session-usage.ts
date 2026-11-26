@@ -10,6 +10,15 @@ export function publishSessionUsage(usage: null | UsageStats | undefined) {
   setCurrentUsage(usage ?? { calls: 0, input: 0, output: 0, total: 0 })
 }
 
+/** Reflect a stored row's persisted token counts into the live usage atom
+ *  (total is derived, so callers can't drift it out of sync with input/output). */
+export function applyStoredUsage(stored: { input_tokens?: null | number; output_tokens?: null | number }) {
+  const input = stored.input_tokens || 0
+  const output = stored.output_tokens || 0
+
+  setCurrentUsage(current => ({ ...current, input, output, total: input + output }))
+}
+
 type StoredTotals = { input_tokens?: null | number; output_tokens?: null | number } | null | undefined
 
 // No reading yet (agentless since a gateway restart): the resolved stored row's token totals (Recents,
@@ -31,13 +40,4 @@ export function publishWarmSessionRuntime(state: ClientSessionState, stored?: St
   setCurrentBranch(state.branch)
   setSessionStartedAt(state.runtimeStartedAt)
   publishSessionUsage(state.usage ?? storedTotals(stored))
-}
-
-// Reflect a stored row's persisted token counts into the live usage atom
-// (total is derived, so callers can't drift it out of sync with input/output).
-export function applyStoredUsage(stored: { input_tokens?: number | null; output_tokens?: number | null }) {
-  const input = stored.input_tokens || 0
-  const output = stored.output_tokens || 0
-
-  setCurrentUsage(current => ({ ...current, input, output, total: input + output }))
 }

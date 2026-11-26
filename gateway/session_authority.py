@@ -223,9 +223,18 @@ class SessionAuthority:
             raise AuthorityRefusal('profile_mismatch')
         if capability not in actor.capabilities:
             raise AuthorityRefusal('permission_denied')
+        store = authority_persistence(self)
+        row = store.sessions.get(ref.session_id)
+        from gateway.session_policy import MANAGED_WORKER_SOURCE
+        manages_workers = 'session:manage-worker' in actor.capabilities
+        managed_worker = row is not None and row.source == MANAGED_WORKER_SOURCE
+        # Router and user conversations may inspect each other, but neither side may mutate the
+        # other's session. Worker mutations stay with the Router that created that worker.
+        if manages_workers and not managed_worker and capability != 'session:read':
+            raise AuthorityRefusal('permission_denied')
+        if managed_worker and capability != 'session:read' and not manages_workers:
+            raise AuthorityRefusal('permission_denied')
         if ref.session_id not in self.sessions:
-            store = authority_persistence(self)
-            row = store.sessions.get(ref.session_id)
             if row is None:
                 raise AuthorityRefusal('not_found')
             marks = store.bindings.binding_marks(ref.session_id)
@@ -245,8 +254,12 @@ class SessionAuthority:
         from gateway.config import Platform
         source = self.sessions[ref.session_id].source
         from gateway.owner_identity import same_owner
-        if (source is not None and source.platform == Platform.LOCAL
-                and not same_owner(source.user_id, actor.subject) and 'session:operator' not in actor.capabilities):
+        if managed_worker and manages_workers and (source is None or not same_owner(source.user_id, actor.subject)):
+            raise AuthorityRefusal('permission_denied')
+        router_read = manages_workers and capability == 'session:read'
+        if (not managed_worker and source is not None and source.platform == Platform.LOCAL
+                and not same_owner(source.user_id, actor.subject) and 'session:operator' not in actor.capabilities
+                and not router_read):
             raise AuthorityRefusal('permission_denied')
         from gateway.session_retirement import touch_restored
         touch_restored(self, ref.session_id)  # a rename or a read brought a retired one back

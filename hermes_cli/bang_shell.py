@@ -33,7 +33,7 @@ def parse_bang_command(text: str) -> str:
     """The shell command inside a bang submission (``""`` when bare).
 
     ``!  ls -la`` -> ``ls -la``; ``!!`` -> ``!`` — a literal second bang belongs to the user's shell
-    (history expansion), not to Hermes.
+    (history expansion), not to Kouri Harness.
     """
     return text.strip()[1:].strip() if is_bang_command(text) else ""
 
@@ -75,19 +75,25 @@ def check_bang_approval(command: str) -> dict:
     hardline blocklist, user deny rules and the dangerous-command prompt all apply
     to user-typed bang commands too. Returns the gate's ``{"approved": bool, "message": ...}``;
     falls back to *approved* only when the gate itself cannot be imported (a broken install, not a
-    policy decision).
+    policy decision). In ``approvals.mode: auto`` no automatic review covers a user-typed
+    command either, so the dangerous-command prompt is what decides it.
     """
     try:
         from tools.terminal_tool import _check_all_guards
     except Exception:
         return {"approved": True, "message": None}
 
+    # A ruling the automatic reviewer stamped for a MODEL tool call must never carry
+    # over to a user-typed command: drop it so bang keeps the guard's own policy.
+    from tools.auto_review import take_ruling
+    take_ruling("terminal")
+
     # Bang commands always run locally in the CLI process, never inside a remote/sandbox backend.
     return _check_all_guards(command, "local", has_host_access=False)
 
 
 def _bang_env() -> dict:
-    """Environment for a bang command with Hermes-managed secrets filtered.
+    """Environment for a bang command with Kouri Harness-managed secrets filtered.
 
     The CLI process holds every provider API key; a user-typed command may still run a third-party
     script, so reuse the sanitizer ``quick_commands`` and the local terminal backend use. If that
@@ -130,7 +136,7 @@ def run_bang_command(command: str, *, cwd: Optional[str] = None, timeout: int = 
         emit(f"!: command timed out after {timeout}s")
         return 124
     except KeyboardInterrupt:
-        # Ctrl+C interrupts the command, not the Hermes session.
+        # Ctrl+C interrupts the command, not the Kouri Harness session.
         proc.kill()
         emit("!: interrupted")
         return 130

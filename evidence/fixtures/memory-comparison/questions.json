@@ -1,0 +1,12 @@
+[
+  {"id": "Q01", "question": "我的默认回答偏好是什么？", "sources": ["memories/USER.md"], "expected": ["先给结论", "默认简短"], "forbidden": ["默认需要长篇回答"], "reject": "不要声称默认需要长篇回答。"},
+  {"id": "Q02", "question": "我主要使用什么系统，在哪个时区？", "sources": ["memories/USER.md"], "expected": ["Windows 11", "Android 14", "Asia/Hong_Kong"], "forbidden": ["Windows 10", "Android 13"], "reject": "不要替换系统版本或时区。"},
+  {"id": "Q03", "question": "首版包含多设备同步吗？", "sources": ["memories/MEMORY.md", "notes/work/release.md", "notes/docs/product-brief.md"], "expected": ["首版只交付 Android 本机模式", "多设备同步安排在后续里程碑"], "forbidden": ["首版支持多设备同步", "首版包含同步"], "reject": "不要把同步说成首版功能。"},
+  {"id": "Q04", "question": "换模型后记忆会丢吗，记忆是什么格式？", "sources": ["memories/MEMORY.md"], "expected": ["UTF-8 Markdown", "换模型时保留这些文件"], "forbidden": ["记忆绑定模型", "私有格式"], "reject": "不要声称记忆绑定模型或采用私有格式。"},
+  {"id": "Q05", "question": "这个项目面向单人还是团队共享？", "sources": ["memories/MEMORY.md", "notes/work/release.md", "notes/docs/product-brief.md"], "expected": ["不提供团队共享"], "forbidden": ["支持团队共享", "团队共享记忆"], "reject": "不要声称支持团队共享记忆。"},
+  {"id": "Q06", "question": "模型接口用什么协议，由谁指定？", "sources": ["memories/MEMORY.md"], "expected": ["模型由使用者指定", "OpenAI 兼容的 Chat Completions"], "forbidden": ["固定供应商"], "reject": "不要编造固定供应商。"},
+  {"id": "Q07", "question": "首版为什么不做向量检索？", "sources": ["memories/MEMORY.md"], "expected": ["避免引入 embedding 数据出口"], "forbidden": ["已部署向量数据库", "使用向量检索"], "reject": "不要声称已部署向量数据库。"},
+  {"id": "Q08", "question": "我的跑步安排是什么，右膝疼痛时怎么办？", "sources": ["notes/health/running.md"], "expected": ["每周三次，每次五公里", "右膝疼痛时暂停跑步"], "forbidden": ["目标配速", "忍痛继续跑"], "reject": "不要编造目标配速或建议继续忍痛跑步。"},
+  {"id": "Q09", "question": "我的模型接口月预算是多少？", "sources": ["notes/finance/subscription.md"], "expected": ["每月一百二十元"], "forbidden": ["每日一百二十元", "每年一百二十元", "日预算"], "reject": "不要把月预算改成日预算或年预算。"},
+  {"id": "Q10", "question": "首版具体在哪天发布？", "sources": ["notes/work/release.md"], "expected": ["首版发布日期尚未确定"], "forbidden": ["2026-11-03 发布", "2026-11-03 正式发布"], "reject": "不要把笔记 updated 日期当作发布日期。"}
+]

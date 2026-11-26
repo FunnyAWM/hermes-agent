@@ -33,7 +33,8 @@ from tools.file_tools_paths import (
     _resolve_path_for_task)
 from tools.file_tools_write_guards import (
     _READ_DEDUP_STATUS_MESSAGE, _check_approval_required_write, _check_binary_document_write,
-    _check_cross_profile_path, _check_protected_instruction_write, _check_sensitive_path,
+    _check_cross_profile_path, _check_notes_docs_readonly, _check_notes_write_scope,
+    _check_protected_instruction_write, _check_sensitive_path,
     _is_internal_file_tool_content, _stale_overwrite_blocker, _stale_write_refusal)
 from tools.file_tools_read_tracking import (
     _bump_consecutive, _cap_read_tracker_data, _carry_full_write_baselines, _check_file_staleness,
@@ -640,7 +641,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
 
     Guard order: NT/device-namespace prefix (raw string, no resolution) →
     device-path blocklist (no I/O) → stat-based special-file guard (host only)
-    → Hermes internal denylist → document extraction → binary-extension guard
+    → Kouri Harness internal denylist → document extraction → binary-extension guard
     → negative-result cache → dedup stub → real read.
     """
     try:
@@ -675,7 +676,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
                         "attempted. Use terminal utilities if you need to "
                         "interact with it.")})
 
-        # Hermes internal denylist (prompt injection via catalog metadata,
+        # Kouri Harness internal denylist (prompt injection via catalog metadata,
         # credential stores). Runs BEFORE document extraction so a
         # protected SQLite store (state.db) cannot be read through the extractor. Pass the RESOLVED path: the denylist's own
         # resolve() uses the process cwd and would miss a relative "auth.json".
@@ -722,6 +723,11 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
             _record_not_found("read", resolved_str, task_id, json.dumps(result_dict, ensure_ascii=False))
         if _err or result_dict.get("is_binary"):
             return json.dumps(result_dict, ensure_ascii=False)
+
+        # notes/docs reads feed the stale-document lifecycle (Android 设 13); best effort.
+        from hermes_notes.lifecycle import note_document_read
+
+        note_document_read(resolved_str)
 
         # Char budget on the FORMATTED content (what enters context), BEFORE
         # redaction (skip the regex pass on huge content); truncate gracefully
@@ -797,6 +803,30 @@ def _resolve_or_none(filepath: str, task_id: str, *, entry: bool = False) -> str
         return None
 
 
+def _archive_memory_surface_before_write(resolved: str | None) -> str | None:
+    """Snapshot memories/ or notes/ Markdown into ``.versions/`` before the agent rewrites it.
+
+    Android 记 05 parity (T-28): a bad model rewrite stays recoverable on disk. Anything outside
+    that surface — SOUL.md, project files — is untouched. Fail closed: when the snapshot of an
+    in-surface file cannot be made the write is refused. ``None`` means "proceed"; anything else
+    is the error to return instead of writing.
+    """
+    if not resolved:
+        return None
+    try:
+        from hermes_constants import get_hermes_home
+        from hermes_notes.lifecycle import archive_before_overwrite
+
+        archive_before_overwrite(Path(str(get_hermes_home())), resolved)
+    except (ImportError, OSError, ValueError) as error:
+        logger.warning("memory-surface archive failed for %s: %s", resolved, error)
+        return (
+            f"Refusing to write {resolved}: the current memories/notes file could not be "
+            "archived, so the previous content would not be recoverable. The file was NOT "
+            "modified — retry the write.")
+    return None
+
+
 def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: str,
                           cross_profile: bool) -> str | None:
     """Run the shared write/patch guards in order; return the first error string.
@@ -806,8 +836,10 @@ def _write_precheck_error(paths: list[str], content_paths: list[str], task_id: s
     prompt covers every path of a multi-file patch.
     """
     for p in paths:
-        err = _check_sensitive_path(p, task_id) or (
-            None if cross_profile else _check_cross_profile_path(p, task_id))
+        err = (_check_sensitive_path(p, task_id)
+               or _check_notes_docs_readonly(p, task_id)
+               or _check_notes_write_scope(p, task_id)
+               or (None if cross_profile else _check_cross_profile_path(p, task_id)))
         if err:
             return err
     for p in content_paths:
@@ -900,6 +932,8 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
     """
     # write_file checks the binary-document guard before the mirror guard.
     err = (_check_sensitive_path(path, task_id)
+           or _check_notes_docs_readonly(path, task_id)
+           or _check_notes_write_scope(path, task_id)
            or _check_binary_document_write(path, task_id)
            or _check_protected_instruction_write([path], task_id)
            or _check_approval_required_write([path], task_id)
@@ -928,6 +962,8 @@ def write_file_tool(path: str, content: str, task_id: str = "default",
                 return json.dumps(_stale_write_refusal(path, blocker, _resolved), ensure_ascii=False)
             warnings = _edit_warnings([path], path_to_resolved, task_id)
             rewrite_hint = _whole_file_rewrite_hint(task_id, _resolved, content)
+            if _archive_error := _archive_memory_surface_before_write(_resolved):
+                return tool_error(_archive_error)
             result = _get_file_ops(task_id).write_file(_resolved or path, content)
             result_dict = result.to_dict()
             if warnings:
@@ -1021,6 +1057,9 @@ def patch_tool(mode: str = "replace", path: str | None = None, old_string: str |
             # Whole-file knowledge held BEFORE the patch reads, under the same locks. Like
             # every baseline check it stats the host path, so a sandbox path carries nothing.
             _known = _known_full_content_sha256(_path_to_resolved.values(), task_id)
+            for _target in _path_to_resolved.values():
+                if _archive_error := _archive_memory_surface_before_write(_target):
+                    return tool_error(_archive_error)
 
             # Hand the shell layer the RESOLVED targets so both layers agree on
             # which file is edited even when the shell's cwd differs.

@@ -161,3 +161,67 @@ def test_plain_http_stays_refused_without_a_pin(tmp_path):
 
     with pytest.raises(ValueError, match="non-https"):
         Download([Source("http://192.168.1.20:4873/model.gguf", tmp_path / "m")], partials_dir=tmp_path / "p").run()
+
+
+def test_download_mirror_prefix_rewrites_the_lock_url(tmp_path, monkeypatch):
+    """HERMES_PM_DOWNLOAD_MIRROR prefixes the lock URL; the original URL and the
+    public archive stay fallbacks, so an unreachable mirror degrades instead of failing."""
+    from pm.artifact_mirror import mirror_url, pinned_source
+
+    digest = "b" * 64
+    lock_url = "https://github.com/x/y/releases/download/v1/y.tgz"
+    monkeypatch.setenv("HERMES_PM_DOWNLOAD_MIRROR", "https://gh.example.com")
+    source = pinned_source(lock_url, tmp_path / "y.tgz", digest)
+    assert source.url == "https://gh.example.com/" + lock_url
+    assert source.fallbacks == (lock_url, mirror_url(digest))
+    assert source.http_mirror == ""
+
+
+def test_download_mirror_prefix_beats_the_npm_registry(tmp_path, monkeypatch):
+    """Both knobs set: the prefix mirror wins the primary slot."""
+    from pm.artifact_mirror import pinned_source
+
+    digest = "c" * 64
+    lock_url = "https://registry.npmjs.org/npm/-/npm-10.9.2.tgz"
+    monkeypatch.setenv("NPM_CONFIG_REGISTRY", "https://npm.corp.example")
+    monkeypatch.setenv("HERMES_PM_DOWNLOAD_MIRROR", "https://gh.example.com")
+    source = pinned_source(lock_url, tmp_path / "npm.tgz", digest)
+    assert source.url == "https://gh.example.com/" + lock_url
+
+
+def test_download_mirror_plain_http_prefix_is_the_users_mirror(tmp_path, monkeypatch):
+    """An http prefix is user-configured and hash-pinned, the LAN-registry trust model."""
+    from pm.artifact_mirror import pinned_source
+
+    digest = "d" * 64
+    lock_url = "https://github.com/x/y/releases/download/v1/y.tgz"
+    monkeypatch.setenv("HERMES_PM_DOWNLOAD_MIRROR", "http://lan.example:8080")
+    source = pinned_source(lock_url, tmp_path / "y.tgz", digest)
+    assert source.url == "http://lan.example:8080/" + lock_url
+    assert source.http_mirror == "http://lan.example:8080/"
+
+
+def test_download_mirror_prefix_rejects_a_non_url(tmp_path, monkeypatch):
+    """A typo'd mirror must fail loudly, not silently mangle every download URL."""
+    import pytest
+    from pm.package import InstallError
+    from pm.artifact_mirror import pinned_source
+
+    monkeypatch.setenv("HERMES_PM_DOWNLOAD_MIRROR", "gh.example.com")
+    with pytest.raises(InstallError, match="HERMES_PM_DOWNLOAD_MIRROR"):
+        pinned_source("https://github.com/x/y.tgz", tmp_path / "y.tgz", "e" * 64)
+
+
+def test_download_mirror_serves_pinned_bytes(tmp_path, monkeypatch, dl_server, no_proxy_env):
+    """End to end: the prefixed mirror serves the pinned bytes through the one downloader."""
+    from pm.artifact_mirror import pinned_source
+    from pm.downloader import Download
+
+    body = b"pinned via mirror"
+    digest = hashlib.sha256(body).hexdigest()
+    lock_url = "https://github.com/x/y/releases/download/v1/y.tgz"
+    monkeypatch.setenv("HERMES_PM_DOWNLOAD_MIRROR", url(dl_server, "").rstrip("/"))
+    RangeHandler.payloads["/" + lock_url] = body
+    source = pinned_source(lock_url, tmp_path / "y.tgz", digest)
+    assert Download([source], partials_dir=tmp_path / "partials").run() == [source.dest]
+    assert source.dest.read_bytes() == body

@@ -4,7 +4,7 @@ import { atom } from 'nanostores'
 import { notifyError } from '@/store/notifications'
 
 /**
- * Feature store for backend (agent) plugins — the native Hermes plugins plus
+ * Feature store for backend (agent) plugins — the native Kouri Harness plugins plus
  * portable Agent Plugins v1 packages the backend discovers on disk. Settings
  * renders this next to the desktop (renderer) plugin inventory so every plugin
  * the user has is discoverable and toggleable from one page, whatever process
@@ -42,7 +42,7 @@ export interface AgentPluginRow {
   /** 'bundled' | 'user' | 'git' | 'project' | 'entrypoint' */
   source: string
   status: 'enabled' | 'disabled' | 'not enabled'
-  /** Agent Plugins v1 package (portable skills/MCP format) vs native Hermes. */
+  /** Agent Plugins v1 package (portable skills/MCP format) vs native Kouri Harness. */
   portable?: boolean
   /** Curated-catalog provenance (from the install sidecar), when present. */
   catalog_name?: string
@@ -65,6 +65,13 @@ export interface AgentPluginRow {
   install_dir?: string
   /** Manifest `config_schema` rendered as a settings form (with current values). */
   settings_schema?: PluginSettingField[]
+  /** Optional manifest presentation metadata for the automatic settings page. */
+  settings_page?: {
+    location: 'root'
+    title?: string | null
+    icon?: string | null
+    order?: number | null
+  } | null
   /** Full snapshot of declared application-backed MCP servers. */
   servers?: AgentPluginServer[]
 }
@@ -82,6 +89,7 @@ export interface PluginSettingField {
   value?: unknown
   default?: unknown
   choices?: string[]
+  model_provider_key?: string | null
   env?: string
   has_value?: boolean
 }
@@ -123,7 +131,7 @@ const MANAGEABLE_BUNDLED_KEYS = new Set(['disk-cleanup', 'security-guidance'])
 
 export const isDesktopRelevantPlugin = (row: AgentPluginRow): boolean => {
   if (row.source === 'bundled') {
-    return MANAGEABLE_BUNDLED_KEYS.has(row.key ?? row.name)
+    return Boolean(row.settings_page) || MANAGEABLE_BUNDLED_KEYS.has(row.key ?? row.name)
   }
 
   const key = row.key

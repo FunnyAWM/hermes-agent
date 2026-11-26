@@ -72,7 +72,7 @@ def _save_blocked_payload(command: str) -> str | None:
         path = script_dir / f"blocked-{int(time.time())}-{uuid.uuid4().hex[:8]}.sh"
         path.write_text(
             "#!/usr/bin/env bash\n"
-            "# Auto-saved by Hermes: this command exceeded the inline command\n"
+            "# Auto-saved by Kouri Harness: this command exceeded the inline command\n"
             "# parser limit and was blocked from direct execution. The approval\n"
             "# guard has not read it: review all of it before running it yourself.\n"
             + command + ("" if command.endswith("\n") else "\n"),

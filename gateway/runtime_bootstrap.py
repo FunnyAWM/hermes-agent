@@ -9,6 +9,10 @@ import time
 _PURPOSE_CAPABILITIES = {
     'interactive': frozenset({'session:create', 'session:read', 'session:submit',
                               'session:control', 'session:approve', 'session:respond'}),
+    # A plugin Router may create and drive only its own managed-worker sessions. SessionAuthority
+    # applies the ownership/source fence; this grant deliberately carries no operator capability.
+    'managed-session': frozenset({'session:create', 'session:read', 'session:submit',
+                                  'session:control', 'session:manage-worker'}),
     'native-http': frozenset({'http:owner'}),
     # Same-user host operation, not permission to read or mutate another profile.
     'native-profile-create': frozenset({'profiles:create'}),

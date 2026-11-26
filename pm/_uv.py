@@ -1,4 +1,4 @@
-"""Pinned tool acquisition for PM's private Python engine; never worker API."""
+"""Compatible local or pinned tooling for PM's private Python engine."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,15 +10,16 @@ from pm.store import current_target
 
 
 def _toolchain(*, realize: bool = True, explicit: bool = False) -> tuple[Path, Path] | None:
-    """Resolve uv and Python without host discovery or recursive worker dispatch.
+    """Resolve uv and Python without recursive worker dispatch.
 
     A read-only probe never installs. A sealed Windows payload builds on a verified writable
     copy of its Python: uv starts a venv's ``Scripts\\python.exe`` to query it, and that
     redirector runs outside the package, so its target must too. A redirector naming the
-    packaged interpreter dies with exit 101 (#135236). Hermes itself still enters those venvs
+    packaged interpreter dies with exit 101 (#135236). Kouri Harness itself still enters those venvs
     on the packaged interpreter (``pm.environments.venv_command``).
     """
     from pm.install import _installed_location, _lockfile, ensure, sealed
+    from pm.local_tools import find_local
     from pm.user_facing import writable_copy
 
     if realize:
@@ -29,6 +30,10 @@ def _toolchain(*, realize: bool = True, explicit: bool = False) -> tuple[Path, P
     binaries = {}
     for name in ("uv", "python"):
         package = get_package(name)
+        local = find_local(package, lockfile, target)
+        if local is not None:
+            binaries[name] = local.binary
+            continue
         location = _installed_location(package, lockfile, target)
         if location is None:
             if not realize:

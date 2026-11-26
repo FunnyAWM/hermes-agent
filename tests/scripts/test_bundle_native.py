@@ -19,6 +19,7 @@ import pytest
 from scripts.bundles import native
 
 
+@pytest.mark.require_symlinks
 def test_bundle_stages_git_tree_and_runs_native_children_before_manifest(tmp_path, monkeypatch):
     import importlib
     import inspect
@@ -680,7 +681,8 @@ def test_staged_cache_ships_full_wheel_set_and_rebuilds_offline(tmp_path):
         encoding="utf-8",
     )
     cache = tmp_path / "build-cache"
-    env = {**os.environ, "UV_CACHE_DIR": str(cache), "UV_NO_CONFIG": "1", "UV_PYTHON_DOWNLOADS": "never"}
+    env = {**os.environ, "UV_CACHE_DIR": str(cache), "UV_NO_CONFIG": "1", "UV_PYTHON_DOWNLOADS": "never",
+           "NO_PROXY": "127.0.0.1"}
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=str(dist)))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -767,6 +769,7 @@ def test_native_dispatch_isolates_process_state_on_real_child_failure(tmp_path, 
     assert not list(out.glob(".build-*"))
 
 
+@pytest.mark.require_symlinks
 def test_native_preparation_refuses_symlinked_output_before_writing(tmp_path, monkeypatch):
     monkeypatch.setattr("pm.prepare_tools", lambda *args, **kwargs: pytest.fail("unsafe output reached acquisition"))
     output = tmp_path / "payload"
@@ -832,3 +835,116 @@ def test_native_dispatch_child_environment(tmp_path, monkeypatch, cache_source, 
     assert (cache / "reused").read_text(encoding="utf-8-sig") == "xx"
     assert all(not home.exists() for home in homes)
     assert dict(os.environ) == before
+
+
+def test_bundle_tool_filter_defaults_to_every_locked_tool(monkeypatch):
+    monkeypatch.delenv("HERMES_BUNDLE_TOOLS", raising=False)
+    assert native._bundle_tool_filter() is None
+    assert "python" in native._staging_names(None)
+
+
+def test_bundle_tool_filter_stages_only_the_named_tools(monkeypatch):
+    monkeypatch.setenv("HERMES_BUNDLE_TOOLS", " python , uv ")
+    assert native._bundle_tool_filter() == {"python", "uv"}
+    assert native._staging_names({"python"}) == ["python"]
+
+
+def test_sealed_subset_venv_takes_all_but_the_full_bundle_takes_every_extra():
+    """A sealed subset can never sync_venv again, so it ships a fixed set (T-41/T-43)."""
+    assert native._venv_sync_extras(None) == {"all_extras": True, "extras": ()}
+    sealed = native._venv_sync_extras({"python"})
+    assert sealed["all_extras"] is False
+    assert "google" not in sealed["extras"]
+    assert set(sealed["extras"]) <= {
+        "acp", "cron", "mcp", "pty", "sms", "uvloop", "web", "youtube"}
+
+
+def test_drop_bytecode_strips_every_cache_under_the_payload(tmp_path):
+    """The sealed subset ships no pyc (T-44): stale caches from the interpreter and venv go."""
+    for rel in ("tools/python/Lib/json", "venv/Lib/site-packages/httpx", "hermes-agent/agent"):
+        cache = tmp_path / rel / "__pycache__"
+        cache.mkdir(parents=True)
+        (cache / "mod.cpython-314.pyc").write_bytes(b"pyc")
+    (tmp_path / "hermes-agent" / "agent" / "turn.py").write_text("x = 1\n", encoding="utf-8")
+    assert native._drop_bytecode(tmp_path) == 3
+    assert not list(tmp_path.rglob("__pycache__"))
+    assert (tmp_path / "hermes-agent" / "agent" / "turn.py").is_file()
+
+
+def test_bundle_tool_filter_rejects_names_outside_the_lock(monkeypatch):
+    monkeypatch.setenv("HERMES_BUNDLE_TOOLS", "python,not-a-tool")
+    with pytest.raises(ValueError, match="not-a-tool"):
+        native._bundle_tool_filter()
+
+
+def test_staging_names_fail_closed_when_a_requested_tool_cannot_be_staged(monkeypatch):
+    from pm.package import InstallError
+
+    class Unavailable:
+        internal = False
+
+        def missing_reason(self, target):
+            return "not built for this target"
+
+    monkeypatch.setattr(native, "get_package", lambda name: Unavailable())
+    with pytest.raises(InstallError, match="unavailable for this target"):
+        native._staging_names({"python"})
+
+
+def test_prepared_inventory_admits_the_sealed_subset_without_uv_cache(tmp_path):
+    """Publish and load must agree that a sealed subset payload ships no uv-cache.
+
+    The sealed stager skips uv-cache (native.py: no in-place rebuilds) while the
+    runtime treats an absent payload cache as "nothing to seed" (uv_cache_dir);
+    the prepared inventory used to demand the directory unconditionally and so
+    rejected every sealed payload at publish time.
+    """
+    from scripts.build.inputs import AgentInputs, RESOURCE_ENV, dependency_site
+    from scripts.bundles.native_prepared import load_prepared, publish_prepared
+
+    target = native.current_target()
+
+    def staged(out, uv_cache):
+        code = out / "hermes-agent"
+        code.mkdir(parents=True)
+        (code / "pyproject.toml").write_text(
+            '[project]\nname="fixture"\nversion="1.0.0"\n', encoding="utf-8")
+        for name in RESOURCE_ENV:
+            (code / name).mkdir(parents=True)
+            (code / name / "asset").write_text("required", encoding="utf-8")
+        (out / "tools").mkdir()
+        venv = out / "venv"
+        site = dependency_site(venv, "3.14.9", target)
+        site.mkdir(parents=True)
+        python = out / "bin" / ("python.exe" if target.startswith("win32") else "python")
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"inert")
+        pm_runtime = out / "pm-runtime"
+        (pm_runtime / "site").mkdir(parents=True)
+        (pm_runtime / "python.txt").write_bytes(b"inert")
+        (pm_runtime / "pm-runtime.json").write_text(
+            json.dumps({"python": "python.txt", "sitePackages": "site"}), encoding="utf-8")
+        (out / "enabled-features.json").write_text("{}", encoding="utf-8")
+        if uv_cache:
+            (out / "uv-cache" / "wheels").mkdir(parents=True)
+            (out / "uv-cache" / "wheels" / "fixture.whl").write_bytes(b"inert")
+        return AgentInputs(
+            project=code / "pyproject.toml", code=code, repo="hermes-agent",
+            placement="contained", target=target, python=python, site_packages=site,
+            environment=venv, pm_runtime=pm_runtime, tools=out / "tools", ref="HEAD",
+            resources={name: code / name for name in RESOURCE_ENV},
+            features=out / "enabled-features.json")
+
+    sealed = tmp_path / "sealed"
+    inputs = staged(sealed, uv_cache=False)
+    prepared = publish_prepared(sealed, tmp_path, "a" * 40, inputs, bundle_tools={"python"})
+    assert "uv-cache" not in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
+    # Install-time verification replays the same inventory; a publish/load
+    # disagreement would brick the payload after distribution.
+    assert load_prepared(prepared) == inputs
+
+    full = tmp_path / "full"
+    inputs = staged(full, uv_cache=True)
+    prepared = publish_prepared(full, tmp_path, "b" * 40, inputs, bundle_tools=None)
+    assert "uv-cache" in json.loads(prepared.read_text(encoding="utf-8-sig"))["digests"]
+    assert load_prepared(prepared) == inputs

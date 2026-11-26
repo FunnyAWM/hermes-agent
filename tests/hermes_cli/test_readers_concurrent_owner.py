@@ -36,7 +36,7 @@ def readers(conn):
         elif command[0] == 'sessions':
             assert 'Total sessions: 1' in result.stdout, result.stdout
         else:
-            assert 'Hermes Insights' in result.stdout, result.stdout
+            assert 'Kouri Harness Insights' in result.stdout, result.stdout
         assert conn.in_transaction, 'reader disturbed owner transaction'
     raise RollBack  # roll the write transaction back
 

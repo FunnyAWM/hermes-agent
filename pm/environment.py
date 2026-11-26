@@ -56,7 +56,7 @@ _BUILD_MARKERS = ("the build backend returned an error",)
 # and hints the version was filtered, so that case needs both lines.
 _UNDATED_PIN = "has no publish time"
 _UNDATED_FILE = ("is missing an upload date", "was filtered by `exclude-newer")
-UNDATED_INDEX_HINT = ("the package index did not report upload times, which locking Hermes's "
+UNDATED_INDEX_HINT = ("the package index did not report upload times, which locking Kouri Harness's "
                       "dependencies needs for its 3-day release-age check. Use https://pypi.org/simple "
                       "or a mirror that serves upload times (pip.conf index-url / UV_INDEX_URL), then retry.")
 
@@ -446,7 +446,7 @@ class PythonEnvironment:
     def sync(self, source: Path, *, extras: Sequence[str] = (), groups: Sequence[str] = (),
              timeout: int = 1800, frozen: bool = True, all_extras: bool = False,
              no_install_project: bool = False, locked: bool = False,
-             no_default_groups: bool = False, upgrade: Sequence[str] = ()) -> None:
+             no_default_groups: bool = False, upgrade: Sequence[str] = (), compile_bytecode: bool = True) -> None:
         """Install the root and every member; resolve only in a writable workspace.
 
         ``frozen=False`` is reserved for the caller-owned generated workspace,
@@ -458,8 +458,12 @@ class PythonEnvironment:
         # Locking members alone is insufficient: plain sync only installs root deps.
         # uv writes no __pycache__ (pip does): without --compile-bytecode the first import
         # of every module in the foreground of a user request compiles it (#100461).
+        # A sealed *bundle* passes False on purpose: its payload must not carry ~9k pyc
+        # files (T-44), and the launcher redirects bytecode writes to the user cache.
         command = ["sync", "--locked" if locked else "--frozen", "--all-packages",
-                   "--python", str(self.python), "--compile-bytecode"]
+                   "--python", str(self.python)]
+        if compile_bytecode:
+            command.append("--compile-bytecode")
         if no_default_groups:
             command.append("--no-default-groups")
         if all_extras:
@@ -576,7 +580,7 @@ class PythonEnvironment:
                                                      cwd=self.cache.parent, timeout=900)
         except InstallError as exc:
             raise InstallError("uv", f"could not clean the uv cache at {cache}: {exc.cause}",
-                               "stop other Hermes installs and retry") from exc
+                               "stop other Kouri Harness installs and retry") from exc
         if result.returncode:
             raise InstallError("uv", f"could not remove {', '.join(names)} from the uv cache at "
                                f"{cache}: {(result.stderr or result.stdout)[-600:]}")

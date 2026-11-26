@@ -16,7 +16,8 @@ export const arDelegationRouting: DelegationRoutingTranslations = {
   plugin: 'إضافة',
   pluginMissing: 'مسارات النماذج ومسارات الملفات الشخصية مصدرها الإضافة Advanced Delegation.',
   pluginDisabled: 'الإضافة Advanced Delegation مثبتة لكنها متوقفة لهذا الملف الشخصي.',
-  pluginNotLoaded: 'الإضافة Advanced Delegation مفعّلة، لكن Hermes لم يحمّلها بعد. أعد تشغيل Hermes لإكمال ذلك.',
+  pluginNotLoaded:
+    'الإضافة Advanced Delegation مفعّلة، لكن Kouri Harness لم يحمّلها بعد. أعد تشغيل Kouri Harness لإكمال ذلك.',
   installPlugin: 'تثبيت الإضافة',
   installUnavailable: 'الإضافة Advanced Delegation ليست في كتالوج الإضافات بعد. ثبّتها من المهارات ← الإضافات.',
   enablePlugin: 'تفعيل',
@@ -24,11 +25,11 @@ export const arDelegationRouting: DelegationRoutingTranslations = {
   modeFailed: 'تعذّر تغيير توجيه الوكلاء الفرعيين',
   loadFailed: 'تعذّر تحميل توجيه الوكلاء الفرعيين',
   blockedPill: 'لا يعمل',
-  blockedDetail: 'هذا الوضع محفوظ، لذا يرفض Hermes كل وكيل فرعي بدلًا من استخدام الوضع الافتراضي بصمت.',
+  blockedDetail: 'هذا الوضع محفوظ، لذا يرفض Kouri Harness كل وكيل فرعي بدلًا من استخدام الوضع الافتراضي بصمت.',
   blockedMissing: 'لن يبدأ الوكلاء الفرعيون حتى تُثبَّت الإضافة Advanced Delegation.',
   blockedDisabled: 'لن يبدأ الوكلاء الفرعيون حتى تُفعَّل الإضافة Advanced Delegation لهذا الملف الشخصي.',
   blockedNotLoaded:
-    'لن يبدأ الوكلاء الفرعيون حتى يحمّل Hermes الإضافة Advanced Delegation. أعد تشغيل Hermes لإكمال ذلك.',
+    'لن يبدأ الوكلاء الفرعيون حتى يحمّل Kouri Harness الإضافة Advanced Delegation. أعد تشغيل Kouri Harness لإكمال ذلك.',
   blockedUnavailable: label => `لن يبدأ الوكلاء الفرعيون حتى يتمكن ${label} من العمل هنا. تفيد إضافته بأنه لا يستطيع.`,
   blockedUnregistered: name => `لن يبدأ الوكلاء الفرعيون حتى تُثبَّت وتُفعَّل إضافة توفّر «${name}».`,
   thirdPartyDescription: 'من إضافة. إعداداته موجودة في تلك الإضافة.',

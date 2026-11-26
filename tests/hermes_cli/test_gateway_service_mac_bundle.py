@@ -1,6 +1,6 @@
 """`hermes gateway install` from a macOS bundle leaves the signed app untouched.
 
-Anything written into ``Hermes.app`` breaks its code seal, and macOS then holds the next update
+Anything written into ``Kouri Harness.app`` breaks its code seal, and macOS then holds the next update
 on a Gatekeeper prompt. The service runs the app's own signed ``bin/hermes`` instead.
 """
 import json
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _mac_bundle(tmp_path: Path) -> tuple[Path, Path, Path]:
     """The payload a macOS app ships (scripts/build/agent.py) around a stub CLI: app, repo, bin/hermes."""
-    app = tmp_path / "Hermes.app"
+    app = tmp_path / "Kouri Harness.app"
     payload = app / "Contents" / "Resources" / "agent-payload"
     repo = payload / "hermes-agent"
     (repo / "hermes_cli").mkdir(parents=True)

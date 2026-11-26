@@ -201,7 +201,7 @@ ruff +files:
 [no-cd]
 [positional-arguments]
 eslint +files:
-    pnpm exec eslint "$@"
+    node "{{justfile_directory()}}/node_modules/eslint/bin/eslint.js" "$@"
 
 # Rewrite imports and string targets for a move commit (libcst comes from a side environment)
 [group('move')]

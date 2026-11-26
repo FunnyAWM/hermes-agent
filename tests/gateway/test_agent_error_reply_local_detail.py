@@ -22,7 +22,7 @@ def _committed_error(platform, err=None):
     runner._session_state = lambda key: SimpleNamespace(turn=SimpleNamespace(agent=None))
     source = SessionSource(platform=platform, chat_id="c", user_id="u")
     prepared = runner._PreparedTurn([], "", None, None, None, None)
-    err = err or ImportError("The 'anthropic' package is required for the Anthropic provider: restart Hermes")
+    err = err or ImportError("The 'anthropic' package is required for the Anthropic provider: restart Kouri Harness")
     captured = {}
     token = execution_result.set(captured)
     try:

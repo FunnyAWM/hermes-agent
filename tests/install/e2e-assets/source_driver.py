@@ -27,7 +27,7 @@ def _live_app_dirs(app: Path, patterns: tuple[str, ...]) -> list[Path]:
 def desktop_outputs(root: Path) -> list[Path]:
     return _live_app_dirs(root / "apps/desktop", (
         "release/*/resources/app.asar.unpacked/dist",
-        "release/mac*/Hermes.app/Contents/Resources/app.asar.unpacked/dist",
+        "release/mac*/Kouri Harness.app/Contents/Resources/app.asar.unpacked/dist",
     ))
 
 
@@ -41,8 +41,8 @@ def verify_products(root: Path, desktop: str, node: Path | None = None) -> None:
         if not outputs or not any((out / "index.html").is_file() for out in outputs):
             raise RuntimeError("desktop packaged renderer is missing or incomplete")
         executables = [path for path in _live_app_dirs(app, (
-            "release/*/Hermes.exe", "release/*/Hermes", "release/*/hermes",
-            "release/mac*/Hermes.app/Contents/MacOS/Hermes",
+            "release/*/Kouri Harness.exe", "release/*/Kouri Harness", "release/*/hermes",
+            "release/mac*/Kouri Harness.app/Contents/MacOS/Kouri Harness",
         )) if path.is_file() and path.stat().st_size]
         if not executables:
             raise RuntimeError("desktop executable is missing or empty")

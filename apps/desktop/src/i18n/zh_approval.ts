@@ -5,6 +5,7 @@ export const zhApproval: Partial<ApprovalCopy> = {
   sendFailed: '无法发送审批响应',
   run: '运行',
   command: '命令',
+  justification: '理由',
   moreOptions: '更多审批选项',
   allowSession: '允许本会话',
   alwaysAllowMenu: '始终允许…',

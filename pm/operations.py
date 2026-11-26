@@ -31,7 +31,7 @@ def build_environment(
     extras: Sequence[str] = (), groups: Sequence[str] = (),
     all_extras: bool = False, no_install_project: bool = False,
     frozen: bool = True, sealed: bool = False, offline: bool = False,
-    explicit: bool = False, timeout: int = 1800,
+    explicit: bool = False, timeout: int = 1800, compile_bytecode: bool = True,
 ) -> Path:
     """Build and validate a fresh destination; never overwrite an existing tree.
 
@@ -61,7 +61,8 @@ def build_environment(
     )
     with _fresh_build(environment, sealed=sealed, lock=source / "uv.lock"):
         environment.sync(source, extras=extras, groups=groups, all_extras=all_extras,
-                         no_install_project=no_install_project, frozen=frozen, timeout=timeout)
+                         no_install_project=no_install_project, frozen=frozen, timeout=timeout,
+                         compile_bytecode=compile_bytecode)
     return environment.executable
 
 

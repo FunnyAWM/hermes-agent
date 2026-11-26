@@ -63,6 +63,7 @@ import {
   PLUGINS_NAV_ICON,
   pluginSettingsNavChildren,
   PluginSettingsPane,
+  pluginSettingsTopLevelNav,
   usePluginSettingsRoute
 } from './plugin-settings'
 import { SettingsBreadcrumbContext } from './primitives'
@@ -209,6 +210,11 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   const openKeysView = useCallback((view: KeysView) => openSubView('keys', 'kview', view, 'tools'), [openSubView])
 
   const plugins = usePluginSettingsRoute(activeView === 'plugins')
+
+  const topLevelPluginNav = useMemo(
+    () => pluginSettingsTopLevelNav(plugins.entries, plugins.target, plugins.open),
+    [plugins.entries, plugins.open, plugins.target]
+  )
 
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -433,10 +439,11 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
             label: servedByHermesCloud() ? t.settings.nav.backupOnly : t.settings.nav.backup,
             onSelect: () => setActiveView('backup')
           },
+          ...topLevelPluginNav.map((group, index) => ({ ...group, gapBefore: index === 0 })),
           {
-            active: activeView === 'plugins',
+            active: activeView === 'plugins' && plugins.target?.entry.location !== 'root',
             children: pluginSettingsNavChildren(plugins.entries, plugins.target, plugins.open),
-            gapBefore: true,
+            gapBefore: topLevelPluginNav.length === 0,
             icon: PLUGINS_NAV_ICON,
             id: 'plugins',
             label: t.settings.nav.plugins,
@@ -474,6 +481,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       canViewPlans,
       keysView,
       plugins,
+      topLevelPluginNav,
       providerView,
       subpage,
       t,
@@ -601,7 +609,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
     <WebAccessSettings />
   ) : activeView === 'plugins' ? (
     <PluginSettingsPane
-      entries={plugins.entries}
+      entries={plugins.entries.filter(entry => entry.location === 'plugins')}
       missing={plugins.missing}
       onOpen={plugins.open}
       pending={plugins.pending}

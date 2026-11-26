@@ -81,6 +81,12 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
         "description": "Context window override (0 = auto-detect from model metadata)",
         "category": "general",
     },
+    # A free-form paragraph: the desktop generic editor would otherwise render it as a
+    # one-line input while empty.
+    "approvals.auto_review.policy": {
+        "type": "text",
+        "description": "Extra trusted rules for the automatic tool-call reviewer",
+    },
     "terminal.backend": _select(
         "Terminal execution backend",
         "local", "docker", "ssh", "modal", "daytona", "vercel_sandbox",
@@ -113,8 +119,8 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     "auth.adopt_external_logins": {
         "type": "boolean",
         "description": (
-            "Borrow and refresh the Codex CLI / Claude Code logins when Hermes has no usable login of its own. "
-            "Off: Hermes uses only its own logins (`hermes auth add <provider>`)."
+            "Borrow and refresh the Codex CLI / Claude Code logins when Kouri Harness has no usable login of its own. "
+            "Off: Kouri Harness uses only its own logins (`hermes auth add <provider>`)."
         ),
         "category": "security",
     },
@@ -142,7 +148,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
     ),
     "display.resume_display": _select("How resumed sessions display history", "minimal", "full", "off"),
     "display.busy_input_mode": _select("Input behavior while agent is running", "interrupt", "queue", "steer"),
-    "approvals.mode": _select("Dangerous command approval mode", "manual", "smart", "off"),
+    "approvals.mode": _select("Dangerous command approval mode", "manual", "smart", "auto", "off"),
     "context.engine": _select("Context management engine", "default", "custom"),
     "human_delay.mode": _select("Simulated typing delay mode", "off", "typing", "fixed"),
     "logging.level": _select("Log level for agent.log", "DEBUG", "INFO", "WARNING", "ERROR"),
@@ -155,7 +161,7 @@ _SCHEMA_OVERRIDES: dict[str, dict[str, Any]] = {
         "", "minimal", "low", "medium", "high", "xhigh", "max", "ultra",
     ),
     "updates.non_interactive_local_changes": _select(
-        "When the chat app / gateway updates Hermes (no terminal prompt), "
+        "When the chat app / gateway updates Kouri Harness (no terminal prompt), "
         "what to do with uncommitted local source edits. 'stash' keeps them "
         "and re-applies them after the update; 'discard' throws them away. "
         "Terminal updates always ask, regardless of this setting.",
@@ -233,6 +239,47 @@ _CATEGORY_MERGE: dict[str, str] = {
 
 _UI_TYPES = ((bool, "boolean"), (int, "number"), (float, "number"), (list, "list"), (dict, "object"))
 
+# Sliding / frozen conversation windows (KouriChat Next Android 设 08, agent/session_window.py).
+# 0 = off; frozen is only effective while 1 <= Y < X. Read with a 0 fallback at runtime, so
+# they stay schema-only virtual fields instead of DEFAULT_CONFIG leaves (that file is at its
+# FILE_LINES ratchet).
+_WINDOW_SCHEMA_FIELDS: dict[str, dict[str, Any]] = {
+    "context.session_window_turns": {
+        "type": "number",
+        "description": (
+            "Keep only the latest N user turns in each model request "
+            "(0 = send the full history)."
+        ),
+        "category": "agent",
+    },
+    "context.frozen_window_turns": {
+        "type": "number",
+        "description": (
+            "Once the window is full, freeze the latest M turns as the cached prefix and "
+            "append newer turns until it refills "
+            "(0 = off; must be less than the session window)."
+        ),
+        "category": "agent",
+    },
+    "context.window_token_budget": {
+        "type": "number",
+        "description": (
+            "Token budget for each model request after the turn window: the newest messages "
+            "that fit are sent, the system prompt counts against it, and the newest message is "
+            "never dropped. 0 = off. A budget that changes the cut point breaks the provider "
+            "prefix cache, so keep it off unless the model window demands it."
+        ),
+        "category": "agent",
+    },
+    "memory.organize_turns": {
+        "type": "number",
+        "description": (
+            "Run a notes/MEMORY.md housekeeping pass every N user turns, after the answer is "
+            "delivered (0 = off)."
+        ),
+        "category": "agent",
+    },
+}
 
 def _infer_type(value: Any) -> str:
     """Infer a UI field type from a Python value."""
@@ -269,6 +316,7 @@ def _config_schema_with_virtual_fields() -> dict[str, dict[str, Any]]:
         ordered[key] = entry
         if key == "model":
             ordered["model_context_length"] = _SCHEMA_OVERRIDES["model_context_length"]
+    ordered.update(_WINDOW_SCHEMA_FIELDS)
     return ordered
 
 
@@ -449,7 +497,7 @@ _AUX_TASK_SLOTS: tuple[str, ...] = (
 
 def _plugin_aux_tasks() -> list[dict[str, Any]]:
     """Auxiliary tasks registered by plugins (``PluginContext.register_auxiliary_task``) for the
-    Hermes home active in this context.
+    Kouri Harness home active in this context.
 
     Callers run inside ``_profile_scope`` / ``_config_profile_scope``, and ``get_plugin_manager()``
     keys its manager on the same context-local home, so a request for profile B enumerates
@@ -507,10 +555,10 @@ def _dashboard_skew_restart_hint() -> str:
     if os.environ.get("HERMES_SERVE_HEADLESS") == "1":
         return (
             "restart the Desktop-owned backend to load the new code "
-            "(use Restart backend in Hermes Desktop, or quit and reopen the app)"
+            "(use Restart backend in Kouri Harness Desktop, or quit and reopen the app)"
         )
     return (
-        "restart this Hermes process to load the new code "
+        "restart this Kouri Harness process to load the new code "
         "(hermes dashboard --port <port>, or the equivalent service restart for this install)"
     )
 

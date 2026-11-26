@@ -633,10 +633,13 @@ def _mirror_turn_to_memory(
     # user's task. Suppressed by skip_background_review (e.g. cron): the fork costs
     # ~30K tokens / event with no human-in-the-loop benefit. Best-effort; the review
     # clones the snapshot structurally so its sanitizers can't reach the live transcript.
+    # Also suppressed while the notes-organizer fork is in flight: one auxiliary fork
+    # at a time, mirroring should_organize's symmetric check.
     if (
         final_response
         and not interrupted
         and not getattr(agent, "skip_background_review", False)
+        and not getattr(agent, "_notes_organizer_in_flight", False)
         and (review_memory or review_skills)
     ):
         with suppress(Exception):
@@ -835,7 +838,7 @@ def finalize_turn(
         # explanation appended since): it carries no new text for the client to paint.
         "response_reused": bool(final_response) and final_response == getattr(agent, "_reused_response_text", None),
         "model": agent.model,
-        # requested_model / served_model: proxy-reported deployment or Hermes' own fallback route.
+        # requested_model / served_model: proxy-reported deployment or Kouri Harness' own fallback route.
         **result_model_fields(agent),
         "provider": agent.provider,
         "base_url": agent.base_url,
@@ -902,11 +905,12 @@ def finalize_turn(
         interrupted=interrupted, messages=messages, review_memory=_should_review_memory,
         review_skills=_should_review_skills, vetoed=vetoed,
     )
-
     # Opt-in (compression.prepare_ahead): near the trigger, write the next compaction summary
     # between turns. No-op otherwise; never raises. Not after a vetoed turn (no model calls).
     from agent.prepared_compaction import maybe_prepare
     if not vetoed:
+        from agent.turn_context import _tick_notes_organizer
+        _tick_notes_organizer(agent, final_response, interrupted)
         maybe_prepare(agent, messages, origin="turn-end")
 
     # Memory provider on_session_end()/shutdown_all() are NOT called here:

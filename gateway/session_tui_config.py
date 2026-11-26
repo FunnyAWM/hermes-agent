@@ -337,14 +337,14 @@ def _set_profile_leaf(cfg, key, value):
 def _set_approval_mode(connection, value):
     """``/approvals <mode>``'s own write (``hermes_cli.approval_mode``) for this profile."""
     from gateway.run import _profile_runtime_scope
-    from hermes_cli.approval_mode import run_approval_mode_command
+    from hermes_cli.approval_mode import VALID_APPROVAL_MODES, run_approval_mode_command
     with _profile_runtime_scope(Path(connection.authority.profile_id)), _WRITE_LOCK:
         result = run_approval_mode_command(_word(value) or None)
     if not result.ok:
         from hermes_cli.managed_scope import is_key_managed
-        if _word(value) in ('manual', 'smart', 'off') and is_key_managed('approvals.mode'):
+        if _word(value) in VALID_APPROVAL_MODES and is_key_managed('approvals.mode'):
             raise _managed_refusal('approvals.mode')  # set_config_value refused it: name the key
-        raise AuthorityRefusal('invalid_params' if _word(value) not in ('manual', 'smart', 'off')
+        raise AuthorityRefusal('invalid_params' if _word(value) not in VALID_APPROVAL_MODES
                                 else 'storage_unavailable')
     return {'key': 'approvals.mode', 'value': result.mode}
 

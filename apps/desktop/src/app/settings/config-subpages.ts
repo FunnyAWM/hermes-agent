@@ -28,7 +28,13 @@ const CONFIG_SUBPAGE_DEFINITIONS: Record<string, ConfigSubpageDefinition[]> = {
       labelKey: 'chatBehavior',
       fields: ['display.personality', 'timezone', 'display.show_reasoning']
     },
-    { id: 'attachments', labelKey: 'chatAttachments', fields: ['agent.image_input_mode'] }
+    { id: 'attachments', labelKey: 'chatAttachments', fields: ['agent.image_input_mode'] },
+    {
+      id: 'bot',
+      labelKey: 'chatBot',
+      fields: ['context.session_window_turns', 'context.frozen_window_turns',
+               'context.window_token_budget', 'memory.organize_turns']
+    }
   ],
   workspace: [
     {
@@ -40,7 +46,13 @@ const CONFIG_SUBPAGE_DEFINITIONS: Record<string, ConfigSubpageDefinition[]> = {
     {
       id: 'shell',
       labelKey: 'workspaceShell',
-      fields: ['terminal.persistent_shell', 'terminal.env_passthrough']
+      fields: [
+        'terminal.persistent_shell',
+        'terminal.env_passthrough',
+        'terminal.sandbox.enabled',
+        'terminal.sandbox.escalation',
+        'terminal.sandbox.backend'
+      ]
     },
     {
       id: 'files',

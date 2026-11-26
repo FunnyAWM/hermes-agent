@@ -7,7 +7,7 @@ import type { BrowserWindow } from 'electron'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const native = vi.hoisted(() => ({
-  app: { on: vi.fn(), quit: vi.fn(), dock: { show: vi.fn(), hide: vi.fn() } },
+  app: { getName: () => 'Kouri Harness', on: vi.fn(), quit: vi.fn(), dock: { show: vi.fn(), hide: vi.fn() } },
   ipc: new Map<string, (...args: any[]) => any>(),
   windows: [] as any[],
   trays: [] as any[],
@@ -279,13 +279,14 @@ test('a restore before the deferred hide fires cancels the stale hide', async ()
   expect(main.minimized).toBe(false)
 })
 
-test('opt-in minimize and primary Close preserve windows while explicit Quit still exits', async () => {
+test('tray residency is the default; primary Close preserves windows while explicit Quit still exits', async () => {
   const { controller, main, peer } = setup()
-  expect(await controller.start()).toEqual({ enabled: false, available: false })
+  // No preference file: the fork keeps the app resident in the tray.
+  expect(await controller.start()).toEqual({ enabled: true, available: true })
   main.minimize()
-  expect(main.visible).toBe(true)
+  await flushDeferredHide()
+  expect(main.visible).toBe(false)
   main.restore()
-  await native.ipc.get('hermes:minimize-to-tray:set')!(null, true)
   expect(native.ipc.get('hermes:minimize-to-tray:get')!()).toEqual({ enabled: true, available: true })
   main.minimize()
   await flushDeferredHide()

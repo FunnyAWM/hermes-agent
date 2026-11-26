@@ -106,7 +106,8 @@ client (`mcp_tool_*.py`: config, discovery, transport, registration, content, er
 (`tts_tool_providers.py`, `tts_command_provider.py`), skills hub sources (`skills_hub_official.py`
 `OptionalSkillSource`). Adding a backend = a new sibling or provider entry in the existing table,
 never an `elif` on a backend name (root shape rules). Remote-backend file visibility problems are
-fixed at the mount, not by adding a tool.
+fixed at the mount, not by adding a tool. Local commands opt into a `sandctl` boundary
+(`terminal.sandbox` → `local_command_sandbox.py`); on Windows that shell is PowerShell, not msys bash.
 
 **Native vision embeds are history, not one-shot payloads.** `vision_tools.py::_vision_analyze_native`
 (and the browser screenshot twin in `browser_use_cli.py`) bake the image
@@ -196,7 +197,7 @@ from an env var on the backend. Client and backend are separate machines: the de
 drive a locally spawned backend, one over SSH, one behind URL + token, or Hermes Cloud, and
 only the first two carry `HERMES_DESKTOP=1`. An env-keyed gate is a silent no-op on the other
 topologies — the tool is stripped from the schema while the platform hint tells the model it
-is "inside the Hermes desktop app". The pattern:
+is "inside the Kouri Harness app". The pattern:
 
 - **The toolset is the surface gate.** Keep such tools off `_HERMES_CORE_TOOLS` and in a named
   toolset (`desktop_ui`, `project`); the GUI gateway's `_load_enabled_toolsets(platform)`

@@ -1,5 +1,5 @@
 /**
- * Hermes Dashboard Plugin SDK — typed contract (SPIKE)
+ * Kouri Harness Dashboard Plugin SDK — typed contract (SPIKE)
  * ====================================================
  *
  * This is the public type surface for ``window.__HERMES_PLUGIN_SDK__`` and
@@ -35,7 +35,7 @@
  *     shape the right boundary for external authors?
  */
 
-import type { ComponentType } from "react";
+import type { ComponentType } from 'react'
 
 // ---------------------------------------------------------------------------
 // Auth-relevant helpers (the surface this PR adds/sanctions)
@@ -50,8 +50,8 @@ import type { ComponentType } from "react";
 export type FetchJSON = <T = unknown>(
   url: string,
   init?: RequestInit,
-  options?: { allowUnauthorized?: boolean },
-) => Promise<T>;
+  options?: { allowUnauthorized?: boolean }
+) => Promise<T>
 
 /**
  * Authenticated ``fetch`` for NON-JSON endpoints (uploads via ``FormData``,
@@ -62,7 +62,7 @@ export type FetchJSON = <T = unknown>(
  * Both reject a URL on another origin instead of sending it the session
  * token; fetch third-party URLs with plain ``fetch``.
  */
-export type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>
 
 /**
  * Build an absolute ``ws(s)://`` URL for a dashboard WebSocket endpoint with
@@ -70,13 +70,10 @@ export type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>
  * gated OAuth mode, ``token`` in loopback). Plugins MUST use this for any
  * WebSocket instead of hand-assembling the URL + reading the session token.
  */
-export type BuildWsUrl = (
-  path: string,
-  params?: Record<string, string>,
-) => Promise<string>;
+export type BuildWsUrl = (path: string, params?: Record<string, string>) => Promise<string>
 
 /** Lower-level: just the ``[authParamName, authParamValue]`` pair. */
-export type BuildWsAuthParam = () => Promise<[string, string]>;
+export type BuildWsAuthParam = () => Promise<[string, string]>
 
 // ---------------------------------------------------------------------------
 // Registry surface (window.__HERMES_PLUGINS__)
@@ -84,9 +81,9 @@ export type BuildWsAuthParam = () => Promise<[string, string]>;
 
 export interface PluginRegistry {
   /** Register the plugin's main tab component by manifest name. */
-  register(name: string, component: ComponentType<Record<string, never>>): void;
+  register(name: string, component: ComponentType<Record<string, never>>): void
   /** Register a component into a named host slot. */
-  registerSlot(slot: string, name: string, component: ComponentType): void;
+  registerSlot(slot: string, name: string, component: ComponentType): void
 }
 
 // ---------------------------------------------------------------------------
@@ -95,18 +92,18 @@ export interface PluginRegistry {
 
 export interface HermesPluginSDK {
   /** Contract version of this SDK surface (see SDK_CONTRACT_VERSION). */
-  readonly sdkVersion: string;
+  readonly sdkVersion: string
 
   /** React core — use instead of importing/bundling react. */
-  React: typeof import("react").default;
+  React: typeof import('react').default
   hooks: {
-    useState: typeof import("react").useState;
-    useEffect: typeof import("react").useEffect;
-    useCallback: typeof import("react").useCallback;
-    useMemo: typeof import("react").useMemo;
-    useRef: typeof import("react").useRef;
-    useContext: typeof import("react").useContext;
-    createContext: typeof import("react").createContext;
+    useState: typeof import('react').useState
+    useEffect: typeof import('react').useEffect
+    useCallback: typeof import('react').useCallback
+    useMemo: typeof import('react').useMemo
+    useRef: typeof import('react').useRef
+    useContext: typeof import('react').useContext
+    createContext: typeof import('react').createContext
     /**
      * Toast feedback. Returns ``{ showToast, toast }`` where ``toast`` is the
      * current visible toast (or null) and ``showToast(message, 'success' | 'error')``
@@ -114,24 +111,24 @@ export interface HermesPluginSDK {
      * in your plugin's tree to render the visible toast.
      */
     useToast: () => {
-      showToast: (message: string, type: "success" | "error") => void;
-      toast: { message: string; type: "success" | "error" } | null;
-    };
+      showToast: (message: string, type: 'success' | 'error') => void
+      toast: { message: string; type: 'success' | 'error' } | null
+    }
     /**
      * Single-id delete-confirm state machine. Pass ``onDelete(id)`` (an async
      * function). Returns ``{ requestDelete, confirm, cancel, isOpen, isDeleting,
      * pendingId }``. Pair with the ``ConfirmDialog`` primitive (passed as
      * ``open={isOpen}`` etc.) or any custom dialog.
      */
-    useConfirmDelete: <TId,>(opts: { onDelete: (id: TId) => Promise<void> }) => {
-      requestDelete: (id: TId) => void;
-      confirm: () => Promise<void>;
-      cancel: () => void;
-      isOpen: boolean;
-      isDeleting: boolean;
-      pendingId: TId | null;
-    };
-  };
+    useConfirmDelete: <TId>(opts: { onDelete: (id: TId) => Promise<void> }) => {
+      requestDelete: (id: TId) => void
+      confirm: () => Promise<void>
+      cancel: () => void
+      isOpen: boolean
+      isDeleting: boolean
+      pendingId: TId | null
+    }
+  }
 
   /**
    * Typed convenience client for core dashboard endpoints. Typed permissively
@@ -139,16 +136,16 @@ export interface HermesPluginSDK {
    * ``Promise<T>``, a few return a URL string synchronously); plugins call the
    * specific methods they need. See ``web/src/lib/api.ts`` for the concrete shape.
    */
-  api: Record<string, (...args: never[]) => unknown>;
+  api: Record<string, (...args: never[]) => unknown>
 
   /** JSON fetch with host auth handling. */
-  fetchJSON: FetchJSON;
+  fetchJSON: FetchJSON
   /** Authenticated raw fetch for uploads / blob downloads. */
-  authedFetch: AuthedFetch;
+  authedFetch: AuthedFetch
   /** Build an auth'd WebSocket URL for the active mode. */
-  buildWsUrl: BuildWsUrl;
+  buildWsUrl: BuildWsUrl
   /** Resolve just the WS auth query-param pair. */
-  buildWsAuthParam: BuildWsAuthParam;
+  buildWsAuthParam: BuildWsAuthParam
 
   /**
    * Shared UI primitives (Nous DS / shadcn). Typed permissively at the
@@ -158,29 +155,29 @@ export interface HermesPluginSDK {
    * ``ComponentType<never>`` accepts any component regardless of its prop
    * requirements (props are contravariant).
    */
-  components: Record<string, ComponentType<never>>;
+  components: Record<string, ComponentType<never>>
 
   utils: {
-    cn: (...classes: Array<string | false | null | undefined>) => string;
+    cn: (...classes: Array<string | false | null | undefined>) => string
     /** Relative-time formatter. Accepts an epoch-ms number. */
-    timeAgo: (ts: number) => string;
+    timeAgo: (ts: number) => string
     /** Relative-time formatter for an ISO-8601 string. */
-    isoTimeAgo: (iso: string) => string;
-  };
+    isoTimeAgo: (iso: string) => string
+  }
 
   /**
    * i18n hook. Returns the host's i18n context value; typed loosely at the
    * boundary so the contract doesn't couple to the host's internal
    * ``I18nContextValue`` shape. Plugins typically call ``useI18n().t(...)``.
    */
-  useI18n: () => unknown;
+  useI18n: () => unknown
 }
 
 declare global {
   interface Window {
-    __HERMES_PLUGIN_SDK__?: HermesPluginSDK;
-    __HERMES_PLUGINS__?: PluginRegistry;
+    __HERMES_PLUGIN_SDK__?: HermesPluginSDK
+    __HERMES_PLUGINS__?: PluginRegistry
   }
 }
 
-export {};
+export {}

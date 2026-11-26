@@ -125,7 +125,7 @@ class PtyHermes:
         self.hermes_home = self.home / ".hermes"
         operator = (_operator_home() / ".hermes").resolve()
         assert operator not in (self.hermes_home.resolve(), *self.hermes_home.resolve().parents), (
-            f"sandbox {self.hermes_home} sits inside the operator's Hermes home")
+            f"sandbox {self.hermes_home} sits inside the operator's Kouri Harness home")
         if llm is not None:
             # No passive update check (the tui_pty sandbox's rule): on an official checkout the
             # CLI and its attached gateway both resolve the stable release against real GitHub,

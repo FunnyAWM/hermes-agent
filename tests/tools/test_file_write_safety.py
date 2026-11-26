@@ -986,7 +986,7 @@ class TestProfileHomeExemptsHermesRoot:
     (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.hermes`` component
     rule, were read as project-local ``.hermes`` config, and — having no approval
     channel headless — failed closed. That blocked #54 (LEDGER.md edit). The gate
-    must exempt the whole Hermes tree, exactly like the default profile does.
+    must exempt the whole Kouri Harness tree, exactly like the default profile does.
     """
 
     @pytest.fixture(autouse=True)
@@ -1016,7 +1016,7 @@ class TestProfileHomeExemptsHermesRoot:
         return json.loads(write_file_tool(str(path), content))
 
     def _profile_layout(self, tmp_path: Path):
-        """A real-shaped Hermes root: ``<tmp>/home/profiles/worker`` + root markers."""
+        """A real-shaped Kouri Harness root: ``<tmp>/home/profiles/worker`` + root markers."""
         root = tmp_path / "home"
         profile = root / "profiles" / "worker"
         (profile / "workspace").mkdir(parents=True)
@@ -1049,7 +1049,7 @@ class TestProfileHomeExemptsHermesRoot:
     def test_only_a_real_hermes_root_is_exempt(self, tmp_path, monkeypatch, approvals):
         """Negatives hold with a named profile active: a checkout's ``.hermes/config.yaml`` and
         protected basenames stay gated (fail-closed, unwritten), and a coincidental
-        ``.../profiles/<name>`` tree that is NOT a Hermes root never exempts its parent."""
+        ``.../profiles/<name>`` tree that is NOT a Kouri Harness root never exempts its parent."""
         import tools.file_tools_write_guards as ft
         from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
@@ -1138,7 +1138,7 @@ class TestMultiplexProfileWriteGuardsAreProfileScoped:
         finally:
             reset_hermes_home_override(tok)
         assert err is not None
-        assert "Refusing to write to Hermes config file" in err
+        assert "Refusing to write to Kouri Harness config file" in err
 
 
 def test_config_hard_block_follows_file_identity_not_spelling(tmp_path):
@@ -1159,5 +1159,5 @@ def test_config_hard_block_follows_file_identity_not_spelling(tmp_path):
         other = ft._check_sensitive_path(str(tmp_path / "other.yaml"), "default")
     finally:
         reset_hermes_home_override(tok)
-    assert err is not None and "Refusing to write to Hermes config file" in err
+    assert err is not None and "Refusing to write to Kouri Harness config file" in err
     assert other is None

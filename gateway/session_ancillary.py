@@ -218,9 +218,11 @@ async def approvals(connection, ref, params, *, ack=False):
         from tools.approval import ack_gateway_approval
         route = next((route for route, prompt in pending if prompt['prompt_id'] == params['request_id']), None)
         return {'acknowledged': route is not None and ack_gateway_approval(route, params['request_id'])}
-    return {'approvals': [{'request_id': prompt['prompt_id'], 'command': prompt['command'],
-                           'description': prompt['description'], 'choices': list(prompt['choices']),
-                           'allow_permanent': 'always' in prompt['choices']} for _, prompt in pending]}
+    return {'approvals': [{
+        'request_id': prompt['prompt_id'], 'command': prompt['command'],
+        'description': prompt['description'], 'choices': list(prompt['choices']),
+        **({'justification': prompt['justification']} if prompt.get('justification') else {}),
+        'allow_permanent': 'always' in prompt['choices']} for _, prompt in pending]}
 
 
 async def read(connection, ref, params, *, kind):

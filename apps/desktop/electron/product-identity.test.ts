@@ -117,10 +117,42 @@ test('nonstable runtime pins userData before the app name can change', async ():
   }
 })
 
+test('stable headless pins userData to its historical directory', async (): Promise<void> => {
+  // The display name now matches the regular app, so without the pin an existing
+  // headless install would silently start reading the regular app's state dir.
+  const headless: ProductIdentity = await identityForVariant('headless')
+  const runtime: { applyDesktopIdentity: typeof applyDesktopIdentity } = await import('./product-identity')
+  const root: string = fs.mkdtempSync(path.join(os.tmpdir(), 'identity-headless-'))
+  const paths: Record<string, string> = { appData: root }
+  let name: string = ''
+
+  const app: Parameters<typeof applyDesktopIdentity>[0] = {
+    getPath: (key: string): string => paths[key],
+    setPath: (key: string, value: string): void => {
+      assert.ok(fs.statSync(value).isDirectory())
+      paths[key] = value
+    },
+    setName: (value: string): void => {
+      name = value
+    }
+  }
+
+  try {
+    assert.equal(runtime.applyDesktopIdentity(app, headless), headless.displayName)
+    assert.equal(paths.userData, path.join(paths.appData, 'KouriChat Next Headless'))
+    assert.equal(name, 'Kouri Harness')
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test.each([
-  [undefined, 'Hermes', 'hermes', 'latest', 'canary'],
-  ['bundled', 'Hermes Agent', 'hermes', 'latest', 'canary'],
-  ['light', 'Hermes Light', 'hermes-light', 'light', 'light-canary']
+  [undefined, 'Kouri Harness', 'hermes', 'latest', 'canary'],
+  ['bundled', 'Kouri Harness', 'hermes', 'latest', 'canary'],
+  ['light', 'Kouri Harness Light', 'hermes-light', 'light', 'light-canary'],
+  // The installed face carries no "Headless" suffix (user request); the package
+  // files keep the HermesHeadless prefix and appId stays hermes-headless.
+  ['headless', 'Kouri Harness', 'hermes', 'latest', 'canary']
 ] as const)(
   '%s separates stable, canary and independent commits',
   async (
@@ -184,11 +216,18 @@ test.each([
 test('light and bundled retain distinct OS markers from the full client', async (): Promise<void> => {
   const full: ProductIdentity = await identityForVariant(undefined)
 
-  for (const variant of ['bundled', 'light']) {
+  for (const variant of ['bundled', 'light', 'headless']) {
     const other: ProductIdentity = await identityForVariant(variant)
 
-    for (const field of ['displayName', 'appId', 'appNamePascal'] as const) {
+    // Bundled and headless share the product name while keeping distinct package identities.
+    const distinctFields: readonly (keyof ProductIdentity)[] =
+      variant === 'light' ? ['displayName', 'appId', 'appNamePascal'] : ['appId', 'appNamePascal']
+    for (const field of distinctFields) {
       assert.notEqual(other[field], full[field])
+    }
+
+    if (variant === 'headless') {
+      assert.equal(other.userDataDirName, 'KouriChat Next Headless')
     }
 
     if (variant === 'light') {
@@ -227,9 +266,7 @@ test('packaging isolates boot metadata and executable names without renaming rel
     assert.notEqual(config.extraMetadata.name, stableIdentity.appNamePascal)
     assert.equal(config.win.executableName, identity.windowsExecutableName)
 
-    const {
-      AppInfo
-    }: { AppInfo: typeof BuilderAppInfo } = require('app-builder-lib')
+    const { AppInfo }: { AppInfo: typeof BuilderAppInfo } = require('app-builder-lib')
 
     const appInfo: BuilderAppInfo = new AppInfo(
       { config, metadata: { ...pkg, ...config.extraMetadata } } as Packager,

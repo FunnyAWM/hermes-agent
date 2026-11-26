@@ -50,6 +50,9 @@ def policy_if_managed(policy):
     """
     if policy is None:
         return None
+    from gateway.session_policy import MANAGED_WORKER_SOURCE
+    if policy.source == MANAGED_WORKER_SOURCE:
+        return policy
     if policy.ignore_user_config or policy.kanban_json is not None:
         return policy
     if policy.config().get('gateway', {}).get('managed_workers') is not True:
@@ -392,7 +395,8 @@ def _prompt_frame(authority, ref, row, worker, frame):
     if len(controls.remote_responders) >= 16:
         raise AuthorityRefusal('worker_control_backpressure')
     if kind == 'approval':
-        fields = {'request_id', 'command', 'description', 'allow_session', 'allow_permanent', 'smart_denied', 'edit'}
+        fields = {'request_id', 'command', 'description', 'justification', 'allow_session', 'allow_permanent',
+                  'smart_denied', 'edit'}
         data = frame.get('data')
         if set(frame) != {'type', 'data'} or not isinstance(data, dict) or set(data) - fields:
             raise AuthorityRefusal('invalid_worker_frame')
@@ -458,7 +462,7 @@ def _launch_env_only_credentials(home, env):
     (``launch_secret_scope``: systemd ``Environment=`` / ``op run`` keys with no ``.env`` line) that
     the scrub removed from *env* — the same mapping the owner's own ``get_secret`` reads for this
     profile. Credential names only: non-credential names the constructor removed on purpose
-    (unbound session context, venv markers) stay removed, and Hermes-internal secrets
+    (unbound session context, venv markers) stay removed, and Kouri Harness-internal secrets
     (``AUXILIARY_*_API_KEY``, relay auth) never reach a child. Only the launch home's worker calls
     this; a routed home's worker sees its own files only."""
     from tools.environments.local import _scrub_credentials

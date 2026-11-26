@@ -233,7 +233,7 @@ def project_plugins_warning(policy):
             return None
     except OSError:  # an unlistable folder skips the optional notice, never the session
         return None
-    return (f'project plugins in {folder} are not loaded: the gateway that runs Hermes sessions does not '
+    return (f'project plugins in {folder} are not loaded: the gateway that runs Kouri Harness sessions does not '
             'load ./.hermes/plugins, so HERMES_ENABLE_PROJECT_PLUGINS has no effect here.')
 
 
@@ -315,7 +315,12 @@ def stage_local_session(authority, actor, params, *, trusted_policy=None, truste
         raise AuthorityRefusal('profile_mismatch')
     if 'session:create' not in actor.capabilities:
         raise AuthorityRefusal('permission_denied')
-    from gateway.session_policy import build_policy, BYPASS_FIELDS, FOLLOW_ADOPTED, LOCAL_DESKTOP_CHAT
+    from gateway.session_policy import (
+        build_policy, BYPASS_FIELDS, FOLLOW_ADOPTED, LOCAL_DESKTOP_CHAT, MANAGED_WORKER_SOURCE,
+    )
+    manages_workers = 'session:manage-worker' in actor.capabilities
+    if manages_workers != (params.get('source') == MANAGED_WORKER_SOURCE):
+        raise AuthorityRefusal('permission_denied')
     from gateway.run import _resolve_gateway_model
     from dataclasses import replace
     private_secrets = dict(trusted_secrets or {})
@@ -528,6 +533,7 @@ def local_session_info(authority, ref):
     else:
         source = policy.source if policy else live.source.platform.value
     info = {'source': source,
+            'read_only': source == 'managed_worker',
             'model': (getattr(agent, 'model', policy.current_model(authority) if policy else None) if agent is not None
                       else _lazy_model(authority, policy)),
             'lazy': agent is None,

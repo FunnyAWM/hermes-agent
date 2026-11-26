@@ -1,6 +1,7 @@
 """Job-local native preparation admission; never a portable environment cache."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import asdict
 import hashlib
@@ -88,13 +89,18 @@ def _input_paths(inputs: AgentInputs, out: Path) -> list[Path]:
             or not inputs.site_packages.is_relative_to(inputs.environment)):
         raise ValueError("native prepared input layout changed")
     paths = [inputs.code, inputs.tools, inputs.environment, inputs.pm_runtime,
-             inputs.python, inputs.features, out / "uv-cache"]
+             inputs.python, inputs.features]
+    # The sealed subset ships no uv-cache (no in-place rebuilds, native.py); the
+    # runtime treats an absent payload cache as "nothing to seed" (uv_cache_dir).
+    if (out / "uv-cache").exists():
+        paths.append(out / "uv-cache")
     for path in [inputs.project, inputs.site_packages, *inputs.resources.values(), *paths]:
         _owned(path, out)
     return paths
 
 
-def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs) -> Path:
+def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs,
+                     bundle_tools: Iterable[str] | None) -> Path:
     from hermes_cli.runtime_state import _atomic_bytes
     from pm.paths import lockfile_path
 
@@ -106,7 +112,11 @@ def publish_prepared(out: Path, source: Path, revision: str, inputs: AgentInputs
         _check_links(path, out)
         digests[path.relative_to(out).as_posix()] = _source_digest(path) if path == inputs.code else _digest(path)
     data = {"schema": 1, "out": str(out), "source": str(source), "revision": revision,
-            "lock": _digest(lockfile_path()), "inputs": asdict(inputs), "digests": digests}
+            "lock": _digest(lockfile_path()), "inputs": asdict(inputs), "digests": digests,
+            # The tool subset this preparation ran (None = the full lock). Finish
+            # phases bind their staging decisions to this fact instead of their
+            # shell env (two-stage builds and a leftover env used to skew them).
+            "bundle_tools": sorted(bundle_tools) if bundle_tools is not None else None}
     prepared = prepared_path(out)
     _atomic_bytes(prepared, (json.dumps(data, default=str, indent=2) + "\n").encode())
     return prepared

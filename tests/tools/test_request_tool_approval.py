@@ -247,3 +247,46 @@ class TestRequestToolApproval:
         )
         res = request_tool_approval("computer_use", "click", rule_key="cua")
         assert res == {"approved": True, "message": None}
+
+
+class TestJustification:
+    def test_gateway_payload_carries_the_command_and_justification(self, monkeypatch):
+        # The approval card decides on the call itself, not a synthetic label:
+        # a caller holding the pending call passes it as the display target,
+        # and the rule's reason rides as its own justification field.
+        monkeypatch.setattr(approval, "_is_interactive_cli", lambda: False)
+        monkeypatch.setattr(approval, "_is_gateway_approval_context", lambda: True)
+        monkeypatch.setattr(tools_approval_context, "_is_gateway_approval_context", lambda: True)
+        monkeypatch.setattr(approval, "_gateway_notify_cb", lambda sk: (lambda data: None))
+        captured = {}
+
+        def fake_await(session_key, notify_cb, data, *, surface, identity):
+            captured.update(data)
+            return {"choice": "deny", "resolved": True}
+
+        monkeypatch.setattr(approval, "_await_gateway_decision", fake_await)
+        res = request_tool_approval(
+            "terminal", "deletes pre-existing build output",
+            command='terminal {"command": "rm -rf build"}',
+            justification="Removes build/ which this session did not create.",
+        )
+
+        assert res["approved"] is False
+        assert captured["command"] == 'terminal {"command": "rm -rf build"}'
+        assert captured["description"] == "deletes pre-existing build output"
+        assert captured["justification"] == "Removes build/ which this session did not create."
+
+    def test_pending_result_keeps_the_justification(self, monkeypatch):
+        monkeypatch.setattr(approval, "_is_interactive_cli", lambda: False)
+        monkeypatch.setattr(approval, "_is_gateway_approval_context", lambda: True)
+        monkeypatch.setattr(tools_approval_context, "_is_gateway_approval_context", lambda: True)
+        monkeypatch.setattr(approval, "_gateway_notify_cb", lambda sk: None)
+        monkeypatch.setattr(approval, "_should_fall_through_to_cli_approval", lambda **kwargs: False)
+        pending = request_tool_approval(
+            "terminal", "deletes pre-existing build output",
+            command='terminal {"command": "rm -rf build"}',
+            justification="Removes build/ which this session did not create.",
+        )
+
+        assert pending["command"] == 'terminal {"command": "rm -rf build"}'
+        assert pending["justification"] == "Removes build/ which this session did not create."

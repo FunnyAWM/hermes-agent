@@ -6,6 +6,7 @@ export interface ApprovalCopy {
   openSafetySettings: string
   run: string
   command: string
+  justification: string
   commandDetails: string
   moreOptions: string
   allowSession: string

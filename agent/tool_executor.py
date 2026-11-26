@@ -147,33 +147,6 @@ _DEFAULT_IMAGE_PARALLEL_REQUESTS = 4
 _DEFAULT_CONCURRENT_TOOL_TIMEOUT_S = 420.0
 # Long enough for an approval round-trip, short enough that one wedged dispatch can't starve the batch.
 _START_ORDER_GATE_TIMEOUT_S = 120.0
-# Fallback only; the effective bound derives from approvals.timeout (_authorization_gate_lock_timeout).
-_AUTHORIZATION_GATE_LOCK_TIMEOUT_S = 360.0
-
-
-def _authorization_gate_lock_timeout() -> float:
-    """Authorization-lock bound = ``tools.approval_human_wait.human_wait_ceiling`` (approval timeout +
-    margin, capped so it can't overflow Lock.acquire): never break serialization while a
-    prompt is answerable, never let a wedged holder park workers forever. Deliberately NOT
-    min()'d with the fallback so the gate never gives up early.
-
-    Delegates to ``tools.approval_human_wait.human_wait_ceiling`` — the same bound that clamps a human-wait window's
-    deadline contribution — so the two can't drift. Long enough that serialization is never broken while a
-    legitimate approval prompt is still answerable; short enough that a wedged holder (hanging
-    ``pre_tool_call`` plugin, dead approval client) cannot park other workers forever (#79719). Resolved
-    once per gate (per batch), so a mid-process ``approvals.timeout`` change applies from the next batch.
-    """
-    try:
-        from tools.approval_human_wait import human_wait_ceiling
-
-        # human_wait_ceiling is platform-safety-capped (agent/deadline.py MAX_SAFE_TIMEOUT_S): a huge
-        # approvals.timeout can no longer overflow Lock.acquire's time_t on macOS (#83220). Deliberately NOT
-        # min()'d with _AUTHORIZATION_GATE_LOCK_TIMEOUT_S — the gate must never give up while a legitimate
-        # approval prompt is still answerable (#79719), so a configured approvals.timeout above 360s must
-        # extend the gate.
-        return human_wait_ceiling()
-    except Exception:
-        return _AUTHORIZATION_GATE_LOCK_TIMEOUT_S
 
 
 class _BatchAbandoned(BaseException):
@@ -506,7 +479,8 @@ class _ConcurrentToolAuthorizationGate:
 
     def __init__(self, *, lock_timeout: float | None = None, session_key: str | None = None) -> None:
         self._serialization_lock = threading.Lock()
-        self._lock_timeout = _authorization_gate_lock_timeout() if lock_timeout is None else lock_timeout
+        from agent.tool_executor_deadline import authorization_gate_lock_timeout
+        self._lock_timeout = authorization_gate_lock_timeout() if lock_timeout is None else lock_timeout
         self._session_key = session_key
         if self._session_key is None:
             # Snapshot on the SUBMITTING thread: excluded_seconds() is polled from the
@@ -646,7 +620,7 @@ def _run_with_activity_heartbeat(agent, function_name: str, fn):
 
 _PRUNED_TOOL_ARGUMENTS_ERROR = "suspected_pruned_tool_arguments"
 _PRUNED_TOOL_ARGUMENTS_MESSAGE = (
-    "Tool was not executed because effect-capable arguments contain a Hermes context-compression artifact. "
+    "Tool was not executed because effect-capable arguments contain a Kouri Harness context-compression artifact. "
     "Recover the exact content from its durable source or re-read it, then issue a complete new call; "
     "do not retry these arguments. To remove a marker that already landed in a file, match it by its "
     f"{_COMPRESSION_MARKER_PREFIX.strip('⟪:')} prefix (e.g. a terminal sed on that line) instead of quoting the full marker."
@@ -694,8 +668,10 @@ def _dispatch_authorized_once(
     display_index: int | None,
     begin_execution,
     authorization_gate: _ConcurrentToolAuthorizationGate | None,
+    messages: list | None = None,
 ) -> Any:
-    """Hermes policy (scope → plugin pre-hooks → pruned-arg check → guardrails) then the one real dispatch.
+    """Kouri Harness policy (scope → plugin pre-hooks → pruned-arg check → auto review → guardrails) then
+    the one real dispatch.
 
     Plugin ``modify`` hooks may rewrite ``ref.args`` (mirrored into ``state.args``).
     ``begin_execution`` (concurrent start-order gate) is advanced exactly once on every
@@ -733,6 +709,15 @@ def _dispatch_authorized_once(
                 "argument_paths": pruned_paths,
             }
             block_error_type = _PRUNED_TOOL_ARGUMENTS_ERROR
+
+    if block_body is None:
+        from agent.tool_executor_auto_review import auto_review_block
+
+        block_body, error_type = auto_review_block(
+            ref, messages=messages, authorization_gate=authorization_gate,
+        )
+        if block_body is not None:
+            block_error_type = error_type
 
     guardrail_decision = None
     if block_body is None:
@@ -780,8 +765,9 @@ def _run_agent_tool_execution_middleware(
     middleware_trace: list[dict[str, Any]] | None = None,
     begin_execution=None,
     authorization_gate: _ConcurrentToolAuthorizationGate | None = None,
+    messages: list | None = None,
 ) -> _ManagedToolResult:
-    """Run Relay rewrites before Hermes policy and dispatch exactly once."""
+    """Run Relay rewrites before Kouri Harness policy and dispatch exactly once."""
     from agent import relay_tools
     from hermes_cli.middleware import (
         apply_tool_request_middleware,
@@ -805,7 +791,7 @@ def _run_agent_tool_execution_middleware(
     def _authorized_dispatch(final_args: dict[str, Any]) -> Any:
         with dispatch_lock:
             if state.dispatched:
-                raise RuntimeError("Hermes tool execution callback invoked more than once")
+                raise RuntimeError("Kouri Harness tool execution callback invoked more than once")
             state.dispatched = True
             state.blocked = False
             state.args = final_args
@@ -818,6 +804,7 @@ def _run_agent_tool_execution_middleware(
             display_index=display_index,
             begin_execution=begin_execution,
             authorization_gate=authorization_gate,
+            messages=messages,
         )
 
     from agent.terminal_approval_batch import bind_prepared_dispatch
@@ -929,6 +916,7 @@ def _run_sequential_tool_execution_middleware(
     scope_block: str | None = None,
     display_index: int | None = None,
     middleware_trace: list[dict[str, Any]] | None = None,
+    messages: list | None = None,
 ) -> _ManagedToolResult:
     """Run one sequential call on a worker thread under the concurrent executor's deadline.
     Interactive tools (``clarify``) own their wait via ``agent.clarify_timeout``; the
@@ -942,7 +930,8 @@ def _run_sequential_tool_execution_middleware(
         _resolve_sequential_tool_timeout(), declared_deadline_floor(function_name, function_args))
     timeout_s = _extend_tool_timeout(function_name, timeout_s)
     ref = _ToolCallRef(function_name, function_args, effective_task_id, tool_call_id, middleware_trace)
-    kwargs = dict(ref.middleware_kwargs(), execute=execute, scope_block=scope_block, display_index=display_index)
+    kwargs = dict(ref.middleware_kwargs(), execute=execute, scope_block=scope_block,
+                  display_index=display_index, messages=messages)
     from agent.terminal_approval_batch import take_prepared_call
     prepared = take_prepared_call(tool_call_id)
     if prepared is not None:
@@ -1391,6 +1380,7 @@ class _ConcurrentBatch:
                 display_index=index + 1,
                 begin_execution=start_gate.advance,
                 authorization_gate=self.authorization_gate,
+                messages=self.messages,
             )
             result, ref.args, ref.trace = managed.result, managed.args, managed.middleware_trace
             blocked, dispatched, data_use = managed.blocked, managed.dispatched, managed.data_use
@@ -1814,6 +1804,7 @@ def _run_sequential_call(
             execute=dispatch.execute,
             scope_block=scope_block,
             display_index=display_index,
+            messages=messages,
         )
         ref.args = managed.args
         _spinner_result = managed.result

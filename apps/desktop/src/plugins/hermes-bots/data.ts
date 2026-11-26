@@ -433,7 +433,9 @@ async function settleServerOutcome(
       return 'persisted'
     }
 
-    return result && typeof result === 'object' && result.applied && typeof result.applied === 'object' ? 'failed' : 'unsupported'
+    return result && typeof result === 'object' && result.applied && typeof result.applied === 'object'
+      ? 'failed'
+      : 'unsupported'
   } catch (error) {
     // The pooled local backend keeps the documented fallback: its local copy is the save.
     if (!routed || rpcMethodMissing(error)) {
@@ -579,7 +581,9 @@ export async function saveBotMeta(
   //                   unchanged ui_meta wins again on reconnect.
   // A routed row that answered the read but whose write then failed for any
   // reason other than a missing method is 'failed', never 'unsupported'.
-  const serverOutcome = serverRequest ? await settleServerOutcome(serverRequest, Boolean(route), progress) : 'unsupported'
+  const serverOutcome = serverRequest
+    ? await settleServerOutcome(serverRequest, Boolean(route), progress)
+    : 'unsupported'
 
   if (serverRequest) {
     // Re-stamp now that the server write settled: a roster snapshot fetched
@@ -1273,7 +1277,7 @@ export function claimDefaultHandles<T extends Partial<RosterRow>>(rows: T[]): T[
  *  display name (`hermes profile rename`) and the Bot Mode title. Free text
  *  reduces to the mention charset two ways: slugified ("Research Buddy" →
  *  research-buddy, the form autocomplete inserts) and collapsed
- *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Hermes"
+ *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Kouri Harness"
  *  can never hijack the primary profile's @hermes alias. */
 export function mentionNameForms(value: null | string | undefined): string[] {
   const name = String(value || '')
@@ -1393,7 +1397,8 @@ export function newBotChat(bot: RosterRow) {
     host.notify?.({
       kind: 'error',
       message:
-        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Hermes Desktop to open another bot chat.'
+        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ??
+        'Update Kouri Harness Desktop to open another bot chat.'
     })
 
     return
@@ -1405,7 +1410,8 @@ export function newBotChat(bot: RosterRow) {
     host.notify?.({
       kind: 'error',
       message:
-        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ?? 'Update Hermes Desktop to open another bot chat.'
+        getPluginCtx()?.i18n?.t('bot.openAnotherChatUnsupported') ??
+        'Update Kouri Harness Desktop to open another bot chat.'
     })
 
     return

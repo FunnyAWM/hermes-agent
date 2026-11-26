@@ -647,7 +647,7 @@ def _approval_request_payload(data: dict | None) -> dict:
                 choices.append("always")
         payload["choices"] = choices + ["deny"]
     from gateway.run import _redact_approval_command  # description too: consent prompts carry MCP/vault text
-    payload.update({k: _redact_approval_command(payload[k]) for k in ("command", "description", "path", "host", "label", "risk") if k in payload})
+    payload.update({k: _redact_approval_command(payload[k]) for k in ("command", "description", "justification", "path", "host", "label", "risk") if k in payload})
     return payload
 
 
@@ -712,7 +712,7 @@ def _emit_approval_request(sid: str, data: dict | None) -> None:
             if request_id:
                 _approval.withdraw_gateway_approval(session_key, request_id,
                                                     "the attached client cannot answer approval requests "
-                                                    "(update the Hermes app)")
+                                                    "(update the Kouri Harness app)")
             return
         choice = str(result.get("choice") or "deny")
         _approval.resolve_gateway_approval(session_key, choice, resolve_all=bool(result.get("all")),
@@ -987,9 +987,9 @@ _TOUR_PROBE_TIMEOUT_S = 10
 
 _TOUR_BRIDGE_UNAVAILABLE = json.dumps({
     "success": False,
-    "error": ("No Hermes Desktop window answered the tour request. The tour is driven by the desktop app's "
+    "error": ("No Kouri Harness Desktop window answered the tour request. The tour is driven by the desktop app's "
               "renderer, which updates separately from this backend, so an app build older than the tour tool "
-              "has nothing listening. Update the Hermes Desktop app and start a new session. Do not retry tour "
+              "has nothing listening. Update the Kouri Harness Desktop app and start a new session. Do not retry tour "
               "in this session.")})
 
 
@@ -1030,10 +1030,10 @@ _PREVIEW_ACTION_REPROBE_COOLDOWN_S = 30
 
 _PREVIEW_ACTION_BRIDGE_UNAVAILABLE = json.dumps({
     "success": False,
-    "error": ("No Hermes Desktop window answered the preview action request. The drive_preview / "
+    "error": ("No Kouri Harness Desktop window answered the preview action request. The drive_preview / "
               "annotate_preview bridge is served by the desktop app's renderer, which updates "
               "separately from this backend, so an app build older than the tool has nothing "
-              "listening. Update the Hermes Desktop app, open a page with open_preview, and try "
+              "listening. Update the Kouri Harness Desktop app, open a page with open_preview, and try "
               "again in this session after a short cooldown.")})
 
 # One in-flight cooldown-expiry reprobe per session: concurrent callers fail fast.
@@ -1236,7 +1236,7 @@ def _write_config_keys(updates: dict) -> None:
 
 
 _STATUSBAR_MODES = frozenset({"off", "top", "bottom"})
-_APPROVAL_MODES = frozenset({"manual", "smart", "off"})
+_APPROVAL_MODES = frozenset({"manual", "smart", "auto", "off"})
 
 # Appearance switches the renderer owns but the AGENT must see (each gates a tool's `check_fn`). `config.set`
 # answers 4002 for unlisted keys — a mirrored switch missing here writes nothing and its tool stays dark.
@@ -1467,7 +1467,7 @@ def _session_info(agent, session: dict | None = None) -> dict:
     model = pending_model or mirror.get("model", getattr(agent, "model", ""))
     # The level the route's entry clamp actually sends (== reasoning_effort when verbatim), so the
     # Desktop can say "ultra sends max on this route" like `/reasoning` does instead of presenting a
-    # Hermes-internal step (#61634) as a wire level the route does not have.
+    # Kouri Harness-internal step (#61634) as a wire level the route does not have.
     reasoning_effort_wire = ""
     if reasoning_effort and reasoning_effort != "none":
         reasoning_effort_wire = str(clamp_effort(reasoning_effort, route_supported_efforts(
@@ -1630,7 +1630,7 @@ def _hydrate_session_cwd(sid: str, key: str, session_db, profile_home: str | Non
                         logger.debug("failed to enrich resumed session git metadata", exc_info=True)
             elif persistence is not None and (not (row and row.cwd) or _is_other_profiles_cwd(row.cwd, profile_home)) \
                     and not _is_remote_launch_cwd(_sessions.get(sid)):
-                # A stored cwd that was set aside (Hermes's own host tree) stays as stored: only an empty row is filled,
+                # A stored cwd that was set aside (Kouri Harness's own host tree) stays as stored: only an empty row is filled,
                 # or a named profile's row holding another profile's dir (#87584), repaired to this session's own.
                 try:
                     _persist_session_cwd_and_schedule_git_meta(_sessions[sid], _sessions[sid]["cwd"], db=db)
@@ -2001,7 +2001,8 @@ from . import (
     methods_connectors as _methods_connectors, methods_connectors_account as _methods_connectors_account,
     methods_display as _methods_display, methods_display_watch as _methods_display_watch,
     methods_onboarding as _methods_onboarding, methods_i18n as _methods_i18n, methods_machine as _methods_machine,
-    methods_shared_metrics as _methods_shared_metrics, methods_plugin_catalog as _methods_plugin_catalog)
+    methods_shared_metrics as _methods_shared_metrics, methods_plugin_catalog as _methods_plugin_catalog,
+    methods_sync as _methods_sync)
 
 for _m in (
     _session_registry, _agent_factory, _slash_worker_client, _store_handles,
@@ -2014,6 +2015,6 @@ for _m in (
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
     _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors,
     _methods_connectors_account, _methods_display, _methods_display_watch, _methods_onboarding,
-    _methods_i18n, _methods_machine, _methods_shared_metrics, _methods_plugin_catalog):
+    _methods_i18n, _methods_machine, _methods_shared_metrics, _methods_plugin_catalog, _methods_sync):
     _m.register(sys.modules[__name__])
 del _m

@@ -9,6 +9,7 @@ export const frApproval: Partial<ApprovalCopy> = {
   openSafetySettings: 'Ouvrir les paramètres de sécurité',
   run: 'Exécuter',
   command: 'Commande',
+  justification: 'Justification',
   moreOptions: "Plus d'options d'approbation",
   allowSession: 'Autoriser cette session',
   alwaysAllowMenu: 'Toujours autoriser…',

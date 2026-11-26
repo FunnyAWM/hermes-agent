@@ -4,12 +4,17 @@ import { $localModelsEnabled } from '@/store/local-models-flag'
 import * as notifications from '@/store/notifications'
 import { markOnboardingDecided } from '@/store/onboarding-presence'
 
-import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext, refreshOnboarding } from './onboarding'
+import {
+  $desktopOnboarding,
+  type DesktopOnboardingState,
+  type OnboardingContext,
+  refreshOnboarding
+} from './onboarding'
 
 markOnboardingDecided()
 
 const SERVER_OFF =
-  'The local model server is turned off. Start it from the Hermes desktop app or `hermes model` → Local models, or switch to another model with /model.'
+  'The local model server is turned off. Start it from the Kouri Harness desktop app or `hermes model` → Local models, or switch to another model with /model.'
 
 function coldState(): DesktopOnboardingState {
   return {
@@ -90,7 +95,7 @@ describe('refreshOnboarding with the local model server down', () => {
     expect($desktopOnboarding.get().configured).toBe(true)
     const shown = notify.mock.calls.at(-1)?.[0]
     expect(shown?.action?.label).toBe('Choose another model')
-    expect(shown?.message).toContain('Hermes desktop app')
+    expect(shown?.message).toContain('Kouri Harness desktop app')
     expect(shown?.message).not.toContain('Local models')
   })
 

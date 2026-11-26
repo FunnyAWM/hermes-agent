@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import json
 import os
 import shutil
 import subprocess
@@ -50,6 +51,75 @@ def _tools_for_builder(names: list[str], store: Path, target: str) -> list[str]:
         # them on the old libc. Never substitute a missing entry or mint its facts.
         verified_tools(staged, source_store=store, target=target)
     return [name for name in names if name not in staged]
+
+
+def _bundle_tool_filter() -> set[str] | None:
+    """Build-lane subset for a sealed-lite payload (HERMES_BUNDLE_TOOLS=a,b):
+    stage only these tools instead of every locked default. The payload keeps
+    the interpreter and the venv; every other tool resolves from the user's
+    PATH exactly as a headless build's does. Unknown names fail the build —
+    a silently shorter payload would ship a promise the manifest can't keep."""
+    raw = os.environ.get("HERMES_BUNDLE_TOOLS", "")
+    if not raw.strip():
+        return None
+    only = {name.strip() for name in raw.split(",") if name.strip()}
+    unknown = sorted(only - set(_lockfile().names()))
+    if unknown:
+        raise ValueError(
+            "HERMES_BUNDLE_TOOLS names packages outside pm/lock.json: " + ", ".join(unknown)
+        )
+    return only
+
+
+# ``[all]`` minus ``google``: google-api-python-client is 109 MB of per-API
+# discovery modules and exists only for the google-workspace skill (T-43).
+_SEALED_EXTRAS = ("acp", "cron", "mcp", "pty", "sms", "uvloop", "web", "youtube")
+
+
+def _venv_sync_extras(only: set[str] | None) -> dict:
+    """Extras for the payload venv: ``--all-extras`` for the full bundle, the
+    sealed subset's explicit list otherwise.
+
+    A sealed subset refuses in-place ``sync_venv`` (pm/cli.py), so every extra it
+    ships is permanent: ``--all-extras`` pulled all 49 opt-in integrations
+    (lark_oapi 113 MB, playwright 109 MB, googleapiclient 109 MB, dingtalk 93 MB,
+    ctranslate2/onnxruntime/piper voice stack …) into a 1.4 GB venv, which
+    tripled installer extraction time (T-41). ``[all]`` is the documented
+    "every session can use it" ceiling; the rest resolve at first use on
+    installs that can grow in place."""
+    if only is None:
+        return {"all_extras": True, "extras": ()}
+    return {"all_extras": False, "extras": _SEALED_EXTRAS}
+
+
+def _drop_bytecode(root: Path) -> int:
+    """Remove every ``__pycache__`` under *root*; returns how many were removed.
+
+    The interpreter and the venv arrive pre-compiled (the managed Python ships its stdlib
+    pyc, uv is asked for ``--compile-bytecode`` on the full bundle), so the sealed subset
+    has to strip them explicitly."""
+    dropped = 0
+    for cache in Path(root).rglob("__pycache__"):
+        shutil.rmtree(cache, ignore_errors=True)
+        dropped += 1
+    return dropped
+
+
+def _staging_names(only: set[str] | None) -> list[str]:
+    from pm.package import InstallError
+
+    names = [
+        n for n in _bundle_package_names()
+        if (only is None or n in only) and get_package(n).missing_reason(current_target()) is None
+    ]
+    if only is not None:
+        unavailable = sorted(only - set(names))
+        if unavailable:
+            raise InstallError(
+                "tools",
+                "requested payload tools are unavailable for this target: " + ", ".join(unavailable),
+            )
+    return names
 
 
 def _arch_guard(store_dir: Path) -> list[str]:
@@ -238,21 +308,25 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     store_dir.mkdir(parents=True, exist_ok=True)
     repo_dir = out / "hermes-agent"
     from scripts.bundles.payload import INERT_SNAPSHOT_DIRS, snapshot
+    from pm.bundle_mirror import mirrored_build_inputs
     revision = subprocess.check_output(
         ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"], cwd=source,
         text=True, encoding="utf-8").strip()
     with _phase(f"staging repo snapshot ({ref})"):
         snapshot(source, revision, repo_dir, exclude=INERT_SNAPSHOT_DIRS)
     # PM's provider code reads its adjacent lock. Never combine that tool graph
-    # with a revision selecting different pins.
-    if (repo_dir / "pm/lock.json").read_bytes() != paths.lockfile_path().read_bytes():
+    # with a revision selecting different pins. Compare with LF normalization:
+    # core.autocrlf writes CRLF into the working copy while the git snapshot
+    # carries LF, which would otherwise reject every clean Windows checkout.
+    def lock_bytes(path: Path) -> bytes:
+        return path.read_bytes().replace(b"\r\n", b"\n")
+
+    if lock_bytes(repo_dir / "pm/lock.json") != lock_bytes(paths.lockfile_path()):
         raise ValueError("selected revision's PM lock differs from the builder; use a checkout at that revision")
     build_env = os.environ if env is None else env
 
-    names = [
-        n for n in _bundle_package_names()
-        if get_package(n).missing_reason(current_target()) is None
-    ]
+    only = _bundle_tool_filter()
+    names = _staging_names(only)
     from pm import prepare_tools, stage_tools
 
     local = _tools_for_builder(names, store_dir, current_target())
@@ -298,10 +372,15 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     from pm import build_environment
 
     # Cold native wheels need a larger budget than interactive installs.
-    build_environment(source=repo_dir, python=python_bin, out=venv_dir,
-                      env=env, cache=cache, all_extras=True, sealed=True, explicit=True,
-                      timeout=2 * 60 * 60)
-    print("✓ venv (all extras, on the staged interpreter)")
+    with mirrored_build_inputs(repo_dir):
+        build_environment(source=repo_dir, python=python_bin, out=venv_dir,
+                          env=env, cache=cache,
+                          compile_bytecode=only is None,
+                          **_venv_sync_extras(only),
+                          sealed=True, explicit=True, timeout=2 * 60 * 60)
+    # Log the extras actually synced: a sealed subset takes the fixed set, not [all].
+    synced = "all extras" if only is None else f"sealed extras ({', '.join(_SEALED_EXTRAS)})"
+    print(f"✓ venv ({synced}, on the staged interpreter)")
 
     # Inventory the staged interpreter before publishing the bundle contract.
     from pm.features import installed_extras, write_features
@@ -324,14 +403,19 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
     payload_cache = out / "uv-cache"
     if payload_cache.exists():
         shutil.rmtree(payload_cache, ignore_errors=True)
-    src_cache = cache
-    if src_cache.is_dir():
-        print(f"  uv-cache: copying {src_cache} → payload...", flush=True)
-        stage_uv_cache(src_cache, payload_cache)
-        pruned = prune_uv_cache_to_lock(payload_cache, repo_dir)
-        print(f"✓ uv-cache (lock-scoped: pruned {pruned} stale entries; offline rebuilds resolve from shipped wheels)", flush=True)
+    if only is not None:
+        # A sealed subset payload refuses in-place pm writes (pm/cli.py), so no
+        # offline rebuild can ever run; the wheel cache would be dead weight.
+        print("✓ uv-cache skipped (sealed subset: no in-place rebuilds)", flush=True)
     else:
-        raise InstallError("uv-cache", "runtime dependency cache is missing")
+        src_cache = cache
+        if src_cache.is_dir():
+            print(f"  uv-cache: copying {src_cache} → payload...", flush=True)
+            stage_uv_cache(src_cache, payload_cache)
+            pruned = prune_uv_cache_to_lock(payload_cache, repo_dir)
+            print(f"✓ uv-cache (lock-scoped: pruned {pruned} stale entries; offline rebuilds resolve from shipped wheels)", flush=True)
+        else:
+            raise InstallError("uv-cache", "runtime dependency cache is missing")
     if current_target().startswith("win32-"):
         from scripts.bundles.msix_names import drop_msix_reserved_names
         for tree in drop_msix_reserved_names(out):
@@ -357,9 +441,17 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
         print(f"✓ uv-cache: {linked} files the venv holds byte for byte ship once, as links into it")
     from scripts.bundles.payload import relativize_links
     relativize_links(out)
-    from scripts.bundles.bytecode import bake_bytecode
-    baked = bake_bytecode(out, python_bin)
-    print(f"✓ baked bytecode ({baked['modules']} modules, unchecked-hash, owner-writable caches)")
+    if only is None:
+        from scripts.bundles.bytecode import bake_bytecode
+        baked = bake_bytecode(out, python_bin)
+        print(f"✓ baked bytecode ({baked['modules']} modules, unchecked-hash, owner-writable caches)")
+    else:
+        # Sealed subset: ~8.7k pyc files are 32% of the payload's file count and a
+        # quarter of the installer's extraction work (T-44). With no baked marker the
+        # launcher redirects bytecode writes to %LOCALAPPDATA%\hermes\pycache on the
+        # user machine, so the cost is one cold compile on first launch instead.
+        dropped = _drop_bytecode(out)
+        print(f"✓ bytecode dropped from payload ({dropped} caches; first launch compiles into the user cache)")
     inputs = AgentInputs(
         project=repo_dir / "pyproject.toml", code=repo_dir, repo="hermes-agent",
         placement="contained", target=current_target(), python=python_bin,
@@ -368,7 +460,34 @@ def _prepare_native(*, out: Path, ref: str, source: Path, cache: Path,
         resources={name: repo_dir / name for name in RESOURCE_ENV},
         features=out / "enabled-features.json",
     )
-    return publish_prepared(out, source, revision, inputs)
+    return publish_prepared(out, source, revision, inputs, bundle_tools=only)
+
+
+def bundle_tools_of(prepared: Path) -> set[str] | None:
+    """The tool subset this prepared payload stages (None = the full lock).
+
+    Reads the subset the preparation recorded in the prepared manifest and
+    cross-checks it against the tools the payload actually staged (its
+    ``tools/facts.json``); a payload that disagrees with its manifest fails
+    closed here. The desktop webapp cut (T-46/T-48) follows this fact — never
+    ``HERMES_BUNDLE_TOOLS`` in the build shell, which two-stage builds and a
+    leftover env used to skew."""
+    prepared = Path(prepared).absolute()
+    data = json.loads(prepared.read_text(encoding="utf-8-sig"))
+    try:
+        recorded = data["bundle_tools"]
+    except KeyError:
+        raise ValueError("native preparation records no tool subset; run preparation again") from None
+    claim = set(recorded) if recorded is not None else None
+    out = prepared.with_name(prepared.name.removesuffix(".prepared.json"))
+    facts = Facts(out / "tools/facts.json")
+    staged = {name for name in _bundle_package_names() if (fact := facts.get(name)) and "entry" in fact}
+    expected = set(_staging_names(claim))
+    if staged != expected:
+        raise ValueError(
+            f"prepared payload stages tools {sorted(staged)} but its manifest records "
+            f"{sorted(claim) if claim is not None else 'the full lock'} (expected {sorted(expected)})")
+    return claim
 
 
 def finish_native(prepared: Path, frontends: dict[str, Path]) -> int:
@@ -384,6 +503,9 @@ def finish_native(prepared: Path, frontends: dict[str, Path]) -> int:
     with preparation_lock(out):
         (out / "manifest.json").unlink(missing_ok=True)
         inputs = load_prepared(prepared)
+        # The manifest's tool subset and the payload's staged tools must agree
+        # before assembly (fail closed on a swapped or half-staged payload).
+        bundle_tools_of(prepared)
         values = asdict(inputs)
         values["frontends"] = {name: Path(path).absolute() for name, path in frontends.items()}
         print("assembling verified payload", flush=True)

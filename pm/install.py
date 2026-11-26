@@ -1,5 +1,4 @@
-"""ensure(): make the installed state match the lockfile for a package,
-and hand back its composed environment."""
+"""ensure(): reuse compatible local tools or install the locked artifacts."""
 
 from __future__ import annotations
 
@@ -17,6 +16,7 @@ from pm import paths
 from pm.downloader import DownloadPaused, ProgressFn
 from pm.filesystem import native, remove_tree, retry_held
 from pm.lock import Facts, Lockfile
+from pm.local_tools import find_local
 from pm.package import InstallError, Package, Runner, StatePackage, compose_env
 from pm.plugin_inputs import Candidates, Members, PluginInput, Selection, StagedUpdate
 from pm.registry import get_package, walk
@@ -134,14 +134,21 @@ class InstalledPackage:
 
 
 def installed_package(name: str, *, allow_outdated: bool = False) -> InstalledPackage | None:
-    """Read the selected PM entry without installing or changing its facts."""
+    """Read the selected local tool or PM entry without changing either."""
     package = get_package(name)
     if package.internal:
         raise ValueError(f"{name} is internal PM tooling, not an application package")
-    target = current_target()
+    return _resolved_package(package, _lockfile(), current_target(), allow_outdated=allow_outdated)
+
+
+def _resolved_package(package, lockfile, target, *, allow_outdated=False) -> InstalledPackage | None:
+    local = find_local(package, lockfile, target)
+    if local is not None:
+        return InstalledPackage(local.path, local.version, local.binary)
     if package.native_abi_reason(target):
         return None
-    location = _installed_location(package, _lockfile(), target, allow_outdated=allow_outdated)
+    name = package.name
+    location = _installed_location(package, lockfile, target, allow_outdated=allow_outdated)
     if location is None:
         return None
     facts, store = location
@@ -155,8 +162,9 @@ def installed_package(name: str, *, allow_outdated: bool = False) -> InstalledPa
 
 def uv_launcher(name: str) -> Path | None:
     """PM's installed ``uv``/``uvx`` for a user-declared MCP stdio ``command:``, so a bare
-    ``uvx`` server runs the packaged uv, never the user's. Read-only; Hermes's own Python
-    work still goes through PM operations, not this executable."""
+    ``uvx`` server runs the packaged uv, never the user's. Read-only; Kouri Harness's own Python
+    work still goes through PM operations, not this executable. Local reuse is for PM's
+    own toolchain (`_toolchain`), not for this contract."""
     if name not in ("uv", "uvx"):
         raise ValueError(f"{name!r} is not a uv launcher")
     package = get_package("uv")
@@ -219,8 +227,7 @@ def enabled_extras() -> list[str]:
 
 
 def is_installed(name: str) -> bool:
-    package, target = get_package(name), current_target()
-    return package.native_abi_reason(target) is None and _installed_location(package, _lockfile(), target) is not None
+    return _resolved_package(get_package(name), _lockfile(), current_target()) is not None
 
 
 def sealed() -> bool:
@@ -271,7 +278,7 @@ _SET_ASIDE_PREFIX = ".reclaim-"
 def _discard_entry(store: Store, entry_name: str) -> None:
     """Drop a tree a finished publish or restore left behind as garbage.
 
-    A running Hermes process can keep the replaced interpreter's DLLs mapped
+    A running Kouri Harness process can keep the replaced interpreter's DLLs mapped
     far past the retry window, and failing here reports a completed install
     as broken (#124807). Windows still allows renaming a tree with mapped
     images, so it moves to a `.reclaim-*` name: its slot is free for the next
@@ -643,6 +650,8 @@ def ensure(
         _operation.lock()
     missing = []
     for package in chain:
+        if find_local(package, lockfile, target, base_env=base_env) is not None:
+            continue
         if reason := package.native_abi_reason(target):
             raise InstallError(package.name, reason, "select a compatible package")
         identity = (package.name, lockfile.version(package.name), target,
@@ -687,6 +696,10 @@ def env_for(*names: str, base_env: Optional[dict] = None) -> dict[str, str]:
     # repeat would put node's bundled npm ahead of the pinned one on PATH.
     for package in walk(known):
         if package.internal:
+            continue
+        local = find_local(package, lockfile, target, base_env=base_env)
+        if local is not None:
+            diffs.append(local.env)
             continue
         location = _installed_location(package, lockfile, target)
         if location:
@@ -821,7 +834,7 @@ def _venv_install_lock(*, patient: bool):
         if not held:
             error = InstallError(
                 "venv",
-                f"another Hermes process is installing dependencies (waited {INSTALL_LOCK_TIMEOUT_SECONDS:.0f}s)",
+                f"another Kouri Harness process is installing dependencies (waited {INSTALL_LOCK_TIMEOUT_SECONDS:.0f}s)",
                 "retry in a moment, or run `hermes pm install` to install explicitly",
             )
             receipt.record_refusal("install-busy", str(error))
@@ -989,7 +1002,7 @@ def sync_venv(extras: Optional[list[str]] = None, *, explicit: bool = False,
     source of plugin members (see pm.plugin_inputs); None discovers them from config.
     ``evict_incompatible_plugins`` is the update's contract: a discovered plugin that
     keeps the environment from building is disabled instead of failing the sync
-    (see pm.plugin_eviction). ``automatic`` names the entries of ``extras`` Hermes chose
+    (see pm.plugin_eviction). ``automatic`` names the entries of ``extras`` Kouri Harness chose
     on the user's behalf: one the user declined is left out, and none of them opts a
     declined extra back in; every other requested extra does (``--extra NAME``).
     ``carried`` names the automatic entries this sync carries over from a pre-PM venv:
@@ -1088,7 +1101,7 @@ def drift(*, include_venv: bool = True) -> dict[str, str]:
             continue
         if package.missing_reason(target) is not None:
             continue
-        if _installed_location(package, lockfile, target) is None:
+        if _resolved_package(package, lockfile, target) is None:
             problems[name] = "not installed or outdated"
     try:
         venv = get_package("venv")
@@ -1149,8 +1162,12 @@ def _store_path_dirs() -> list[str]:
 
     def located(package):
         if package.name not in locations:
-            locations[package.name] = _installed_location(
-                package, lockfile, target, roots=roots, root_facts=root_facts)
+            local = find_local(package, lockfile, target)
+            location = _installed_location(package, lockfile, target, roots=roots, root_facts=root_facts) if local is None else None
+            locations[package.name] = (
+                local.env if local is not None
+                else location[0].env_for(package.name, location[1].root) if location else None
+            )
         return locations[package.name]
 
     dirs: list[str] = []
@@ -1170,8 +1187,7 @@ def _store_path_dirs() -> list[str]:
         if location is None or any(located(dep) is None for dep in chain
                                    if dep.missing_reason(target) is None):
             continue
-        facts, store = location
-        env = facts.env_for(name, store.root)
+        env = location
         path_dirs = env.get("PATH") or []
         if isinstance(path_dirs, str):
             path_dirs = [path_dirs]
@@ -1182,9 +1198,7 @@ def _store_path_dirs() -> list[str]:
 
 
 def activate(*, allow_incomplete: bool = False) -> list[str]:
-    """Make the installed store usable: put its tool dirs at the FRONT of
-    os.environ['PATH'] so reactive `shutil.which('git'|'node'|'ffmpeg'|...)`
-    resolves the bundled binaries, never a user copy that sorts earlier.
+    """Put selected compatible local tools or managed tool dirs at the FRONT of PATH.
     Return `check()`'s problems, or an empty list on success, so startup
     callers can report the verdict without checking the store twice.
 
@@ -1196,9 +1210,8 @@ def activate(*, allow_incomplete: bool = False) -> list[str]:
     ``allow_incomplete`` is the install-time exception: tools are published
     before the venv sync, so the venv verdict is not computed at all.
 
-    This is the ONE sanctioned global PATH write: PATH is the discovery
-    contract every `which` reads, not a tool-specific env leak. Store-first
-    unconditionally — pinned bundled versions win on dev machines too.
+    This is the ONE sanctioned global PATH write. Sealed distributions use their
+    pinned tools; source installs prefer compatible local tools.
     """
     import os
 
@@ -1214,7 +1227,7 @@ def activate(*, allow_incomplete: bool = False) -> list[str]:
 
 def store_first_path(path: str) -> str:
     """``path`` with the installed store's tool dirs moved to the front, for
-    Hermes's own children whose PATH gets other dirs prepended after activate."""
+    Kouri Harness's own children whose PATH gets other dirs prepended after activate."""
     import os
 
     dirs = _store_path_dirs()

@@ -103,7 +103,12 @@ function legacyInstallationLauncher(updateRoot: string, isWindows: boolean): str
     return null
   }
 
-  const legacy: string = path.join(updateRoot, 'venv', isWindows ? 'Scripts' : 'bin', isWindows ? 'hermes.exe' : 'hermes')
+  const legacy: string = path.join(
+    updateRoot,
+    'venv',
+    isWindows ? 'Scripts' : 'bin',
+    isWindows ? 'hermes.exe' : 'hermes'
+  )
 
   return stagedFileExists(legacy) ? legacy : null
 }
@@ -138,7 +143,7 @@ function userBinLaunchers(isWindows: boolean, hermesHome: string, extraDirs: str
  * A source install outside the canonical root (install.sh --dir, a
  * setup-hermes.sh clone) is reachable only through the user-bin launcher it
  * published. Return the install directory that launcher reports, when it is a
- * Hermes source tree; the caller still resolves and probes it by root.
+ * Kouri Harness source tree; the caller still resolves and probes it by root.
  */
 export function userLauncherInstallRoot(
   isWindows: boolean = process.platform === 'win32',
@@ -188,7 +193,9 @@ export function launcherInstallRoot(launcher: string): Promise<string | undefine
 
   const cached = launcherInstallRoots.get(launcher)
 
-  if (cached) {return cached}
+  if (cached) {
+    return cached
+  }
   const flight = launcherInstallDirectoryAsync(launcher).then(root => {
     if (root === null) {
       launcherInstallRoots.delete(launcher)
@@ -207,7 +214,11 @@ export function launcherInstallRoot(launcher: string): Promise<string | undefine
   return flight
 }
 
-interface LauncherVersionProbe { command: string; args: string[]; options: SpawnSyncOptions }
+interface LauncherVersionProbe {
+  command: string
+  args: string[]
+  options: SpawnSyncOptions
+}
 
 // Node refuses to exec a .cmd directly (CVE-2024-27980), and `shell:true`
 // would hand an interpolated path to cmd.exe wholesale. Invoke cmd.exe
@@ -244,8 +255,13 @@ export function launcherInstallDirectory(launcher: string, root?: string): strin
   try {
     const probe: LauncherVersionProbe | null = launcherVersionProbe(launcher, root)
 
-    if (!probe) {return null}
-    const result: SpawnSyncReturns<string> = spawnSync(probe.command, probe.args, { ...probe.options, encoding: 'utf8' })
+    if (!probe) {
+      return null
+    }
+    const result: SpawnSyncReturns<string> = spawnSync(probe.command, probe.args, {
+      ...probe.options,
+      encoding: 'utf8'
+    })
 
     return result.error || result.status !== 0 ? null : reportedInstallDirectory(result.stdout)
   } catch {
@@ -257,17 +273,24 @@ export function launcherInstallDirectory(launcher: string, root?: string): strin
 function launcherInstallDirectoryAsync(launcher: string, root?: string): Promise<string | null> {
   const probe: LauncherVersionProbe | null = launcherVersionProbe(launcher, root)
 
-  if (!probe) {return Promise.resolve(null)}
+  if (!probe) {
+    return Promise.resolve(null)
+  }
 
   return new Promise(resolve => {
     try {
-      execFile(probe.command, probe.args, { ...probe.options, encoding: 'utf8' } as ExecFileOptions, (error, stdout) => {
-        try {
-          resolve(error ? null : reportedInstallDirectory(String(stdout)))
-        } catch {
-          resolve(null)
+      execFile(
+        probe.command,
+        probe.args,
+        { ...probe.options, encoding: 'utf8' } as ExecFileOptions,
+        (error, stdout) => {
+          try {
+            resolve(error ? null : reportedInstallDirectory(String(stdout)))
+          } catch {
+            resolve(null)
+          }
         }
-      })
+      )
     } catch {
       resolve(null)
     }
@@ -585,7 +608,7 @@ export function resolveStagedUpdaterBinary(
  * predating #74782 have no self-PID exclusion in `UpdateMarkerGuard::acquire`,
  * so when the desktop pre-writes the marker naming that very updater, the
  * updater reads its own claim as a foreign live owner and aborts with
- * "Another Hermes update is already running (PID <itself>, started 1s ago)" —
+ * "Another Kouri Harness update is already running (PID <itself>, started 1s ago)" —
  * the observed infinite "Install didn't finish" loop. Skipping the pre-write
  * for those binaries lets them acquire cleanly and run `hermes update`, which
  * pulls the permanent fixes. See shouldPrewriteUpdateMarker.
@@ -750,13 +773,13 @@ export interface ObserveUpdaterHandoffDeps {
 
 /**
  * User-facing copy for a hand-off that did not take (spawn error or early exit).
- * The lead sentence is plain: nothing changed and Hermes keeps running. The raw
+ * The lead sentence is plain: nothing changed and Kouri Harness keeps running. The raw
  * outcome message (exit code / signal / spawn error) stays on a trailing
  * "Details:" line for logs and support.
  */
 export function describeUpdaterHandoffFailure(outcome: Pick<UpdaterHandoffOutcome, 'message'>): string {
   const lead =
-    "The updater couldn't start, so nothing was changed and Hermes keeps running as before. " +
+    "The updater couldn't start, so nothing was changed and Kouri Harness keeps running as before. " +
     'Try again; if it keeps failing, open the logs and send them to support.'
 
   return outcome.message ? `${lead}\n\nDetails: ${outcome.message}` : lead

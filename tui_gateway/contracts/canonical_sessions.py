@@ -21,7 +21,7 @@ class CanonicalSessionParams(ProfileParams):
 
 class CanonicalCreateParams(ProfileParams):
     request_id: str | None = None
-    source: Literal['cli', 'tui', 'gui', 'acp', 'tool', 'oneshot'] = 'cli'
+    source: Literal['cli', 'tui', 'gui', 'acp', 'tool', 'oneshot', 'managed_worker'] = 'cli'
     cwd: str | None = None
     # The sessions-row ``cwd`` when it differs from the execution ``cwd`` (the classic CLI records
     # main's stamp: the launch dir, ``""`` = none); ``cwd`` stays where the tools run.
@@ -194,6 +194,7 @@ class CanonicalSessionListRow(Result):
     started_at: float | None
     message_count: int
     running: bool
+    read_only: bool = False
     model: str | None = None
     resolved_id: str | None = None
     root_title: str | None = None

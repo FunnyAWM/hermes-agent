@@ -11,12 +11,19 @@ from hermes_platform.host.facts import native_arch
 from pm.environments import install_state_dir, site_packages
 from pm.lock import Lockfile
 from tests.hermes_cli.test_source_launcher_publication import fixture_tree
+from tests.preconditions import requires_tool
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.mark.platforms("windows")
-@pytest.mark.parametrize("shell", ["powershell", "pwsh"])
+@pytest.mark.parametrize(
+    "shell",
+    [
+        "powershell",
+        pytest.param("pwsh", marks=requires_tool("pwsh")),
+    ],
+)
 def test_powershell_stage_publishes_without_a_checkout_venv(tmp_path, monkeypatch, shell):
     repo, home, interpreter = fixture_tree(tmp_path, monkeypatch)
     # Exercise the real pin reader, including the nested artifact objects.
@@ -46,10 +53,8 @@ function Invoke-FixtureUv {
     $call = $args -join ' '
     Add-Content -LiteralPath $env:PROBE_UV_CALLS -Encoding UTF8 -Value $call
     switch -Exact ($call) {
-        "python install --no-bin --no-registry $env:PROBE_PY_REQUEST" {
+        "python find --system --no-managed-python --no-python-downloads --no-project $env:PROBE_PY_REQUEST" {
             if (-not (Test-Path -LiteralPath $env:PROBE_PYTHON -PathType Leaf)) { throw 'missing fixture Python' }
-        }
-        "python find --managed-python --no-project $env:PROBE_PY_REQUEST" {
             Write-Output $env:PROBE_PYTHON
         }
         default { throw "unexpected bootstrap uv call: $call" }
@@ -82,7 +87,7 @@ exit 0
     assert result.returncode == 0, result.stdout + result.stderr
     assert b'REACHED_PATH_PUBLICATION' in result.stdout
     assert calls.read_text(encoding='utf-8-sig').splitlines() == [
-        f'python find --managed-python --no-project {py_request}',
+        f'python find --system --no-managed-python --no-python-downloads --no-project {py_request}',
     ]
     for name in ('hermes', 'hermes-acp'):
         command = home / 'bin' / (name + ('.exe' if (home / 'bin' / (name + '.exe')).is_file() else '.cmd'))

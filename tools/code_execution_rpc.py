@@ -106,10 +106,22 @@ def _handle_rpc_request(request: dict, *, allowed_tools: frozenset, tool_call_co
     if tool_name == "terminal" and isinstance(tool_args, dict):
         for param in _TERMINAL_BLOCKED_PARAMS:
             tool_args.pop(param, None)
-    # Silence handler status prints so they don't leak into the CLI spinner.
     try:
-        with thread_scoped_silence():
-            result = dispatch(tool_name, tool_args)
+        # ``approvals.mode: auto`` must rule on in-script calls too: the executor's
+        # auto-review gate is on the far side of this RPC boundary. The ruling is
+        # stamped so the tool's own command guards skip their second prompt; a
+        # blocked call is logged and budgeted like any dispatched failure.
+        from tools.auto_review import gate_tool_call
+
+        block_body, _error_type = gate_tool_call(tool_name, tool_args)
+        if block_body is not None:
+            result = tool_error(
+                str(block_body.get("message") or "BLOCKED by automatic review."),
+                error_type=str(block_body.get("error") or "auto_review_block"))
+        else:
+            # Silence handler status prints so they don't leak into the CLI spinner.
+            with thread_scoped_silence():
+                result = dispatch(tool_name, tool_args)
     except Exception as exc:
         logger.error("Tool call failed in %s: %s", where, exc, exc_info=True)
         result = tool_error(str(exc))

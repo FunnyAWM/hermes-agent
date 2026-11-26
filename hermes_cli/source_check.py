@@ -378,7 +378,7 @@ def _read_runtime_verdict(repository: str, sha: str) -> Optional[bool]:
                  if isinstance(e, dict) and e.get("type") == "blob" and isinstance(e.get("path"), str)]
         paths = [path for path in paths if any(fnmatchcase(path, p) for p in SCHEMA_SOURCES)]
         if not paths:
-            return None  # not a recognised Hermes tree: no claim either way
+            return None  # not a recognised Kouri Harness tree: no claim either way
         urls = iter(f"https://raw.githubusercontent.com/{repository}/{sha}/{quote(path)}" for path in paths)
         pending = 0
         for url in islice(urls, 4):
@@ -585,8 +585,12 @@ def check_for_updates(*, install_root: Path | None = None, home: Path | None = N
     if unsupported:
         return {**result, **unsupported}
     config = require_readable_config_before_write(home / "config.yaml")
-    if passive and (config.get("updates") or {}).get("check") is False:
-        return {**result, "reason": "disabled"}
+    # Passive checks are opt-in for this fork: PRD §8.1 隐 02 allows one
+    # outbound link, the model endpoint. Absence of the key means off, so a
+    # fresh install never phones GitHub; `updates.check: true` restores the
+    # upstream behaviour and `hermes update --check` (not passive) is untouched.
+    if passive and (config.get("updates") or {}).get("check") is not True:
+        return {**result, "reason": "disabled", "message": "Automatic update checks are disabled."}
     channel = resolve_update_channel(config, root) if channel is None else validate_name(channel)
     forward_only = rides_default_channel(channel_record(config, root), channel, root)
     co = _read_checkout(root, _installed_git(git), embedded)
@@ -642,7 +646,7 @@ def main() -> None:
     parser.add_argument("--channel", type=validate_name)
     parser.add_argument("--cache-path", type=Path)
     parser.add_argument("--branch-config-path", type=Path)
-    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--force", action="store_true", help="Check explicitly, bypassing the cache and passive opt-out.")
     parser.add_argument("--set-channel", type=validate_name,
                         help="Persist this install's channel (the Desktop selector), then report as usual.")
     args = parser.parse_args()
@@ -655,7 +659,8 @@ def main() -> None:
             set_hermes_home_override(args.home)
             set_install_channel(args.set_channel, args.install_root)
             args.force = True
-        result = check_for_updates(**{k: v for k, v in vars(args).items() if k != "set_channel"})
+        result = check_for_updates(passive=not args.force,
+                                   **{k: v for k, v in vars(args).items() if k != "set_channel"})
     if isinstance(result, dict):
         # Older runtimes reject --set-channel; Desktop offers its selector only on this flag.
         result["channelSelectable"] = True

@@ -121,10 +121,10 @@ def hermes_npmrc() -> Path | None:
 
 
 def user_npmrc(env: Mapping[str, str]) -> Path:
-    """The user npmrc Hermes's npm and pnpm children read: a non-empty ``npm_config_userconfig``
+    """The user npmrc Kouri Harness's npm and pnpm children read: a non-empty ``npm_config_userconfig``
     (that exact name first, as pnpm and the desktop read it, then any case), else ``hermes_npmrc()``
     (``source_build_env`` points ``NPM_CONFIG_USERCONFIG`` at it), else ``~/.npmrc``. As npm's
-    userconfig, the Hermes file replaces ``~/.npmrc``; the two never merge."""
+    userconfig, the Kouri Harness file replaces ``~/.npmrc``; the two never merge."""
     names = sorted((key for key in env if key.lower() == "npm_config_userconfig"), key=lambda key: key != "npm_config_userconfig")
     explicit = next((env[key] for key in names if env[key]), "")
     if explicit:

@@ -7,7 +7,7 @@
  */
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs"
-import { resolve, join, relative, posix } from "path"
+import { resolve, join, relative, posix, isAbsolute } from "path"
 import productIdentity from "../product-identity.cjs"
 import { COMMIT_TAG_RE, channelBuildRequest, releaseVersion } from "../../../scripts/msix-shared.mjs"
 import { validateBundleEnvironment } from "./bundle-env.mjs"
@@ -258,7 +258,8 @@ export function buildStampPayload(stamp, env = process.env, platform = process.p
     bootstrap: 'self',
     store: 'microsoft-store',
     bundled: { win32: 'app-installer', darwin: 'electron-updater' }[platform] || 'external',
-    light: platform === 'darwin' ? 'electron-updater' : 'external'
+    light: platform === 'darwin' ? 'electron-updater' : 'external',
+    headless: 'external'
   }[variant]
   if (!updateMechanism) throw new Error(`Unknown desktop variant: ${variant}`)
   if (channelBuild && updateMechanism === 'external') throw new Error('Channel builds require a supported native update owner')
@@ -266,6 +267,7 @@ export function buildStampPayload(stamp, env = process.env, platform = process.p
   if (bundled && !payload?.runtime?.commands?.hermes) {
     throw new Error('PM payload has no completed launch contract; stage the bundle before packaging')
   }
+  const localRuntimeRoot = variant === 'headless' ? recordedLocalRoot(env) : null
   return {
     ...base,
     payload: variant === "store" ? "bundled" : variant || "bootstrap",
@@ -274,8 +276,19 @@ export function buildStampPayload(stamp, env = process.env, platform = process.p
     updateMechanism: commitBuild ? 'external' : updateMechanism,
     tag: channelBuild?.receiverCandidate ? channelBuild.releaseTag : env.HERMES_PAYLOAD_TAG || null,
     ...(bundleEnv ? { bundleEnv } : {}),
-    ...(bundled ? { runtime: payload.runtime } : {})
+    ...(bundled ? { runtime: payload.runtime } : {}),
+    ...(localRuntimeRoot ? { localRuntimeRoot } : {})
   }
+}
+
+/** The checkout a headless artifact is built to drive (double-click on this machine). */
+function recordedLocalRoot(env) {
+  const recorded = (env.HERMES_DESKTOP_LOCAL_ROOT || '').trim()
+  if (!recorded) {return null}
+  if (!isAbsolute(recorded)) {
+    throw new Error(`HERMES_DESKTOP_LOCAL_ROOT must be absolute: ${recorded}`)
+  }
+  return resolve(recorded)
 }
 
 if (isMain(import.meta.url)) {

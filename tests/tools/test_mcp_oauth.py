@@ -903,7 +903,7 @@ def test_provider_preserves_server_url_path():
     breaking RFC 9728 protected-resource validation against servers whose PRM
     advertises a path-scoped resource (Notion). The MCP SDK strips the path
     itself for authorization-server discovery via
-    ``OAuthContext.get_authorization_base_url``; Hermes must not pre-strip.
+    ``OAuthContext.get_authorization_base_url``; Kouri Harness must not pre-strip.
     """
     from tools import mcp_oauth, mcp_oauth_manager
 

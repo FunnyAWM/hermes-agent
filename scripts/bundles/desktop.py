@@ -86,7 +86,7 @@ def build_prepared(path: Path, builder_args: list[str], variant: str | None = No
 def _build_prepared(prepared, builder_args: list[str], variant: str | None) -> None:
     prepared.validate()
     from scripts.bundles.desktop_inputs import build_environment, packaging_environment, select_variant, validate_builder_identity
-    from scripts.bundles.native import finish_native
+    from scripts.bundles.native import bundle_tools_of, finish_native
 
     request = prepared.request
     validate_builder_identity(request, builder_args)
@@ -114,11 +114,23 @@ def _build_prepared(prepared, builder_args: list[str], variant: str | None) -> N
         run([node, "scripts/build/tui.mjs", "--source", str(repo), "--out", str(products / "tui")], cwd=repo, env=env)
         run([node, "scripts/build/web.mjs", "--source", str(repo), "--icons", str(products / "icons"),
              "--out", str(products / "web")], cwd=repo, env=env)
-        run([node, "scripts/build/webapp.mjs", "--source", str(repo), "--out", str(products / "webapp")],
-            cwd=repo, env=env)
         if prepared.payload is None:
             raise ValueError("payload dependencies were not prepared")
-        frontends = {name: products / name for name in ("tui", "web", "webapp")}
+        # T-46/T-48: a sealed subset drops the browser-host bundle: `apps/desktop/dist-webapp`
+        # is 1,086 static files (985 js chunks) for `hermes webapp` / the browser
+        # dashboard, which this app never opens (T-46). `web_dist` stays — that is
+        # what `hermes serve` serves. Skipping the build too saves one vite pass (T-48).
+        # The cut follows the tool subset the payload was prepared with (recorded in
+        # its prepared manifest and cross-checked against the staged tools), never
+        # HERMES_BUNDLE_TOOLS in this shell: two-stage builds and a leftover env
+        # used to skew it (sealed payload stuffed with dist-webapp, or a full one
+        # robbed of its webapp).
+        names = ("tui", "web")
+        if bundle_tools_of(prepared.payload) is None:
+            names = ("tui", "web", "webapp")
+            run([node, "scripts/build/webapp.mjs", "--source", str(repo), "--out", str(products / "webapp")],
+                cwd=repo, env=env)
+        frontends = {name: products / name for name in names}
         if finish_native(prepared.payload, frontends):
             raise RuntimeError("prepared payload assembly failed")
     from scripts.bundles.desktop_prepare import require_source

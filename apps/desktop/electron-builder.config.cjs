@@ -74,6 +74,9 @@ module.exports = {
   electronVersion,
   appId,
   productName: displayName,
+  // Stamped into every Windows artifact's LegalCopyright; package.json's
+  // `author` still supplies CompanyName.
+  copyright: 'Copyright © 2026 FunnyAWM',
   executableName: displayName,
   protocols: [
     {
@@ -138,7 +141,10 @@ module.exports = {
     }
   ],
   asar: {
-    unpack: ['**/*.node', '**/prebuilds/**', 'dist/**']
+    // Only native binaries need real files on disk (`dist/native/*.exe` is spawned; `*.node` and
+    // prebuilds are dlopen'd). Unpacking `dist/**` put 1,126 renderer files (fonts, images, CSS)
+    // on disk for one 9.7 KB helper and made every install extract them one by one.
+    unpack: ['**/*.node', '**/prebuilds/**', 'dist/native/**']
   },
   mac: {
     // macOS 26 masks every icon into its own squircle: the layered Icon
@@ -280,10 +286,8 @@ module.exports = {
   },
   linux: {
     category: 'Development',
-    maintainer: 'Nous Research <support@nousresearch.com>',
-    synopsis: light
-      ? 'Remote-only desktop client for Hermes Agent.'
-      : 'Native desktop shell for Hermes Agent.',
+    maintainer: 'FunnyAWM <funnyawm@qq.com>',
+    synopsis: 'Kal\'tsit',
     target: ['AppImage']
   }
 }

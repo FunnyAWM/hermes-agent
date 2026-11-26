@@ -48,7 +48,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
   {
     prefix: 'NOUS_',
     name: 'Nous Portal',
-    description: 'Hosted Hermes & Nous-trained models',
+    description: 'Hosted Kouri Harness & Nous-trained models',
     docsUrl: 'https://portal.nousresearch.com',
     priority: 0
   },
@@ -233,7 +233,7 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
 // backend schema only declares a string type.
 export const ENUM_OPTIONS: Record<string, string[]> = {
   'agent.image_input_mode': ['auto', 'native', 'text'],
-  'approvals.mode': ['manual', 'smart', 'off'],
+  'approvals.mode': ['manual', 'smart', 'auto', 'off'],
   'code_execution.mode': ['project', 'strict'],
   'context.engine': ['compressor', 'default', 'custom'],
   // '' = inherit the agent's own effort; the rest is the shared scale.
@@ -253,7 +253,7 @@ export const ENUM_OPTIONS: Record<string, string[]> = {
   // tools/transcription_common.py (local_command is auto-detected, not picked).
   'stt.provider': ['local', 'groq', 'openai', 'mistral', 'xai', 'elevenlabs', 'deepinfra'],
   // How the desktop voice conversation is wired — tools/voice_live.py owns the
-  // gpt-live branch (one full-duplex voice model delegating to Hermes).
+  // gpt-live branch (one full-duplex voice model delegating to Kouri Harness).
   'voice.voice_chat_mode': ['chained', 'gpt-live'],
   'voice.gpt_live.voice': [
     'marin',
@@ -445,6 +445,11 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     timeout: 'Command Timeout',
     persistentShell: 'Persistent Shell',
     envPassthrough: 'Environment Passthrough',
+    sandbox: {
+      enabled: 'Command Sandbox',
+      escalation: 'One-Command Escalation',
+      backend: 'Sandbox Isolation Level'
+    },
     dockerImage: 'Docker Image',
     singularityImage: 'Singularity Image',
     modalImage: 'Modal Image',
@@ -462,7 +467,13 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   approvals: {
     mode: 'Approval Mode',
     timeout: 'Approval Timeout',
-    mcpReloadConfirm: 'Confirm MCP Reloads'
+    mcpReloadConfirm: 'Confirm MCP Reloads',
+    autoReview: {
+      policy: 'Auto Review Policy',
+      historyMessages: 'Review History Window',
+      maxArgChars: 'Review Argument Limit',
+      skipTools: 'Tools Skipped By Review'
+    }
   },
   commandAllowlist: 'Command Allowlist',
   security: {
@@ -577,7 +588,9 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     provider: 'Memory Provider'
   },
   context: {
-    engine: 'Context Engine'
+    engine: 'Context Engine',
+    sessionWindowTurns: 'Session Window (turns)',
+    frozenWindowTurns: 'Frozen Window (turns)'
   },
   compression: {
     enabled: 'Auto-Compression',
@@ -621,17 +634,25 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   timezone: 'IANA timezone identifier. Blank uses the system timezone.',
   browser: {
     useRealProfile:
-      "Local browsing uses your real logins. Hermes copies your default browser's profile (cookies, logins, preferences) into a managed snapshot and drives it with its packaged Chromium — your live profile is never opened directly, and the copy is refreshed from it on each run. Also lets the agent open a local real-profile session on request even when a cloud browser backend is configured. Only Chromium browsers (Chrome, Edge, Brave, Brave Origin, Chromium) are supported; a non-Chromium default fails with a clear message. Off by default."
+      "Local browsing uses your real logins. Kouri Harness copies your default browser's profile (cookies, logins, preferences) into a managed snapshot and drives it with its packaged Chromium — your live profile is never opened directly, and the copy is refreshed from it on each run. Also lets the agent open a local real-profile session on request even when a cloud browser backend is configured. Only Chromium browsers (Chrome, Edge, Brave, Brave Origin, Chromium) are supported; a non-Chromium default fails with a clear message. Off by default."
   },
   agent: {
     imageInputMode: 'Controls how image attachments are sent to the model.',
-    maxTurns: 'Upper bound for tool-calling turns before Hermes stops a run.'
+    maxTurns: 'Upper bound for tool-calling turns before Kouri Harness stops a run.'
   },
   terminal: {
     cwd: 'Default project folder for tool and terminal work.',
     persistentShell:
       'SSH backend: keep exported variables between commands. Off starts each command from the login environment; the working directory always carries over.',
     envPassthrough: 'Environment variables to pass into tool execution.',
+    sandbox: {
+      enabled:
+        'Run every agent command inside sandctl; Full Access bypasses it. Sandboxed Windows sessions use PowerShell. The active profile below decides what the workspace allows, and every profile denies the network.',
+      escalation:
+        'The agent may ask, for one command, to run at a wider sandbox level (up to Full Access). You approve each request, and the configured profile applies again to the next command.',
+      backend:
+        'Isolation level for every command: l1 (process boundary), l2 (gVisor) or l3 (Kata VM), or a concrete backend name. A sandbox profile can override it.'
+    },
     dockerImage: 'Container image used when the execution backend is Docker.',
     singularityImage: 'Image used when the execution backend is Singularity.',
     modalImage: 'Image used when the execution backend is Modal.',
@@ -640,10 +661,17 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   codeExecution: {
     mode: 'How strictly code execution is scoped to the current project.'
   },
-  fileReadMaxChars: 'Maximum characters Hermes can read from one file request.',
+  fileReadMaxChars: 'Maximum characters Kouri Harness can read from one file request.',
   approvals: {
-    mode: 'How Hermes handles commands that need explicit approval.',
-    timeout: 'How long approval prompts wait before timing out.'
+    mode: 'How Kouri Harness handles commands that need explicit approval.',
+    timeout: 'How long approval prompts wait before timing out.',
+    autoReview: {
+      policy:
+        'Extra rules for the reviewer. They are trusted operator text, while the tool call itself is always untrusted.',
+      historyMessages: 'How many recent conversation messages the reviewer sees (0-50).',
+      maxArgChars: 'How much of each tool argument the reviewer is shown (500-20000 characters).',
+      skipTools: 'Tool names that are never reviewed. Local read-only tools are always skipped.'
+    }
   },
   security: {
     redactSecrets: 'Hide detected secrets from model-visible content when possible.'
@@ -656,7 +684,11 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     userProfileEnabled: 'Maintain a compact profile of user preferences.'
   },
   context: {
-    engine: 'Strategy for managing long conversations near the context limit.'
+    engine: 'Strategy for managing long conversations near the context limit.',
+    sessionWindowTurns:
+      'Send only the latest N user turns to the model (0 = send the full history). Applies to every conversation in this profile.',
+    frozenWindowTurns:
+      'Once the session window is full, keep the latest M turns as a stable cached prefix and append newer turns until the window refills (0 = off; must be less than the session window).'
   },
   compression: {
     enabled: 'Summarize older context when conversations get large.',
@@ -671,11 +703,11 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   voice: {
     autoTts: 'Automatically speak assistant responses.',
     voiceChatMode:
-      'chained: speech-to-text → Hermes → text-to-speech with the providers below. gpt-live: one full-duplex OpenAI voice model (gpt-live-1) listens and talks, and hands every real request to Hermes — any model you have selected answers with the full toolset. Needs an OpenAI API key; the voice layer bills $0.05 per minute.',
+      'chained: speech-to-text → Kouri Harness → text-to-speech with the providers below. gpt-live: one full-duplex OpenAI voice model (gpt-live-1) listens and talks, and hands every real request to Kouri Harness — any model you have selected answers with the full toolset. Needs an OpenAI API key; the voice layer bills $0.05 per minute.',
     gptLive: {
       voice: 'Voice for GPT-Live mode. Custom voice IDs are accepted.',
       instructions:
-        'Extra sentences for the live voice persona (tone, pace, language). Hermes keeps its own system prompt.'
+        'Extra sentences for the live voice persona (tone, pace, language). Kouri Harness keeps its own system prompt.'
     }
   },
   tts: {
@@ -702,7 +734,7 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   },
   updates: {
     nonInteractiveLocalChanges:
-      'When Hermes updates itself from the app (no terminal prompt), keep local source edits (stash) or throw them away (discard). Terminal updates always ask.'
+      'When Kouri Harness updates itself from the app (no terminal prompt), keep local source edits (stash) or throw them away (discard). Terminal updates always ask.'
   }
 })
 
@@ -727,7 +759,16 @@ export const SECTIONS: DesktopConfigSection[] = [
     id: 'chat',
     label: 'Chat',
     icon: MessageCircle,
-    keys: ['display.personality', 'timezone', 'display.show_reasoning', 'agent.image_input_mode']
+    keys: [
+      'display.personality',
+      'timezone',
+      'display.show_reasoning',
+      'agent.image_input_mode',
+      'context.session_window_turns',
+      'context.frozen_window_turns',
+      'context.window_token_budget',
+      'memory.organize_turns'
+    ]
   },
   {
     id: 'appearance',
@@ -747,6 +788,9 @@ export const SECTIONS: DesktopConfigSection[] = [
       'code_execution.mode',
       'terminal.persistent_shell',
       'terminal.env_passthrough',
+      'terminal.sandbox.enabled',
+      'terminal.sandbox.escalation',
+      'terminal.sandbox.backend',
       'file_read_max_chars'
     ]
   },
@@ -758,6 +802,10 @@ export const SECTIONS: DesktopConfigSection[] = [
       'approvals.mode',
       'approvals.timeout',
       'approvals.mcp_reload_confirm',
+      'approvals.auto_review.policy',
+      'approvals.auto_review.history_messages',
+      'approvals.auto_review.max_arg_chars',
+      'approvals.auto_review.skip_tools',
       'command_allowlist',
       'security.redact_secrets',
       'security.allow_private_urls',

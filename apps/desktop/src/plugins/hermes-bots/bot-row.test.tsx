@@ -186,6 +186,20 @@ describe('the menu opens the same forever-chat a row click does', () => {
 
     expect(openRosterBot.mock.calls).toEqual([[bot, { intent: 'tab' }]])
   })
+
+  it('single-bot mode keeps open-chat and rename only', async () => {
+    render(
+      <BotRow bot={{ name: 'default' } as RosterRow} onDelete={noop} onEdit={noop} onGroup={noop} onNewSection={noop} singleBot />
+    )
+
+    fireEvent.contextMenu(screen.getByRole('button'))
+
+    expect(await screen.findByText('Open Bot Chat')).toBeTruthy()
+    expect(screen.getByText('Edit…')).toBeTruthy()
+    expect(screen.queryByText('Open Bot Chat in new tab')).toBeNull()
+    expect(screen.queryByText('New chat with this bot')).toBeNull()
+    expect(screen.queryByText('Pin to top')).toBeNull()
+  })
 })
 
 describe('context-menu mutations hydrate the alias first', () => {

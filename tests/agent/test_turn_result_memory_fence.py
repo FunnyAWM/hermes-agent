@@ -57,11 +57,11 @@ def _run(content: str) -> dict:
 
 
 def test_echoed_memory_block_is_not_in_final_response():
-    result = _run(f"Auth restored, Hermes Agent is live.\n\n{ECHOED_BLOCK}")
+    result = _run(f"Auth restored, Kouri Harness is live.\n\n{ECHOED_BLOCK}")
 
     assert SENTINEL not in result["final_response"]
     assert "memory-context" not in result["final_response"]
-    assert result["final_response"] == "Auth restored, Hermes Agent is live."
+    assert result["final_response"] == "Auth restored, Kouri Harness is live."
 
 
 def test_leading_memory_block_is_not_in_final_response():

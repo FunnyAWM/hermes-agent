@@ -1,8 +1,9 @@
 """The enabled-features file: the exact extras the install carries.
 
-The bundle is built with `uv sync --all-extras` minus the declared
-opt-in extras (`opt_in_extras`), but WHICH extras
-actually resolve differs per platform (markers gate some off). The
+The full bundle is built with `uv sync --all-extras` minus the declared
+opt-in extras (`opt_in_extras`) and a sealed subset with `--extra all`
+(its venv can never sync again, scripts/bundles/native.py), but WHICH
+extras actually resolve differs per platform (markers gate some off). The
 shipped default is the EXACT list that installed — written at bundle
 time beside the payload, read at sync time:
 

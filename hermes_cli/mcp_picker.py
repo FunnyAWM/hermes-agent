@@ -79,7 +79,7 @@ def _enable_disable(name: str, *, enable: bool) -> None:
     save_config(cfg)
     _say(
         f"  ✓ '{name}' {'enabled' if enable else 'disabled'}. "
-        "Start a new Hermes session for changes to take effect."
+        "Start a new Kouri Harness session for changes to take effect."
     )
 
 
@@ -175,12 +175,12 @@ def _print_rows_text(rows: list[_Row]) -> None:
         print(f"  {_format_row(row)}")
     print()
     _say("  Install: hermes mcp install <name>    Picker: hermes mcp", Colors.DIM)
-    # Manifest-version warnings: the user's Hermes is too old to install everything listed.
+    # Manifest-version warnings: the user's Kouri Harness is too old to install everything listed.
     future = [d for d in catalog_diagnostics() if d[1] == "future_manifest"]
     if future:
         print()
         for name, _, _msg in future:
-            _say(f"  ⚠ '{name}' requires a newer Hermes — run `hermes update` to install this entry.", Colors.YELLOW)
+            _say(f"  ⚠ '{name}' requires a newer Kouri Harness — run `hermes update` to install this entry.", Colors.YELLOW)
         print()
     print()
 

@@ -1,10 +1,10 @@
 ---
 sidebar_position: 3
 title: "Android / Termux"
-description: "Install Hermes Agent on Android from its signed Termux APT repository"
+description: "Install Kouri Harness on Android from its signed Termux APT repository"
 ---
 
-# Hermes on Android with Termux
+# Kouri Harness on Android with Termux
 
 :::danger Termux is currently broken
 The Termux package does not work right now. A fix is in progress and will
@@ -12,7 +12,7 @@ ship soon. Until then, the steps below may fail or install a package that
 does not run.
 :::
 
-The Termux package runs Hermes on **aarch64 (arm64-v8a)** Android devices.
+The Termux package runs Kouri Harness on **aarch64 (arm64-v8a)** Android devices.
 Two APT channels are published under
 `https://hermes-assets.nousresearch.com/releases/termux/<channel>`:
 
@@ -78,7 +78,7 @@ Do not use the desktop/server `install.sh` or a glibc Linux archive on this targ
      > "$PREFIX/etc/apt/sources.list.d/hermes-agent.list"
    ```
 
-5. Install Hermes:
+5. Install Kouri Harness:
 
    ```bash
    pkg update

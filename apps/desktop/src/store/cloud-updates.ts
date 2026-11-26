@@ -21,12 +21,15 @@ function connectedToHermesCloud(connection: HermesConnection | null): boolean {
 }
 
 /** Whether Hermes Cloud owns updates for `target` under `connection`. */
-export function cloudOwnsUpdates(target: UpdateTarget, connection: HermesConnection | null = $connection.get()): boolean {
+export function cloudOwnsUpdates(
+  target: UpdateTarget,
+  connection: HermesConnection | null = $connection.get()
+): boolean {
   return servedByHermesCloud() || (target === 'backend' && connectedToHermesCloud(connection))
 }
 
 /**
- * The target a generic "Update Hermes" command acts on: the connected backend
+ * The target a generic "Update Kouri Harness" command acts on: the connected backend
  * in remote mode, unless Hermes Cloud owns it — then this machine's own app.
  */
 export function updateTargetFor(connection: HermesConnection | null): UpdateTarget {

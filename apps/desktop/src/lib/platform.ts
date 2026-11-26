@@ -21,7 +21,7 @@ export const isWindowsPlatform = (): boolean =>
 export const isLinuxPlatform = (): boolean =>
   typeof navigator !== 'undefined' && /linux/i.test(navigator.platform || navigator.userAgent || '')
 
-/** Globals the Hermes web server injects into the page it serves. */
+/** Globals the Kouri Harness web server injects into the page it serves. */
 export interface BrowserHostGlobals {
   __HERMES_AUTH_REQUIRED__?: boolean
   __HERMES_BASE_PATH__?: string
@@ -65,8 +65,10 @@ export function isBrowserHostedDesktop() {
   // The bridge writes the marker once it installs. During static module
   // evaluation, use the browser bootstrap globals too; otherwise an OS check
   // can classify a browser page as native before the marker is written.
-  return document.documentElement.dataset.hermesDesktopHost === 'browser' ||
+  return (
+    document.documentElement.dataset.hermesDesktopHost === 'browser' ||
     (!window.hermesDesktop && hasBrowserHostBootstrap())
+  )
 }
 
 /**

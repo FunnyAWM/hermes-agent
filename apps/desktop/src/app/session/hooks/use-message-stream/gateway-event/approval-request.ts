@@ -48,6 +48,7 @@ export const approval: Handler = ctx => {
       : undefined,
     command,
     description,
+    justification: str(p.justification) || undefined,
     // The approval queue's own id — `approval.pending` / `approval.received` / `approval.respond` key on it.
     requestId: str(p.request_id) || undefined,
     serverRequestId: request.id,

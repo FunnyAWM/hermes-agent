@@ -18,6 +18,7 @@ import type { ConversationStatus } from './hooks/use-voice-conversation'
 import { ModelPill } from './model-pill'
 import { sendButtonDisabled } from './paused-reply'
 import { ReasoningPill } from './reasoning-pill'
+import { SandboxPill } from './sandbox-pill'
 import { StartVoiceButton } from './start-voice-button'
 import type { ChatBarState, VoiceStatus } from './types'
 import { VoiceFan } from './voice-fan'
@@ -152,6 +153,7 @@ export function ComposerControls({
         <>
           {hideModelPill ? null : (
             <>
+              <SandboxPill compact={compactModelPill} disabled={disabled} sandbox={state.sandbox} />
               <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
               {compactModelPill ? null : <ReasoningPill disabled={disabled} model={state.model} />}
             </>
@@ -407,7 +409,7 @@ function ConversationIndicator({
   )
 }
 
-// "Hey Hermes" wake-word toggle. ALWAYS rendered — the ear never hides. A
+// "Hey Kouri Harness" wake-word toggle. ALWAYS rendered — the ear never hides. A
 // user must always be able to click it to turn passive listening on; if the
 // backend can't start (missing STT/TTS, deps still installing, no mic
 // permission, etc.) the click surfaces the reason in the tooltip and the

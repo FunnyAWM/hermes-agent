@@ -19,7 +19,7 @@ export const arSettings = {
     billing: {
       keepGoingOnCredits: {
         title: 'الاستمرار بالرصيد',
-        description: 'استخدم رصيدك عند نفاد الاستخدام المضمّن. عند الإيقاف: ينتظر Hermes إعادة التعيين.',
+        description: 'استخدم رصيدك عند نفاد الاستخدام المضمّن. عند الإيقاف: ينتظر Kouri Harness إعادة التعيين.',
         approveInBrowser: 'وافق على الإنفاق عن بُعد في متصفحك لتغيير هذا. يُطبَّق فور الموافقة.',
         openAgain: 'الفتح مرة أخرى',
         cancel: 'إلغاء',
@@ -58,6 +58,7 @@ export const arSettings = {
       modelFallbacks: 'النماذج البديلة',
       chatBehavior: 'السلوك',
       chatAttachments: 'المرفقات',
+      chatBot: 'البوت',
       workspaceProjects: 'المشاريع والاكتشاف',
       workspaceShell: 'بيئة الصدفة',
       workspaceFiles: 'الملفات والتنفيذ',
@@ -100,7 +101,7 @@ export const arSettings = {
     exportConfig: 'تصدير الإعدادات',
     importConfig: 'استيراد الإعدادات',
     resetToDefaults: 'إعادة الافتراضيات',
-    resetConfirm: 'هل تريد إعادة كل الإعدادات إلى افتراضيات Hermes؟',
+    resetConfirm: 'هل تريد إعادة كل الإعدادات إلى افتراضيات Kouri Harness؟',
     exportFailed: 'فشل التصدير',
     resetFailed: 'فشلت إعادة الضبط',
     pluginPages: {
@@ -176,7 +177,7 @@ export const arSettings = {
       deleteAction: 'إزالة العنصر المحفوظ',
       otpField: 'مفتاح المصادقة',
       otpPlaceholder: 'سر Base32 أو رابط otpauth://',
-      otpHint: '«مفتاح الإعداد» الذي يعرضه الموقع عند تفعيل المصادقة الثنائية. بحفظه يولّد Hermes الرموز بنفسه.',
+      otpHint: '«مفتاح الإعداد» الذي يعرضه الموقع عند تفعيل المصادقة الثنائية. بحفظه يولّد Kouri Harness الرموز بنفسه.',
       twoFactorBadge: '2FA تلقائي',
       deleteTitle: 'حذف هذا العنصر؟',
       deleteDescription: label => `سيُزال "${label}" من الخزنة المشفّرة. لا يمكن التراجع عن هذا.`,
@@ -186,10 +187,11 @@ export const arSettings = {
         blurb:
           'تُكتشف مديري كلمات المرور المثبّتة تلقائيًا. يطلب منك الوكيل فتح أحدها في أول مرة يحتاج فيها إلى بيانات دخول منه (مرة واحدة لكل جلسة)؛ يبقى في الذاكرة رمز الجلسة فقط، ولا يرى الوكيل كلمة المرور الرئيسية أو أي بيانات دخول.',
         toggleFailed: 'تعذر تحديث مدير كلمات المرور',
-        notInstalled: name => `غير مكتشف. ثبّت أداة سطر الأوامر ${name} وسجّل الدخول إليها؛ سيكتشفها Hermes تلقائيًا.`,
-        disabledDesc: 'مكتشف لكنه معطّل لـ Hermes.',
+        notInstalled: name =>
+          `غير مكتشف. ثبّت أداة سطر الأوامر ${name} وسجّل الدخول إليها؛ سيكتشفها Kouri Harness تلقائيًا.`,
+        disabledDesc: 'مكتشف لكنه معطّل لـ Kouri Harness.',
         lockedDesc: 'مكتشف. سيطلب منك الوكيل فتحه عند الحاجة إلى بيانات دخول، أو افتحه الآن.',
-        unlockedDesc: 'مفتوح لهذه الجلسة. يُقفل تلقائيًا بعد 30 دقيقة من الخمول أو عند إغلاق Hermes.',
+        unlockedDesc: 'مفتوح لهذه الجلسة. يُقفل تلقائيًا بعد 30 دقيقة من الخمول أو عند إغلاق Kouri Harness.',
         statusLocked: 'مقفل',
         statusNotDetected: 'غير مكتشف',
         statusOff: 'متوقف',
@@ -213,7 +215,7 @@ export const arSettings = {
       kinds: { bundled: 'مضمّنة', disk: 'على القرص', runtime: 'وقت التشغيل' },
       installModal: {
         installUncertain:
-          'توقف Hermes عن انتظار نتيجة التثبيت، لكن قد يستمر تثبيت المكوّن الإضافي. أغلق هذه النافذة وأعد فحص قائمة المكوّنات الإضافية قبل محاولة التثبيت مرة أخرى.',
+          'توقف Kouri Harness عن انتظار نتيجة التثبيت، لكن قد يستمر تثبيت المكوّن الإضافي. أغلق هذه النافذة وأعد فحص قائمة المكوّنات الإضافية قبل محاولة التثبيت مرة أخرى.',
         toolsConnected: n => `تم توصيل ${n} من الأدوات`,
         skillsReady: names => (names.length === 1 ? `المهارة ${names[0]} جاهزة` : `${names.length} من المهارات جاهزة`),
         nextChat: 'أدوات أخرى متاحة في دردشتك التالية',
@@ -247,7 +249,7 @@ export const arSettings = {
         'إشعارات سطح المكتب الأصلية، منفصلة عن التنبيهات داخل التطبيق. هذه محلية على الجهاز — كل حاسوب يحتفظ بإعداداته الخاصة.',
       enableAll: 'تفعيل الإشعارات',
       enableAllDesc: 'إيقافه يصمت كل الإشعارات أدناه.',
-      focusedHint: 'تنبيهات الاكتمال تظهر فقط عندما يكون Hermes في الخلفية.',
+      focusedHint: 'تنبيهات الاكتمال تظهر فقط عندما يكون Kouri Harness في الخلفية.',
       kinds: {
         approval: {
           label: 'يلزم الموافقة',
@@ -255,11 +257,11 @@ export const arSettings = {
         },
         input: {
           label: 'يلزم إدخال',
-          description: 'طرح Hermes سؤالا أو يحتاج إلى كلمة مرور أو سر.'
+          description: 'طرح Kouri Harness سؤالا أو يحتاج إلى كلمة مرور أو سر.'
         },
         turnDone: {
           label: 'الرد جاهز',
-          description: 'انتهى دور بينما كان Hermes في الخلفية.'
+          description: 'انتهى دور بينما كان Kouri Harness في الخلفية.'
         },
         turnError: {
           label: 'فشل الدور',
@@ -274,7 +276,8 @@ export const arSettings = {
         title: 'إشعارات المتصفح',
         allow: 'السماح',
         states: {
-          default: 'يعرض هذا المتصفح التنبيهات عندما تكون علامة التبويب في الخلفية. إلى أن تسمح بذلك، يومض عنوان علامة التبويب فقط.',
+          default:
+            'يعرض هذا المتصفح التنبيهات عندما تكون علامة التبويب في الخلفية. إلى أن تسمح بذلك، يومض عنوان علامة التبويب فقط.',
           granted: 'مسموح. تظهر التنبيهات عندما تكون علامة التبويب هذه في الخلفية، ويومض عنوانها أيضًا.',
           denied: 'محظور في إعدادات الموقع لهذا المتصفح. سيظل عنوان علامة التبويب يومض.',
           insecure: 'يتطلب HTTPS، مثل Tailscale serve. عبر HTTP العادي يومض عنوان علامة التبويب فقط.',
@@ -291,7 +294,7 @@ export const arSettings = {
         watchingWindowNoInput: 'ما دامت محادثة مفتوحة في هذه النافذة، يُبلَّغ Hermes بآخر مرة استخدمت فيها هذه النافذة. لم يُرصَد أي إدخال بعد.'
       },
       test: 'إرسال إشعار تجريبي',
-      testTitle: 'Hermes',
+      testTitle: 'Kouri Harness',
       testBody: 'الإشعارات تعمل.',
       testSent: 'تم إرسال التجربة. إذا لم يظهر شيء، تحقق من أذونات الإشعارات في نظام التشغيل ووضع التركيز/عدم الإزعاج.',
       testUnsupported: 'هذا النظام لا يدعم الإشعارات الأصلية.',
@@ -313,7 +316,7 @@ export const arSettings = {
       advanced: 'متقدم'
     },
     searchPlaceholder: {
-      about: 'حول Hermes Desktop',
+      about: 'حول Kouri Harness Desktop',
       config: 'ابحث في الإعدادات...',
       gateway: 'اتصال البوابة...',
       keys: 'ابحث في مفاتيح API...',
@@ -339,7 +342,7 @@ export const arSettings = {
       chatTextScaleDesc:
         'يضبط حجم نص المحادثة ومحرر الرسائل نسبةً إلى مقياس الواجهة. يبقى حجم الأشرطة الجانبية وعناصر التحكم كما هو.',
       title: 'المظهر',
-      intro: 'خصص مظهر Hermes Desktop.',
+      intro: 'خصص مظهر Kouri Harness Desktop.',
       colorMode: 'نمط الألوان',
       colorModeDesc: 'اختر الوضع الفاتح أو الداكن أو اتبع النظام.',
       toolViewTitle: 'عرض الأدوات',
@@ -370,7 +373,7 @@ export const arSettings = {
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح Hermes.',
+      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح Kouri Harness.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       textDirectionTitle: 'اتجاه النص',
@@ -382,14 +385,14 @@ export const arSettings = {
       modelPricingTitle: 'أسعار النماذج',
       modelPricingDesc: 'عرض أسعار الإدخال والإخراج وقراءة ذاكرة التخزين المؤقت لكل مليون رمز في منتقي النماذج.',
       reactionsTitle: 'تفاعلات الرسائل',
-      reactionsDesc: 'تفاعلات إيموجي بأسلوب iMessage — تفاعل مع الرسائل، ويمكن لـ Hermes التفاعل مع رسائلك.',
+      reactionsDesc: 'تفاعلات إيموجي بأسلوب iMessage — تفاعل مع الرسائل، ويمكن لـ Kouri Harness التفاعل مع رسائلك.',
       tipsTitle: 'نصائح داخل التطبيق',
       tipsDesc:
         'نصائح تظهر أحيانًا من التطبيق وHermes. تظهر كل نصيحة مرة واحدة. تُعطّل تلقائيًا بعد أول 30 يومًا من الاستخدام، ويمكنك تفعيلها مجددًا.',
       tipsReset: count => `إظهار ${count} نصيحة مرة أخرى`,
       toursTitle: 'جولات إرشادية',
       toursDesc:
-        'دع Hermes يرشدك في التطبيق مع إبراز كل خطوة. تُعطّل الجولات تلقائيًا بعد أول 30 يومًا من الاستخدام، ويمكنك تفعيلها مجددًا.',
+        'دع Kouri Harness يرشدك في التطبيق مع إبراز كل خطوة. تُعطّل الجولات تلقائيًا بعد أول 30 يومًا من الاستخدام، ويمكنك تفعيلها مجددًا.',
       composerPopoutTitle: 'محرر عائم',
       composerPopoutDesc: 'السماح بسحب محرر الرسائل خارج موضعه. عند إيقاف الخيار، يبقى مثبتًا في الأسفل.',
       fileBrowserTitle: 'مستعرض الملفات',
@@ -424,9 +427,9 @@ export const arSettings = {
       pet: {
         title: 'حيوان أليف',
         intro:
-          'تبنَّ تعويذة petdex متحركة تطفو فوق التطبيق وتتفاعل مع ما يفعله Hermes — تجري أثناء تنفيذ الأدوات، وتحتفل عند النجاح، وتعبس عند الأخطاء.',
+          'تبنَّ تعويذة petdex متحركة تطفو فوق التطبيق وتتفاعل مع ما يفعله Kouri Harness — تجري أثناء تنفيذ الأدوات، وتحتفل عند النجاح، وتعبس عند الأخطاء.',
         restartHint:
-          'تحتاج الحيوانات الأليفة إلى إعادة تشغيل سريعة — بدأ التطبيق العامل قبل إضافة هذه الميزة. أغلق Hermes وأعد فتحه، ثم ارجع إلى هنا.',
+          'تحتاج الحيوانات الأليفة إلى إعادة تشغيل سريعة — بدأ التطبيق العامل قبل إضافة هذه الميزة. أغلق Kouri Harness وأعد فتحه، ثم ارجع إلى هنا.',
         scaleTitle: 'الحجم',
         scaleDesc: 'غيّر حجم التعويذة الطافية. يُطبّق في كل مكان فورا.',
         chooseTitle: 'اختر حيوانا أليفا',
@@ -457,6 +460,107 @@ export const arSettings = {
         turnOffFailed: 'تعذّر إيقاف الحيوان الأليف.'
       }
     },
+    sandboxProfiles: {
+      title: 'ملفات تعريف الصندوق الرملي للأوامر',
+      activeTitle: 'الملف النشط',
+      activeDesc:
+        'كل أمر لا يستخدم الوصول الكامل يُنفَّذ داخل الملف النشط. يُقرأ الملف لكل أمر، لذا يسري التبديل على الأمر التالي دون إعادة تشغيل الجلسة.',
+      profileName: 'اسم الملف',
+      addProfile: 'إضافة ملف',
+      deleteProfile: 'حذف الملف',
+      readDirectories: 'مجلدات القراءة',
+      readDirectoriesDesc: 'مسارات إضافية يمكن لهذا الملف قراءتها، مسار واحد في كل سطر.',
+      writeDirectories: 'مجلدات الكتابة',
+      writeDirectoriesDesc: 'مسارات إضافية يمكن لهذا الملف الكتابة فيها، مسار واحد في كل سطر.',
+      pathsPlaceholder: 'مسار واحد في كل سطر',
+      presets: {
+        readOnly: {
+          title: 'قراءة فقط',
+          description: 'يقرأ مساحة العمل. تبقى كل عمليات الكتابة مغلقة، وكذلك الشبكة.'
+        },
+        workspaceWrite: {
+          title: 'مساحة عمل قابلة للكتابة',
+          description: 'يقرأ ويكتب مساحة العمل. تبقى الشبكة مغلقة.'
+        },
+        workspaceExec: {
+          title: 'مساحة عمل قابلة للتنفيذ',
+          description: 'يقرأ ويكتب وينفّذ أوامر مساحة العمل. تبقى الشبكة مغلقة.'
+        },
+        fullAccess: {
+          title: 'وصول كامل',
+          description: 'ينفّذ الأوامر خارج sandctl دون أي تقييد.'
+        },
+        custom: {
+          title: 'مخصص',
+          description: 'يقرأ ويكتب المسارات المدرجة فقط، مع تجاوزات sandctl أدناه.'
+        }
+      },
+      fullAccess: {
+        title: 'تمكين الوصول الكامل؟',
+        description:
+          'يشغّل الوصول الكامل الأوامر على هذا الجهاز دون تقييد sandctl. تابع فقط إذا كنت تثق بكل ما يشغّله الوكيل.',
+        confirmLabel: 'تمكين الوصول الكامل',
+        cancelLabel: 'إبقاء الصندوق'
+      },
+      widen: {
+        title: 'توسيع الصندوق؟',
+        description:
+          'يتيح هذا التغيير للأوامر تجاوز ما يسمح به الإعداد المسبق: تصبح الشبكة أو عامل تصفية syscall أو حقن الأسرار أوسع.',
+        confirmLabel: 'توسيع',
+        cancelLabel: 'إلغاء'
+      },
+      policy: {
+        title: 'تجاوزات سياسة sandctl',
+        subtitle: 'يُطبَّق فوق الإعداد المسبق. أي حقل تتركه فارغًا يحتفظ بقيمة الإعداد المسبق.',
+        isolation: 'مستوى العزل',
+        inheritGlobal: 'وراثة العام',
+        l1: 'L1 — حدود العملية',
+        l2: 'L2 — gVisor',
+        l3: 'L3 — جهاز Kata',
+        syscall: 'عامل تصفية syscall',
+        inherit: 'وراثة الإعداد المسبق',
+        none: 'بلا (دون تصفية)',
+        platformDefault: 'افتراضي المنصة',
+        restricted: 'مقيّد',
+        strict: 'صارم',
+        networkMode: 'وضع الشبكة',
+        networkModeDefault: 'وراثة الإعداد المسبق',
+        networkModeAllowlist: 'قائمة السماح',
+        networkModeDenylist: 'قائمة الحظر',
+        networkDefault: 'إجراء الشبكة الافتراضي',
+        networkDefaultDefault: 'وراثة الإعداد المسبق',
+        deny: 'رفض',
+        allow: 'سماح',
+        allowedHosts: 'المضيفون المسموحون',
+        allowedHostsDesc:
+          'أسماء المضيفين التي يمكن لهذا الملف الوصول إليها، واحد في كل سطر. يُضاف إلى الإعداد المسبق فقط.',
+        allowedHostsPlaceholder: 'api.example.com:443',
+        allowedCidrs: 'نطاقات CIDR المسموحة',
+        allowedCidrsDesc:
+          'نطاقات CIDR التي يمكن لهذا الملف الوصول إليها، واحد في كل سطر. يُضاف إلى الإعداد المسبق فقط.',
+        allowedCidrsPlaceholder: '10.0.0.0/8:443',
+        blockedTargets: 'الأهداف المحظورة',
+        blockedTargetsDesc: 'أسماء مضيفين أو نطاقات CIDR تُرفض، واحد في كل سطر.',
+        blockedTargetsPlaceholder: '169.254.0.0/16',
+        fsMode: 'وضع نظام الملفات',
+        fsModeDefault: 'وراثة الإعداد المسبق',
+        allowlist: 'قائمة السماح',
+        denylist: 'قائمة الحظر',
+        cpu: 'حد المعالج',
+        memory: 'حد الذاكرة',
+        pids: 'حد العمليات',
+        wallTime: 'حد الوقت الفعلي',
+        noNewPrivs: 'حظر رفع الصلاحيات',
+        noNewPrivsDesc: 'يضبط no_new_privs حتى لا يكتسب الأمر صلاحيات عبر برامج setuid.',
+        injectSecrets: 'حقن الأسرار',
+        injectSecretsDesc: 'يمرّر قيم الأسرار إلى بيئة الصندوق. أوسع من الإعداد المسبق.',
+        proxySecrets: 'أسرار عبر الوكيل',
+        proxySecretsDesc: 'يبقي الأسرار خارج الصندوق ويحقنها عند وكيل الخروج بدلًا من ذلك.',
+        allowedSecrets: 'الأسرار المسموحة',
+        allowedSecretsDesc: 'أسماء الأسرار التي يمكن لهذا الملف استخدامها، اسم واحد في كل سطر.',
+        allowedSecretsPlaceholder: 'OPENAI_API_KEY'
+      }
+    },
     fieldLabels: {
       model: 'النموذج الافتراضي',
       modelContextLength:
@@ -476,6 +580,9 @@ export const arSettings = {
       'terminal.timeout': 'مهلة الأوامر',
       'terminal.persistentShell': 'صدفة مستمرة',
       'terminal.envPassthrough': 'تمرير متغيرات البيئة',
+      'terminal.sandbox.enabled': 'صندوق الأوامر',
+      'terminal.sandbox.escalation': 'تصعيد لأمر واحد',
+      'terminal.sandbox.backend': 'مستوى عزل الصندوق',
       'terminal.dockerImage': 'صورة Docker',
       'terminal.singularityImage': 'صورة Singularity',
       'terminal.modalImage': 'صورة Modal',
@@ -488,6 +595,10 @@ export const arSettings = {
       'approvals.mode': 'نمط الموافقات',
       'approvals.timeout': 'مهلة الموافقة',
       'approvals.mcpReloadConfirm': 'تأكيد إعادة تحميل MCP',
+      'approvals.autoReview.policy': 'سياسة المراجعة التلقائية',
+      'approvals.autoReview.historyMessages': 'نافذة سجل المراجعة',
+      'approvals.autoReview.maxArgChars': 'حد وسائط المراجعة',
+      'approvals.autoReview.skipTools': 'الأدوات التي تتخطاها المراجعة',
       commandAllowlist: 'قائمة الأوامر المسموحة',
       'security.redactSecrets': 'إخفاء الأسرار',
       'security.allowPrivateUrls': 'السماح بالروابط الخاصة',
@@ -553,20 +664,31 @@ export const arSettings = {
       fallbackProviders: 'إدخالات احتياطية بصيغة provider:model لتجربتها إذا فشل النموذج الافتراضي.',
       'display.personality': 'أسلوب المساعد الافتراضي للجلسات الجديدة.',
       'display.showReasoning': 'يعرض أقسام التفكير عندما توفرها الخلفية.',
-      timezone: 'تستخدم عندما يحتاج Hermes إلى سياق الوقت المحلي. اتركها فارغة لاستخدام منطقة النظام.',
+      timezone: 'تستخدم عندما يحتاج Kouri Harness إلى سياق الوقت المحلي. اتركها فارغة لاستخدام منطقة النظام.',
       'agent.imageInputMode': 'يتحكم في طريقة إرسال مرفقات الصور إلى النموذج.',
-      'agent.maxTurns': 'الحد الأعلى لدورات استدعاء الأدوات قبل أن يوقف Hermes التشغيل.',
+      'agent.maxTurns': 'الحد الأعلى لدورات استدعاء الأدوات قبل أن يوقف Kouri Harness التشغيل.',
       'terminal.cwd': 'مجلد المشروع الافتراضي لعمل الأدوات والطرفية.',
       'terminal.persistentShell': 'يحافظ على حالة الصدفة بين الأوامر عندما تدعمها الخلفية.',
       'terminal.envPassthrough': 'متغيرات البيئة التي تمرر إلى تنفيذ الأدوات.',
+      'terminal.sandbox.enabled':
+        'تشغيل كل أمر للوكيل داخل sandctl؛ الوصول الكامل يتجاوزه. جلسات الصندوق على Windows تستخدم PowerShell. الملف النشط أدناه يحدد ما تسمح به مساحة العمل، وكل الملفات تحظر الشبكة.',
+      'terminal.sandbox.escalation':
+        'يمكن للوكيل أن يطلب، لأمر واحد فقط، مستوى صندوق أوسع (حتى الوصول الكامل). توافق على كل طلب، ثم يعود الملف المهيّأ للأمر التالي.',
+      'terminal.sandbox.backend':
+        'مستوى العزل لكل أمر: l1 (حدود العملية) أو l2 (gVisor) أو l3 (جهاز Kata افتراضي)، أو اسم خلفية محددة. يمكن لملف الصندوق تجاوزه.',
       'terminal.dockerImage': 'صورة الحاوية المستخدمة عند اختيار Docker كخلفية تنفيذ.',
       'terminal.singularityImage': 'الصورة المستخدمة عند اختيار Singularity.',
       'terminal.modalImage': 'الصورة المستخدمة عند اختيار Modal.',
       'terminal.daytonaImage': 'الصورة المستخدمة عند اختيار Daytona.',
       'codeExecution.mode': 'مدى تقييد تنفيذ الكود بالمشروع الحالي.',
-      fileReadMaxChars: 'أقصى عدد أحرف يستطيع Hermes قراءته من ملف واحد في الطلب.',
-      'approvals.mode': 'كيف يتعامل Hermes مع الأوامر التي تحتاج موافقة صريحة.',
+      fileReadMaxChars: 'أقصى عدد أحرف يستطيع Kouri Harness قراءته من ملف واحد في الطلب.',
+      'approvals.mode': 'كيف يتعامل Kouri Harness مع الأوامر التي تحتاج موافقة صريحة.',
       'approvals.timeout': 'مدة انتظار طلبات الموافقة قبل انتهاء المهلة.',
+      'approvals.autoReview.policy':
+        'قواعد إضافية للمراجع. نصك أنت ويُعدّ موثوقًا؛ أما استدعاء الأداة نفسه فغير موثوق دائمًا.',
+      'approvals.autoReview.historyMessages': 'عدد رسائل المحادثة الأخيرة التي يراها المراجع (0-50).',
+      'approvals.autoReview.maxArgChars': 'مقدار ما يُعرض للمراجع من وسائط كل أداة (500-20000 حرف).',
+      'approvals.autoReview.skipTools': 'أسماء الأدوات التي لا تُراجَع أبدًا. أدوات القراءة المحلية تُتخطى دائمًا.',
       'security.redactSecrets': 'يخفي الأسرار المكتشفة من المحتوى المرئي للنموذج قدر الإمكان.',
       'checkpoints.enabled': 'ينشئ لقطات رجوع قبل تعديلات الملفات.',
       'memory.memoryEnabled': 'يحفظ ذكريات دائمة يمكن أن تساعد الجلسات القادمة.',
@@ -583,17 +705,21 @@ export const arSettings = {
       'stt.enabled': 'يفعل التفريغ الصوتي المحلي أو عبر مزود.',
       'stt.elevenlabs.languageCode': 'رمز لغة ISO-639-3 اختياري. اتركه فارغاً للاكتشاف التلقائي.',
       'updates.nonInteractiveLocalChanges':
-        'عندما يحدّث Hermes نفسه من التطبيق دون موجه طرفية، احتفظ بتعديلات المصدر المحلية أو تجاهلها.'
+        'عندما يحدّث Kouri Harness نفسه من التطبيق دون موجه طرفية، احتفظ بتعديلات المصدر المحلية أو تجاهلها.'
     },
     about: {
       updates: 'التحديثات',
-      channel: arUpdateChannel
+      channel: arUpdateChannel,
+      attribution: {
+        builtOn: 'مبني على Hermes Agent',
+        copyright: 'Hermes Agent © 2025 Nous Research · MIT License'
+      }
     },
 
     config: {
       minimizeToTrayTitle: 'التصغير إلى علبة النظام',
       minimizeToTrayDesc:
-        'تصغير النوافذ أو إغلاق النافذة الرئيسية يخفيها في علبة النظام (شريط القوائم على macOS) مع استمرار Hermes في العمل. استخدم إنهاء Hermes من قائمة العلبة أو Cmd+Q للخروج. معطّل افتراضيًا ويُطبّق على هذا الجهاز فقط.',
+        'تصغير النوافذ أو إغلاق النافذة الرئيسية يخفيها في علبة النظام (شريط القوائم على macOS) مع استمرار Kouri Harness في العمل. استخدم إنهاء Kouri Harness من قائمة العلبة أو Cmd+Q للخروج. معطّل افتراضيًا ويُطبّق على هذا الجهاز فقط.',
       minimizeToTrayUnavailable:
         'علبة النظام غير متاحة. ستُصغّر النوافذ وتُغلق كالمعتاد. أوقف هذا الخيار ثم فعّله لإعادة المحاولة.',
       none: 'لا شيء',
@@ -603,7 +729,7 @@ export const arSettings = {
       searchPlaceholder: 'بحث…',
       noResults: 'لا توجد نتائج',
       systemDefault: 'إعداد النظام الافتراضي',
-      loading: 'جار تحميل إعدادات Hermes...',
+      loading: 'جار تحميل إعدادات Kouri Harness...',
       emptyTitle: 'لا توجد إعدادات',
       emptyDesc: 'لا يحتوي هذا القسم على إعدادات قابلة للتعديل.',
       failedLoad: 'فشل تحميل الإعدادات',
@@ -622,26 +748,27 @@ export const arSettings = {
       description:
         'اضغط ثم حرّر ⌘ + Option على Mac، أو Ctrl + Alt على Windows/Linux، لإظهار HUD من أي تطبيق. معطّل افتراضيًا ويُطبّق على هذا الجهاز فقط.',
       permission:
-        'اسمح لـ Hermes في إعدادات النظام ← الخصوصية والأمان ← مراقبة الإدخال، ثم أعد المحاولة. لا تسجّل هذه الإيماءة ضغطات المفاتيح ولا تلتقط الشاشة.',
+        'اسمح لـ Kouri Harness في إعدادات النظام ← الخصوصية والأمان ← مراقبة الإدخال، ثم أعد المحاولة. لا تسجّل هذه الإيماءة ضغطات المفاتيح ولا تلتقط الشاشة.',
       unavailable:
-        'تعذّر تشغيل مساعد إيماءة HUD أو توقف بشكل غير متوقع. أعد المحاولة أو أعد تشغيل Hermes. يظل اختصار HUD الحالي يعمل داخل Hermes.',
-      missingHelper: 'مساعد إيماءة HUD غير موجود في تثبيت Hermes هذا. حدّث Hermes أو أعد تثبيته، ثم أعد المحاولة.',
+        'تعذّر تشغيل مساعد إيماءة HUD أو توقف بشكل غير متوقع. أعد المحاولة أو أعد تشغيل Kouri Harness. يظل اختصار HUD الحالي يعمل داخل Kouri Harness.',
+      missingHelper:
+        'مساعد إيماءة HUD غير موجود في تثبيت Kouri Harness هذا. حدّث Kouri Harness أو أعد تثبيته، ثم أعد المحاولة.',
       unsupportedSession:
         'جلسة سطح المكتب هذه لا تدعم ضغطات مفاتيح التعديل على مستوى النظام. يتطلب Linux جلسة X11؛ Wayland غير مدعوم.'
     },
     screenshot: {
       enabledTitle: 'اختصار لقطة الشاشة',
       enabledDesc:
-        'اضغط مفتاحَي Command معًا من أي تطبيق لالتقاط النافذة الأمامية وإرفاقها بمسودة Hermes الحالية. لا يُرسل أي شيء تلقائيًا. معطّل افتراضيًا ويُطبَّق على جهاز Mac هذا فقط. قد تتضمن النافذة محتوى حساسًا، لذا راجع المرفق قبل الإرسال.',
+        'اضغط مفتاحَي Command معًا من أي تطبيق لالتقاط النافذة الأمامية وإرفاقها بمسودة Kouri Harness الحالية. لا يُرسل أي شيء تلقائيًا. معطّل افتراضيًا ويُطبَّق على جهاز Mac هذا فقط. قد تتضمن النافذة محتوى حساسًا، لذا راجع المرفق قبل الإرسال.',
       statusTitle: 'حالة اختصار لقطة الشاشة',
       checking: 'جارٍ التحقق من اختصار لقطة الشاشة…',
       disabled: 'اختصار لقطة الشاشة معطّل.',
       starting: 'جارٍ بدء رصد الاختصار. لم يصبح جاهزًا بعد.',
       ready: 'الاختصار جاهز. تُرفق اللقطات بالمسودة الحالية دون إرسالها.',
       inputPermission:
-        'يتيح إذن مراقبة الإدخال لـ Hermes رصد مفتاحَي Command أثناء استخدام تطبيق آخر. اسمح لـ Hermes في إعدادات النظام ← الخصوصية والأمان ← مراقبة الإدخال، ثم عُد إلى هنا وأعد المحاولة.',
+        'يتيح إذن مراقبة الإدخال لـ Kouri Harness رصد مفتاحَي Command أثناء استخدام تطبيق آخر. اسمح لـ Kouri Harness في إعدادات النظام ← الخصوصية والأمان ← مراقبة الإدخال، ثم عُد إلى هنا وأعد المحاولة.',
       screenPermission:
-        'يتيح إذن تسجيل الشاشة لـ Hermes التقاط نافذة التطبيق الأمامية عند استخدام هذا الاختصار. اسمح لـ Hermes في إعدادات النظام ← الخصوصية والأمان ← تسجيل الشاشة، ثم عُد إلى هنا وأعد المحاولة. أعد تشغيل Hermes إذا طلب macOS ذلك.',
+        'يتيح إذن تسجيل الشاشة لـ Kouri Harness التقاط نافذة التطبيق الأمامية عند استخدام هذا الاختصار. اسمح لـ Kouri Harness في إعدادات النظام ← الخصوصية والأمان ← تسجيل الشاشة، ثم عُد إلى هنا وأعد المحاولة. أعد تشغيل Kouri Harness إذا طلب macOS ذلك.',
       openSettings: 'فتح إعدادات النظام',
       retry: 'إعادة المحاولة',
       unavailable: 'اختصار لقطة الشاشة غير متاح. أعد المحاولة أو عطّله.',
@@ -654,7 +781,7 @@ export const arSettings = {
     },
     quickEntry: {
       enabledTitle: 'الإدخال السريع',
-      enabledDesc: 'استدعِ محرّرا صغيرا من أي مكان باختصار عام وأرسل طلبا دون فتح Hermes.',
+      enabledDesc: 'استدعِ محرّرا صغيرا من أي مكان باختصار عام وأرسل طلبا دون فتح Kouri Harness.',
       shortcutTitle: 'اختصار الإدخال السريع',
       shortcutDesc: 'يحتاج إلى مفتاح تعديل واحد على الأقل، مثل CommandOrControl+Shift+Space.',
       active: 'الاختصار مفعّل.',
@@ -684,12 +811,13 @@ export const arSettings = {
       loading: 'جار تحميل إعدادات البوابة...',
       unavailableTitle: 'إعدادات البوابة غير متاحة',
       unavailableDesc: 'جسر IPC في سطح المكتب لا يوفّر إعدادات البوابة.',
-      webappHostTitle: 'مضيف Hermes',
+      webappHostTitle: 'مضيف Kouri Harness',
       webappHostDesc:
-        'يعمل Webapp دائمًا على مضيف Hermes الذي يقدّمه. الاتصالات المحفوظة أدناه هي قائمة هذا الجهاز، مشتركة مع تطبيق Hermes Desktop؛ ويتم الوصول إلى البوابات الأخرى عبر هذا المضيف.',
+        'يعمل Webapp دائمًا على مضيف Kouri Harness الذي يقدّمه. الاتصالات المحفوظة أدناه هي قائمة هذا الجهاز، مشتركة مع تطبيق Kouri Harness Desktop؛ ويتم الوصول إلى البوابات الأخرى عبر هذا المضيف.',
       webappOauthPaste: {
         title: 'إكمال تسجيل الدخول',
-        description: 'إذا انتهت علامة تبويب تسجيل الدخول على عنوان لا يُحمَّل (هذا المتصفح ليس على جهاز البوابة)، فالصق ذلك العنوان هنا.',
+        description:
+          'إذا انتهت علامة تبويب تسجيل الدخول على عنوان لا يُحمَّل (هذا المتصفح ليس على جهاز البوابة)، فالصق ذلك العنوان هنا.',
         placeholder: 'http://127.0.0.1:…/webapp/gateway-connections/oauth/callback?…',
         finish: 'إكمال',
         failed: 'تعذّر إكمال تسجيل الدخول'
@@ -697,14 +825,14 @@ export const arSettings = {
       title: 'اتصال البوابة',
       envOverride: 'تجاوز من البيئة',
       intro:
-        'يشغّل Hermes Desktop بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية Hermes تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
+        'يشغّل Kouri Harness Desktop بوابة محلية خاصة افتراضياً. استخدم بوابة بعيدة عندما تريد أن يتحكم هذا التطبيق بخلفية Kouri Harness تعمل مسبقاً على جهاز آخر أو خلف وكيل موثوق. اتصالات البوابة إعداد على مستوى الجهاز؛ ويتم اكتشاف الملفات الشخصية من البوابات المتصلة.',
       envOverrideTitle: 'متغيرات البيئة تتحكم في جلسة سطح المكتب هذه.',
       envOverrideDesc: 'أزل HERMES_DESKTOP_REMOTE_URL و HERMES_DESKTOP_REMOTE_TOKEN لاستخدام الإعداد المحفوظ أدناه.',
       localTitle: 'بوابة محلية',
-      localDesc: 'تشغيل خلفية Hermes خاصة على localhost. هذا هو الافتراضي ويعمل دون اتصال.',
+      localDesc: 'تشغيل خلفية Kouri Harness خاصة على localhost. هذا هو الافتراضي ويعمل دون اتصال.',
       remoteTitle: 'بوابة بعيدة',
       remoteDesc:
-        'صل واجهة سطح المكتب هذه بخلفية Hermes بعيدة. البوابات المستضافة تستخدم OAuth أو اسم مستخدم وكلمة مرور، والبوابات الذاتية قد تستخدم رمز جلسة.',
+        'صل واجهة سطح المكتب هذه بخلفية Kouri Harness بعيدة. البوابات المستضافة تستخدم OAuth أو اسم مستخدم وكلمة مرور، والبوابات الذاتية قد تستخدم رمز جلسة.',
       remoteUrlTitle: 'رابط البوابة البعيدة',
       remoteUrlDesc: 'الرابط الأساسي لخلفية لوحة التحكم البعيدة. يمكن استخدام بادئات مسار مثل /hermes.',
       probing: 'جار فحص طريقة مصادقة هذه البوابة...',
@@ -741,9 +869,9 @@ export const arSettings = {
       enterUrlFirst: 'أدخل رابط البوابة البعيدة أولاً.',
       restartingTitle: 'جار إعادة تشغيل اتصال البوابة',
       savedTitle: 'تم حفظ إعدادات البوابة',
-      restartingMessage: 'سيعيد Hermes Desktop الاتصال باستخدام الإعدادات المحفوظة.',
+      restartingMessage: 'سيعيد Kouri Harness Desktop الاتصال باستخدام الإعدادات المحفوظة.',
       savedMessage: 'تم الحفظ للتشغيل القادم.',
-      connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Kouri Harness ${version}` : ''}`,
       reachableTitle: 'البوابة البعيدة قابلة للوصول',
       signedOutTitle: 'تم تسجيل الخروج',
       signedOutMessage: 'تم مسح جلسة البوابة البعيدة.',
@@ -755,7 +883,8 @@ export const arSettings = {
       saveFailed: 'تعذر حفظ إعدادات البوابة',
       webAccess: {
         title: 'الوصول عبر الويب',
-        intro: 'افتح Hermes الموجود على هذا الحاسوب من هاتفك أو من حاسوب آخر، مع تسجيل الدخول بحساب Nous. من يسجّل الدخول يمكنه تشغيل الأوامر على هذا الحاسوب.',
+        intro:
+          'افتح Kouri Harness الموجود على هذا الحاسوب من هاتفك أو من حاسوب آخر، مع تسجيل الدخول بحساب Nous. من يسجّل الدخول يمكنه تشغيل الأوامر على هذا الحاسوب.',
         failed: 'تعذّر تغيير الوصول عبر الويب',
         running: 'قيد التشغيل',
         stopped: 'متوقف',
@@ -763,7 +892,7 @@ export const arSettings = {
         stopping: 'جارٍ الإيقاف',
         restartNeeded: 'يلزم إعادة التشغيل',
         unavailable: 'غير متاح',
-        notRunningDetail: 'شغّله لفتح Hermes من جهاز آخر.',
+        notRunningDetail: 'شغّله لفتح Kouri Harness من جهاز آخر.',
         needsNous: 'سجّل الدخول إلى حساب Nous من قسم المزوّدين أولًا.',
         runningLan: 'افتح هذا العنوان على جهاز في الشبكة نفسها.',
         runningPublic: 'يُقدَّم عبر عنوانك.',
@@ -771,7 +900,8 @@ export const arSettings = {
         pendingOn: 'تم الحفظ. ستقدّم البوابة تطبيق الويب بعد إعادة تشغيلها.',
         pendingOff: 'تم الإيقاف، لكن البوابة تواصل تقديم تطبيق الويب حتى إعادة تشغيلها.',
         unavailableDetail: reason => `تعذّر على البوابة تقديم تطبيق الويب: ${reason}`,
-        restartBusy: 'تم الحفظ. توجد محادثة قيد التشغيل، لذا لم تُعَد تشغيل البوابة. اختر «إعادة تشغيل البوابة» عند انتهائها.',
+        restartBusy:
+          'تم الحفظ. توجد محادثة قيد التشغيل، لذا لم تُعَد تشغيل البوابة. اختر «إعادة تشغيل البوابة» عند انتهائها.',
         restartFailed: 'تم الحفظ، لكن تعذّرت إعادة تشغيل البوابة. اختر «إعادة تشغيل البوابة» للمحاولة مجددًا.',
         restartFailedBecause: reason => `تعذّرت إعادة تشغيل البوابة: ${reason}`,
         startTimedOut: 'لم تقدّم البوابة تطبيق الويب خلال 90 ثانية.',
@@ -791,7 +921,8 @@ export const arSettings = {
         lanUnencrypted: 'الاتصال غير مشفّر: يمكن لآخرين على هذه الشبكة قراءة ما ترسله وتستقبله.',
         noLan: 'لا يملك هذا الحاسوب عنوان شبكة يمكن للأجهزة الأخرى الوصول إليه.',
         modePublic: 'عنواني الخاص',
-        modePublicDetail: port => `عنوان HTTPS تديره بالفعل، مثل Tailscale Serve أو نفق، يحوّل إلى http://127.0.0.1:${port}.`
+        modePublicDetail: port =>
+          `عنوان HTTPS تديره بالفعل، مثل Tailscale Serve أو نفق، يحوّل إلى http://127.0.0.1:${port}.`
       }
     },
     keys: {
@@ -817,7 +948,7 @@ export const arSettings = {
       remove: 'إزالة',
       deepLinkTitle: 'إضافة خادم MCP؟',
       deepLinkDescription:
-        'طلب رابط إضافة خادم MCP هذا إلى Hermes. راجع الإعدادات الكاملة أدناه — فهي قادمة من الرابط وليست من Hermes.',
+        'طلب رابط إضافة خادم MCP هذا إلى Kouri Harness. راجع الإعدادات الكاملة أدناه — فهي قادمة من الرابط وليست من Kouri Harness.',
       deepLinkStdioWarning:
         'سيشغّل هذا الخادم عملية محلية على جهازك بالأمر الموضح أدناه. لا تتابع إلا إذا كنت تثق بمصدره.',
       deepLinkConfirm: 'إضافة الخادم',
@@ -946,7 +1077,7 @@ export const arSettings = {
     providers: {
       connectAccount: 'ربط حساب',
       haveApiKey: 'لديك مفتاح API بدلاً من ذلك؟',
-      intro: 'سجل الدخول باشتراكك دون نسخ مفتاح API. يشغّل Hermes تسجيل الدخول من المتصفح لك داخل التطبيق.',
+      intro: 'سجل الدخول باشتراكك دون نسخ مفتاح API. يشغّل Kouri Harness تسجيل الدخول من المتصفح لك داخل التطبيق.',
       connected: 'متصل',
       collapse: 'طي',
       connectAnother: 'ربط مزود آخر',
@@ -1002,9 +1133,10 @@ export const arSettings = {
       browserRealProfile: {
         reimportSignins: 'إعادة استيراد تسجيلات الدخول',
         signinsImportedTitle: 'تسجيلات الدخول في المتصفح المدمج',
-        signinsImported: count => `تم تسجيل الدخول إلى المتصفح المدمج باستخدام ${count} من ملفات تعريف الارتباط من ملف متصفحك.`,
+        signinsImported: count =>
+          `تم تسجيل الدخول إلى المتصفح المدمج باستخدام ${count} من ملفات تعريف الارتباط من ملف متصفحك.`,
         signinsRemote: 'تعمل هذه الواجهة الخلفية على جهاز آخر، لذا لا يُستورد ملف متصفحها إلى المتصفح المدمج.',
-        signinsFailed: 'تعذر استيراد تسجيلات الدخول إلى المتصفح المدمج',
+        signinsFailed: 'تعذر استيراد تسجيلات الدخول إلى المتصفح المدمج'
       },
       loadingConfig: 'جار تحميل الإعدادات',
       savedTitle: 'تم حفظ بيانات الاعتماد',
@@ -1039,7 +1171,7 @@ export const arSettings = {
     }
   },
   modelAssignment: {
-    saveFailed: 'لم يحفظ Hermes تغيير النموذج هذا.',
+    saveFailed: 'لم يحفظ Kouri Harness تغيير النموذج هذا.',
     confirmTitle: 'تحذير اختيار النموذج',
     confirmDetail: 'أكّد فقط إذا كنت تقبل هذه المقايضة.',
     confirmAction: 'تأكيد',
@@ -1098,11 +1230,11 @@ export const arSettings = {
   },
   interfaceMode: {
     title: 'وضع الواجهة',
-    hint: 'يغيّر ما يظهر، وليس ما يستطيع Hermes فعله.',
+    hint: 'يغيّر ما يظهر، وليس ما يستطيع Kouri Harness فعله.',
     sessionNote: 'يحدده الوضع البسيط. التغيير هنا يستمر لهذه الجلسة فقط؛ بدّل إلى المتقدم لجعله خيارك.',
     simple: {
       label: 'بسيط',
-      description: 'للتحدث مع Hermes. الشريط الجانبي والدردشة؛ بلا طرفية أو لوحات ملفات أو فروقات.'
+      description: 'للتحدث مع Kouri Harness. الشريط الجانبي والدردشة؛ بلا طرفية أو لوحات ملفات أو فروقات.'
     },
     advanced: {
       label: 'متقدم',

@@ -36,7 +36,8 @@
     "./slash-input": "./src/slash-input.ts",
     "./slash-score": "./src/slash-score.ts",
     "./theme-presets": "./src/theme-presets.ts",
-    "./usage-tick": "./src/usage-tick.ts"
+    "./usage-tick": "./src/usage-tick.ts",
+    "./weixin-onboarding": "./src/weixin-onboarding.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

@@ -53,7 +53,7 @@ def load_on_disk_store() -> MemoryStore:
         config = load_config() or {}
         mem_cfg = get_builtin_memory_config(config)
         memory_enabled, user_profile_enabled = get_builtin_memory_store_flags(config)
-        store = MemoryStore(int(mem_cfg.get("memory_char_limit", 2200)), int(mem_cfg.get("user_char_limit", 1375)),
+        store = MemoryStore(int(mem_cfg.get("memory_char_limit", 3000)), int(mem_cfg.get("user_char_limit", 0)),
                             memory_enabled=memory_enabled, user_profile_enabled=user_profile_enabled)
     except Exception:
         store = MemoryStore()  # config optional — fall back to defaults rather than break /memory
@@ -381,12 +381,13 @@ MEMORY_SCHEMA = {
         "to free room AND add new ones, even when an add alone would overflow. The response "
         "reports current/limit chars and confirms completion; one batch call finishes the "
         "update, so don't repeat it.\n\n"
-        "WHEN: only for facts that apply to EVERY session regardless of task: who the user "
-        "is, stable environment facts, standing conventions with no task home. Anything "
-        "learned while doing a task (procedures, pitfalls, and the user's preferences and "
-        "corrections for that kind of work) belongs in the task's skill via skill_manage, "
-        "where it loads only when relevant; memory is injected into every turn and must "
-        "stay small.\n\n"
+        "WHEN: durable facts about the user or their world — including ones you learn mid-task "
+        "(preferences, corrections, dates, people, commitments). Long-lived facts belong in "
+        "notes/<category>/<topic>.md via write_file: notes are listed in the prompt when present "
+        "and loaded on demand. This tool holds only what every turn must see: who the user is, "
+        "stable environment facts, standing conventions with no task home. Reusable procedures "
+        "and pitfalls for a kind of work belong in the task's skill via skill_manage. Memory is "
+        "injected into every turn, so keep entries compact.\n\n"
         "IF FULL: an add is rejected with the current entries shown. Reissue as ONE batch that "
         "removes or shortens enough stale entries and adds the new one together.\n\n"
         "TARGETS: 'user' = who the user is (name, role, preferences, style). 'memory' = your "

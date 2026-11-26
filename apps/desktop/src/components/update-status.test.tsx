@@ -5,7 +5,14 @@ import type { DesktopUpdateStatus, DesktopVersionInfo } from '@/global'
 import { I18nProvider, type Locale, TRANSLATIONS, type Translations } from '@/i18n'
 import { en } from '@/i18n/en'
 import type { UpdateApplyState } from '@/store/updates'
-import { $backendUpdateApply, $backendUpdateStatus, $updateApply, $updateStatus } from '@/store/updates'
+import {
+  $backendUpdateApply,
+  $backendUpdateStatus,
+  $updateApply,
+  $updateStatus,
+  checkBackendUpdates,
+  checkUpdates
+} from '@/store/updates'
 
 import { deriveUpdateStatus, UpdateStatusCard, VersionHero } from './update-status'
 
@@ -154,6 +161,32 @@ describe('deriveUpdateStatus', () => {
     expect(view.line).toBe(en.updates.tapCheck)
   })
 
+  it('keeps manual checking available when a passive check is disabled', () => {
+    const status = { supported: false, reason: 'disabled', behind: null, updateAvailable: false }
+    const view = derive(status)
+
+    expect(view.tone).toBe('idle')
+    expect(view.supported).toBe(true)
+    expect(view.updateAvailable).toBe(false)
+    expect(view.line).toBe(en.updates.tapCheck)
+    expect(derive(status, IDLE_APPLY, true).line).toBe(en.updates.checking)
+    expect(derive(status, { ...IDLE_APPLY, applying: true, stage: 'update' }).line).toBe(en.updates.installing)
+  })
+
+  it.each(['client', 'backend'] as const)('allows an explicit %s check after a disabled passive check', target => {
+    const applyStore = target === 'client' ? $updateApply : $backendUpdateApply
+    const statusStore = target === 'client' ? $updateStatus : $backendUpdateStatus
+    const check = target === 'client' ? checkUpdates : checkBackendUpdates
+    applyStore.set(IDLE_APPLY)
+    statusStore.set({ supported: false, reason: 'disabled', behind: null })
+    const { unmount } = render(<UpdateStatusCard target={target} version={null} />)
+
+    fireEvent.click(screen.getByRole('button', { name: en.updates.checkNow }))
+    expect(check).toHaveBeenLastCalledWith({ force: true })
+    unmount()
+    statusStore.set(null)
+  })
+
   it('unsupported wins over everything else and keeps the backend message', () => {
     const view = derive({ supported: false, message: 'managed install', behind: 5, updateAvailable: true })
 
@@ -231,7 +264,10 @@ describe('deriveUpdateStatus', () => {
     $backendUpdateStatus.set({ supported: true, error: 'backend-check-failed' })
 
     const { unmount } = render(
-      <UpdateStatusCard target="backend" version={{ appVersion: '0.19.0', bundleSwapPending: true } as DesktopVersionInfo} />
+      <UpdateStatusCard
+        target="backend"
+        version={{ appVersion: '0.19.0', bundleSwapPending: true } as DesktopVersionInfo}
+      />
     )
 
     expect(screen.getByText(en.updates.cantReach)).toBeTruthy()

@@ -72,7 +72,7 @@ function pluginPathSuffix(caller: string, path: string): string {
  *  declared-capability seam; today the namespace IS the boundary. */
 export async function pluginRest<T>(pluginId: string, path: string, opts: PluginRestOptions = {}): Promise<T> {
   if (!window.hermesDesktop?.api) {
-    throw new Error('Hermes desktop bridge unavailable')
+    throw new Error('Kouri Harness desktop bridge unavailable')
   }
 
   const suffix = pluginPathSuffix('pluginRest', path)
@@ -97,7 +97,11 @@ type PluginSocketTarget = null | string | { refused: 'permission' }
 /** The URL a plugin socket dials, or null to stay on polling. A local gateway
  *  (`authMode: 'native'`, no static token) gets a fresh one-use URL from main:
  *  its native grant rides a request header main attaches to that one dial. */
-async function pluginSocketUrl(connection: HermesConnection, pluginId: string, suffix: string): Promise<PluginSocketTarget> {
+async function pluginSocketUrl(
+  connection: HermesConnection,
+  pluginId: string,
+  suffix: string
+): Promise<PluginSocketTarget> {
   if (connection.authMode === 'native') {
     const mint = window.hermesDesktop.getPluginWsUrl
 
@@ -162,11 +166,14 @@ export function pluginSocket(pluginId: string, path: string, onMessage: (data: u
     // socket reconnect loops — an immediate-retry loop across many
     // desktop clients floods the gateway with connection attempts
     // during a restart.
-    window.setTimeout(() => {
-      if (dial === generation) {
-        void connect()
-      }
-    }, reconnectBackoffDelayMs(attempt, { baseDelayMs: 500, capMs: 30_000 }))
+    window.setTimeout(
+      () => {
+        if (dial === generation) {
+          void connect()
+        }
+      },
+      reconnectBackoffDelayMs(attempt, { baseDelayMs: 500, capMs: 30_000 })
+    )
     attempt += 1
   }
 

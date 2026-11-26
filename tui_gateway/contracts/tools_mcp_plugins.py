@@ -681,8 +681,22 @@ class PluginSettingField(Result):
     value: JsonValue | None = None
     default: JsonValue | None = None
     choices: list[str] | None = None
+    model_provider_key: str | None = None
     env: str | None = None
     has_value: bool | None = None
+
+
+class PluginSettingsPageLocation(WireEnum):
+    root = "root"
+
+
+class PluginSettingsPage(Result):
+    """Optional presentation metadata for a manifest-backed Desktop settings page."""
+
+    location: PluginSettingsPageLocation
+    title: str | None = None
+    icon: str | None = None
+    order: int | None = None
 
 
 class PluginServerState(WireEnum):
@@ -727,6 +741,7 @@ class AgentPluginRow(Result):
     update_target: str | None = None
     pinned_sha: str | None = None
     settings_schema: list[PluginSettingField] | None = None
+    settings_page: PluginSettingsPage | None = None
     # Exact tool names this package's own code registered (native + its MCP servers' tools):
     # Desktop renders a plugin's tool-media renderer only for these.
     tools: list[str] = Field(default_factory=list)

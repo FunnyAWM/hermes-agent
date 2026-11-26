@@ -84,6 +84,8 @@ export interface PluginSettingsEntry extends PluginSettingsNode {
   order: number
   /** Registering desktop plugin id, when contributed by one. */
   pluginId?: string
+  /** Automatic agent pages may ask Settings to promote them out of the Plugins group. */
+  location: 'plugins' | 'root'
   children: PluginSettingsNode[]
 }
 
@@ -211,6 +213,7 @@ export function pluginSettingsEntries({
       key: contribution.id,
       kind: 'desktop',
       order: typeof contribution.order === 'number' ? contribution.order : 0,
+      location: 'plugins',
       pluginId: pluginIdOf(contribution.source),
       render: contribution.render,
       title: contribution.title,
@@ -223,15 +226,18 @@ export function pluginSettingsEntries({
       continue
     }
 
-    const owner = entries.find(entry => {
-      if (!entry.pluginId || entry.agentKey) {
-        return false
-      }
+    const owner =
+      row.settings_page?.location === 'root'
+        ? undefined
+        : entries.find(entry => {
+            if (!entry.pluginId || entry.agentKey) {
+              return false
+            }
 
-      const pkg = packageOf?.(entry.pluginId)
+            const pkg = packageOf?.(entry.pluginId)
 
-      return row.name === pkg || row.name === entry.pluginId || row.key === entry.pluginId
-    })
+            return row.name === pkg || row.name === entry.pluginId || row.key === entry.pluginId
+          })
 
     if (owner) {
       if (!owner.children.some(child => child.agentKey)) {
@@ -244,11 +250,13 @@ export function pluginSettingsEntries({
     entries.push({
       agentKey: row.key,
       children: [],
+      icon: row.settings_page?.icon ?? undefined,
       id: row.key,
       key: row.key,
       kind: 'agent',
-      order: 0,
-      title: row.name || row.key,
+      location: row.settings_page?.location ?? 'plugins',
+      order: row.settings_page?.order ?? 0,
+      title: row.settings_page?.title || row.name || row.key,
       uid: `agent:${row.key}`
     })
   }

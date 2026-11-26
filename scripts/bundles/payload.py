@@ -27,6 +27,10 @@ if str(ROOT) not in sys.path:
 INERT_SNAPSHOT_DIRS = (
     "tests", "tests-js", "website", "evals", ".github", "nix", "docker",
     "apps", "ui-tui", "web", "scripts",
+    # Build tooling and attribution data: 2,894 per-email files read only by
+    # scripts/add_contributor.py and scripts/audit_pr_attribution.py (T-45), and
+    # the project's own evidence/ write-ups. Never imported at runtime.
+    "contributors", "evidence",
 )
 
 

@@ -1,4 +1,5 @@
 import type { PluginRecord } from '@/contrib/plugins-store'
+import { localizeAgentPlugin } from '@/i18n/agent-plugin-settings'
 import type { AgentPluginRow } from '@/store/agent-plugins'
 
 /**
@@ -64,16 +65,18 @@ export function agentPackageName(row: AgentPluginRow): string {
 
 export function mergePluginPackages(
   desktopRecords: readonly PluginRecord[],
-  agentRows: readonly AgentPluginRow[]
+  agentRows: readonly AgentPluginRow[],
+  locale = 'en'
 ): PluginPackage[] {
   const byKey = new Map<string, PluginPackage>()
 
   for (const row of agentRows) {
     const key = agentPackageName(row)
+    const display = localizeAgentPlugin(row, locale)
     byKey.set(key, {
       key,
-      name: row.name,
-      description: row.description,
+      name: display.name,
+      description: display.description,
       kind: row.has_desktop_half ? 'both' : 'agent',
       desktop: null,
       agent: row,

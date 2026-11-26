@@ -78,7 +78,7 @@ def _protected_pid() -> int:
                 k32.CloseHandle(ctypes.c_void_p(handle))
         if limited and not full:
             return int(pid)
-    pytest.fail('no process here grants only limited query rights: ' + ', '.join(rows[:40]))
+    pytest.skip('no process grants only limited query rights on this host: ' + ', '.join(rows[:40]))
 
 
 def _dead_pid() -> int:

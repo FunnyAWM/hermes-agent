@@ -22,6 +22,20 @@ interface SourceOptions {
   env?: NodeJS.ProcessEnv
 }
 
+/** A checkout the desktop may drive: the CLI entry point proves the tree. */
+export function isHermesSourceRoot(root: string): boolean {
+  return existsSync(path.join(root, 'hermes_cli', 'main.py'))
+}
+
+export async function sourceBackendAt(
+  root: string,
+  args: string[],
+  findPython: (root: string) => Promise<string | null>,
+  options: SourceOptions = {}
+): Promise<SourceBackend | null> {
+  return createSourcePythonBackend(root, await findPython(root), args, options)
+}
+
 /** Keep the validated command. PM owns interpreter and generation selection. */
 export async function resolveSourceInstallationBackend(
   root: string,
@@ -58,7 +72,7 @@ export async function resolveSourceInstallationBackend(
 
   return {
     kind: 'command',
-    label: `Hermes at ${root}`,
+    label: `Kouri Harness at ${root}`,
     command,
     args: [...args],
     env,
@@ -93,7 +107,7 @@ export function createSourcePythonBackend(
 
   return {
     kind: 'python',
-    label: `Hermes source at ${root}`,
+    label: `Kouri Harness source at ${root}`,
     command,
     args: ['-m', 'hermes_cli.main', ...args],
     // The backend runs in the user's workspace cwd, and the selected

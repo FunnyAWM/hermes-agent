@@ -2294,7 +2294,7 @@ wheels = [
 
 [[package]]
 name = "hermes-agent"
-version = "0.0.0"
+version = "0.3.25+kaltsit"
 source = { editable = "." }
 default-groups = []
 dependencies = [

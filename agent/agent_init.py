@@ -1,3 +1,4 @@
+# health: allow FILE_LINES -- the +4 lines are the fork's own v0.23.0-line session-window wiring, merged in T-36 onto the smaller v0.23.2 base; existing fork code, not new
 """Implementation of :meth:`AIAgent.__init__` as ``init_agent(agent, ...)``.
 
 ``init_agent`` is a thin, ordered orchestrator over ``_init_*`` / ``_build_*`` phase
@@ -578,7 +579,7 @@ def _init_prompt_cache_config(agent):
         # Config values and traceback frames may contain credentials.
         logger.warning(
             "Agent configuration for prompt_caching.cache_ttl could not be loaded (%s); "
-            "using default prompt caching settings. Check the active Hermes Python "
+            "using default prompt caching settings. Check the active Kouri Harness Python "
             "environment and dependencies; run 'hermes config check' after "
             "configuration imports work again.",
             type(exc).__name__,
@@ -1177,8 +1178,8 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform, memory_manager=None):
             agent._memory_nudge_interval = int(mem_config.get("nudge_interval", 10))
             if agent._memory_enabled or agent._user_profile_enabled:
                 agent._memory_store = MemoryStore(
-                    memory_char_limit=mem_config.get("memory_char_limit", 2200),
-                    user_char_limit=mem_config.get("user_char_limit", 1375),
+                    memory_char_limit=mem_config.get("memory_char_limit", 3000),
+                    user_char_limit=mem_config.get("user_char_limit", 0),
                     memory_enabled=agent._memory_enabled,
                     user_profile_enabled=agent._user_profile_enabled,
                 )
@@ -1215,6 +1216,12 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform, memory_manager=None):
 
 
 def _apply_agent_section(agent, _agent_cfg):
+    # Conversation windows (Android 设 08): X caps user turns per request, Y freezes the prefix.
+    from agent.session_window import token_budget_settings, window_settings
+    agent._session_window_turns, agent._frozen_window_turns = window_settings(_agent_cfg)
+    # Token budget (Android ChatContextTrimmer.trim): newest rows that fit. 0 = off.
+    agent._window_token_budget = token_budget_settings(_agent_cfg)
+
     # Skills config: nudge interval for skill creation reminders
     agent._skill_nudge_interval = 10
     with suppress(Exception):
@@ -1925,7 +1932,7 @@ def _enforce_minimum_context(agent):
         raise ValueError(
             f"Model {agent.model} has a context window of {_ctx:,} tokens, "
             f"which is below the minimum {MINIMUM_CONTEXT_LENGTH:,} required "
-            f"by Hermes Agent.  {remedy}"
+            f"by Kouri Harness.  {remedy}"
         )
 
 
@@ -2171,7 +2178,7 @@ def init_agent(
         logger.warning(
             "Agent configuration could not be loaded (%s); using defaults for "
             "memory, skills, compression and related settings. Check the active "
-            "Hermes Python environment and dependencies; run 'hermes config check' "
+            "Kouri Harness Python environment and dependencies; run 'hermes config check' "
             "after configuration imports work again.",
             type(exc).__name__,
         )

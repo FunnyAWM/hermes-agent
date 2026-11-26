@@ -22,7 +22,7 @@ function stamp(payload: InstallStamp['payload']): InstallStamp {
   }
 }
 
-test.each(['bundled', 'bootstrap', 'light'] as const)(
+test.each(['bundled', 'bootstrap', 'light', 'headless'] as const)(
   'bootstrap state retains the %s artifact fact across failure and reset',
   payload => {
     const artifact = stamp(payload)

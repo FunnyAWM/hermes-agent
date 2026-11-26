@@ -67,8 +67,7 @@ export function sharedSshProfiles(
   backends: ReadonlyArray<{ descriptor: unknown; profileLabel: null | string }>
 ): string[] | undefined {
   const base = backends.find(({ profileLabel }) => (profileLabel || 'default') === 'default')?.descriptor as
-    | { baseUrl?: string }
-    | undefined
+    { baseUrl?: string } | undefined
 
   const served = base ? servedProfiles.get(`${connectionId}\0${base.baseUrl ?? ''}`) : undefined
 
@@ -83,14 +82,18 @@ function profileNames(body: unknown): string[] {
   }
 
   return profiles
-    .map(entry => String((entry as { name?: unknown } | null)?.name ?? '').trim().toLowerCase())
+    .map(entry =>
+      String((entry as { name?: unknown } | null)?.name ?? '')
+        .trim()
+        .toLowerCase()
+    )
     .filter(Boolean)
 }
 
 // Same shape remote-lifecycle gives a remote `--profile X serve` that refuses a missing profile.
 function remoteProfileMissing(profile: string): Error & { kind: string; profile: string } {
   return Object.assign(
-    new Error(`The remote Hermes profile '${profile}' does not exist. Select an existing remote profile.`),
+    new Error(`The remote Kouri Harness profile '${profile}' does not exist. Select an existing remote profile.`),
     { kind: 'remote-profile-missing', profile }
   )
 }
@@ -105,7 +108,9 @@ export async function resolveSharedSshProfileBackend<T extends { baseUrl?: strin
   profile: null | string | undefined,
   deps: SharedSshProfileDeps<T>
 ): Promise<(T & SharedSshProfileScope) | null> {
-  const key = String(profile ?? '').trim().toLowerCase()
+  const key = String(profile ?? '')
+    .trim()
+    .toLowerCase()
 
   if (source.kind !== 'ssh' || String(source.remoteProfile ?? '').trim() || !key || key === 'default') {
     return null

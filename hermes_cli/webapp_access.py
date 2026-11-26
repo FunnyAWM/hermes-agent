@@ -243,7 +243,7 @@ def _shown_address(host: str) -> Optional[str]:
 
 #: How many ports above the default Start tries for a standalone profile's Webapp.
 _PORT_SEARCH = 100
-#: Under the Hermes root every profile shares: one standalone profile's gateway at a time chooses and
+#: Under the Kouri Harness root every profile shares: one standalone profile's gateway at a time chooses and
 #: saves its Webapp port, so a Start in another gateway's process sees that claim before it chooses.
 _PORT_CLAIM_LOCK = Path("webapp") / "port-claim.lock"
 _PORT_CLAIM_HOLDER = threading.local()
@@ -256,7 +256,7 @@ def _port_to_serve(home: Path, host: str) -> tuple[int, Optional[int]]:
     A ``webapp.port`` in *home*'s config is the user's, and so is the default profile's gateway, which
     serves the documented address (9120 unless set): both keep it, and Start writes no port. A standalone
     profile's gateway with no ``webapp.port`` would find the default port taken by the default gateway's
-    Webapp, so it gets the first port above it that no other Hermes home on this machine claims and
+    Webapp, so it gets the first port above it that no other Kouri Harness home on this machine claims and
     nothing listens on now (for a specific address, on loopback too), and Start writes it to that profile's ``webapp.port``: the profile keeps that
     address across restarts, and the gateway, the launcher and the sign-in callback all use it.
 
@@ -275,7 +275,7 @@ def _port_to_serve(home: Path, host: str) -> tuple[int, Optional[int]]:
     _create_user_only(lock)
     try:
         with _file_lock(lock, _PORT_CLAIM_HOLDER, _PORT_CLAIM_TIMEOUT_SECONDS,
-                        "Timed out waiting for another Hermes profile to choose its Webapp port"):
+                        "Timed out waiting for another Kouri Harness profile to choose its Webapp port"):
             claimed = _claimed_ports(home)
             # A specific address also takes the port on loopback (its loopback socket).
             hosts = [host, *filter(None, [loopback_companion(host)])]
@@ -326,7 +326,7 @@ def _own_port(home: Path) -> Optional[object]:
 
 
 def _claimed_ports(home: Path) -> set[int]:
-    """The Webapp ports the other Hermes homes beside *home* claim: the default profile's (9120 unless
+    """The Webapp ports the other Kouri Harness homes beside *home* claim: the default profile's (9120 unless
     set) and every other profile's own ``webapp.port``, whether or not its gateway runs now. Only that
     setting is read from their configs."""
     from gateway.webapp_listener import DEFAULT_PORT

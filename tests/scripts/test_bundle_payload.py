@@ -22,6 +22,37 @@ def test_release_version_comes_from_the_release_identity_not_the_checkout(tmp_pa
     assert release_version(tmp_path, "v1.2.4") == "1.2.4"
 
 
+def test_frozen_mirror_preserves_hashes_and_restores_snapshot_on_failure(tmp_path, monkeypatch):
+    import tomllib
+    from pm.bundle_mirror import mirrored_build_inputs
+
+    index = "http://mirrors.aliyun.com/pypi"
+    monkeypatch.setenv("UV_DEFAULT_INDEX", index + "/simple/")
+    monkeypatch.setenv("HERMES_BUNDLE_TOOLS", "python,uv")
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_bytes(b'# [tool.uv] policy below\r\n[build-system]\r\nrequires=["wheel"]\r\n'
+                         b'[tool.uv]\r\nexclude-newer="3 days"\r\n')
+    lock = tmp_path / "uv.lock"
+    digest = "a" * 64
+    lock.write_text("".join(
+        f'[[package]]\nname="{name}"\nwheels=[{{url="https://files.pythonhosted.org/packages/{name}.whl",'
+        f'hash="sha256:{digest}"}}]\n' for name in ("setuptools", "packaging")
+    ) + '[[package]]\nname="other"\nsource={url="https://example.org/other.whl"}\n')
+    original = (lock.read_bytes(), manifest.read_bytes())
+
+    with pytest.raises(RuntimeError, match="build failed"), mirrored_build_inputs(tmp_path):
+        packages = tomllib.loads(lock.read_text())["package"]
+        assert packages[0]["wheels"] == [{"url": index + "/packages/setuptools.whl", "hash": "sha256:" + digest}]
+        assert packages[-1]["source"]["url"] == "https://example.org/other.whl"
+        project = tomllib.loads(manifest.read_text())
+        policy = project["tool"]["uv"]
+        assert policy["exclude-newer"] == "3 days" and policy["require-build-hashes"]
+        assert "wheel" in project["build-system"]["requires"]
+        assert f"setuptools @ {index}/packages/setuptools.whl#sha256={digest}" in project["build-system"]["requires"]
+        raise RuntimeError("build failed")
+    assert (lock.read_bytes(), manifest.read_bytes()) == original
+
+
 def test_wrapper_rejects_unresolved_template_fields(tmp_path, monkeypatch):
     from scripts.build import launchers
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 logger = logging.getLogger("hermes_cli.plugins")
 
@@ -167,26 +167,57 @@ async def _post_for(ctx: Any, text: str, session_key: str, route: Any) -> Plugin
     return PluginMessage(plugin_id, None, result)
 
 
-async def apost(ctx: Any, text: str) -> PluginMessage:
+def _directed_route(runner: Any, source: Mapping[str, Any]) -> tuple[str, Any] | tuple[None, dict[str, Any]]:
+    try:
+        from gateway.session import SessionSource
+        route = SessionSource.from_dict(dict(source))
+        session_key = runner._session_key_for_source(route)
+    except (KeyError, TypeError, ValueError) as exc:
+        return None, _err("invalid_source", str(exc)[:256])
+    if route.platform.value == "local":
+        return None, _err("invalid_source", "background source routing is only available for messaging chats")
+    return session_key, route
+
+
+async def apost(ctx: Any, text: str, *, source: Mapping[str, Any] | None = None) -> PluginMessage:
     """``post`` for code already running on the gateway's event loop (async hooks/commands)."""
+    if source is not None:
+        runner, _loop = _gateway_loop()
+        if runner is None:
+            return PluginMessage(ctx.plugin_id, None, _err(
+                "gateway_unavailable", "no live gateway is running in this process"))
+        session_key, route = _directed_route(runner, source)
+        if session_key is None:
+            return PluginMessage(ctx.plugin_id, None, route)
+        if not runner._plugin_injection_authorized(
+                route, plugin_id=ctx.plugin_id, target=f"session={session_key}"):
+            return PluginMessage(ctx.plugin_id, None, _err("permission_denied"))
+        return await _post_for(ctx, text, session_key, route)
     from gateway.plugin_messages import bound_route
     from gateway.session_context import bound_session_key
     return await _post_for(ctx, text, bound_session_key(), bound_route())
 
 
-def post(ctx: Any, text: str) -> PluginMessage:
+def post(ctx: Any, text: str, *, source: Mapping[str, Any] | None = None) -> PluginMessage:
     """Post *text* to the calling session from a tool handler or hook on a worker thread. The session
     is read here, on the caller's own context, then the send runs on the gateway loop."""
     from gateway.session_context import bound_session_key
-    session_key = bound_session_key()
+    session_key = bound_session_key() if source is None else "directed"
     if not session_key:
         return PluginMessage(ctx.plugin_id, None, _err("no_conversation", _NO_SESSION))
-    from gateway.plugin_messages import bound_route
-    route = bound_route()
+    directed_source = dict(source) if source is not None else None
+    if directed_source is None:
+        from gateway.plugin_messages import bound_route
+        route = bound_route()
+    else:
+        route = None
     handle = PluginMessage(ctx.plugin_id, None, _err("timeout"))
 
     async def _post() -> dict[str, Any]:
-        handle._adopt(await _post_for(ctx, text, session_key, route))
+        if directed_source is not None:
+            handle._adopt(await apost(ctx, text, source=directed_source))
+        else:
+            handle._adopt(await _post_for(ctx, text, session_key, route))
         return handle.result
 
     result = _run_on_gateway_loop(_post(), handle)

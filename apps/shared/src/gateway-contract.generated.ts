@@ -572,6 +572,7 @@ export interface SessionLiveInfo {
   system_prompt?: string | null
   credential_warning?: string | null
   lazy?: boolean | null
+  read_only?: boolean
   [key: string]: unknown
 }
 /** ``tui_gateway/server.py::_project_info_for_cwd``. */
@@ -2344,11 +2345,11 @@ export interface ProfilesGetAssetResult {
   size?: number | null
   data?: string | null
 }
-/** ``assume_fresh``: the unpackaged desktop's ``--fresh-install`` launch; the backend treats this machine as one that never used Hermes. Packaged builds never send it. */
+/** ``assume_fresh``: the unpackaged desktop's ``--fresh-install`` launch; the backend treats this machine as one that never used Kouri Harness. Packaged builds never send it. */
 export interface OnboardingStateParams {
   assume_fresh?: boolean
 }
-/** ``run``: onboarding opens on this launch (root config ``onboarding.run``, else a machine that never used Hermes). ``eligible``: this is the desktop's local backend and the welcome trial or a configured provider can carry the first chat. ``session_id``: the stored id of the onboarding chat still in progress, so a relaunch reopens it; ``run_id``: that run's id, which ``onboarding.ended`` names. */
+/** ``run``: onboarding opens on this launch (root config ``onboarding.run``, else a machine that never used Kouri Harness). ``eligible``: this is the desktop's local backend and the welcome trial or a configured provider can carry the first chat. ``session_id``: the stored id of the onboarding chat still in progress, so a relaunch reopens it; ``run_id``: that run's id, which ``onboarding.ended`` names. */
 export interface OnboardingRunStateResult {
   run: boolean
   eligible: boolean
@@ -3450,6 +3451,7 @@ export interface SessionListRow {
   message_count?: number
   live_message_count?: number | null
   source?: string
+  read_only?: boolean
   _lineage_root_id?: string | null
 }
 export interface SessionMostRecentParams {
@@ -3569,6 +3571,7 @@ export interface SessionCwdSetResult {
   system_prompt?: string | null
   credential_warning?: string | null
   lazy?: boolean | null
+  read_only?: boolean
   [key: string]: unknown
 }
 export interface SessionCloseParams {
@@ -3877,6 +3880,61 @@ export interface LlmOneshotParams {
 }
 export interface LlmOneshotResult {
   text: string
+}
+export interface SyncStatusParams {
+  profile?: string | null
+}
+export interface SyncStatusResult {
+  role: 'disabled' | 'master' | 'secondary'
+  paired: boolean
+  device_id?: string | null
+  master_endpoint?: string
+  listen_port?: number
+  auto_sync_minutes?: number
+  pinned_fingerprint?: string | null
+  last_sync_at_ms?: number | null
+  last_sync_error?: string | null
+  applied_count?: number
+  archived_count?: number
+  tracked_files?: number
+  syncable_files?: number
+  serving?: boolean
+}
+export interface SyncCreateChainParams {
+  profile?: string | null
+}
+/** The 24 words are shown exactly once (paper backup) and stored only in .env. */
+export interface SyncCreateChainResult {
+  words: string[]
+}
+export interface SyncPairParams {
+  profile?: string | null
+  endpoint?: string | null
+  words: string[]
+}
+export interface SyncPairResult {
+  device_id: string
+  pinned_fingerprint: string
+  master_endpoint?: string
+}
+export interface SyncNowParams {
+  profile?: string | null
+}
+export interface SyncNowResult {
+  role: 'disabled' | 'master' | 'secondary'
+  records: number
+  applied: number
+}
+export interface SyncServeParams {
+  profile?: string | null
+  start: boolean
+}
+export interface SyncServeResult {
+  serving: boolean
+  port?: number | null
+}
+export interface SyncAckResult {
+  ok?: boolean
 }
 export interface SystemBatteryParams {
   profile?: string | null
@@ -4668,6 +4726,7 @@ export interface AgentPluginRow {
   update_target?: string | null
   pinned_sha?: string | null
   settings_schema?: PluginSettingField[] | null
+  settings_page?: PluginSettingsPage | null
   tools?: string[]
 }
 export interface PluginServerRow {
@@ -4686,10 +4745,19 @@ export interface PluginSettingField {
   value?: unknown | null
   default?: unknown | null
   choices?: string[] | null
+  model_provider_key?: string | null
   env?: string | null
   has_value?: boolean | null
 }
 export type PluginSettingFieldType = 'string' | 'number' | 'boolean' | 'enum' | 'secret' | 'json'
+/** Optional presentation metadata for a manifest-backed Desktop settings page. */
+export interface PluginSettingsPage {
+  location: PluginSettingsPageLocation
+  title?: string | null
+  icon?: string | null
+  order?: number | null
+}
+export type PluginSettingsPageLocation = 'root'
 /** What a plugin loaded mid-run does NOW vs later (``hermes_cli.plugins_activation``). ``activated_now`` kinds (``{kind: [names]}``): ``gateway_commands`` (slash names), ``locales`` (``<lang>.<surface>`` language-pack layers), ``gateway_transforms`` / ``hooks`` (hook names), ``callbacks`` (platforms / ``slack:<action_id>``) — live in the running gateway once it reloaded (``gateway_reloaded``). ``live_now``: the plugin's MCP servers (connected, with their tools, or the error) and skills, usable in every open chat of the profile from its next turn — the chats also get a note listing them. ``deferred`` kinds: ``tools`` (Python tool names) and ``prompt`` (section ids) apply from the next session. ``missing_dependencies``: the plugin's declared Python requirements a running process cannot import (installed after it booted, or never); ``missing_in`` names which processes (``gateway``, ``backend`` = the Desktop / dashboard process) — only restarting them loads them. ``activated_now.provider``: a model-provider plugin whose current tree serves new sessions. ``load_error``: a model-provider plugin's updated tree failed to import (the previous version keeps serving). */
 export interface PluginActivation {
   name: string
@@ -4929,6 +4997,7 @@ export interface CanonicalSessionInfo {
   tool_availability_warnings?: string[] | null
   unknown_toolsets?: string[] | null
   usage?: Usage | null
+  read_only?: boolean
   source: string
   model?: string | null
   lazy: boolean
@@ -5233,7 +5302,7 @@ export interface CanonicalGroupsPeerRegisterParams {
 export interface CanonicalCreateParams {
   profile?: string | null
   request_id?: string | null
-  source?: 'cli' | 'tui' | 'gui' | 'acp' | 'tool' | 'oneshot'
+  source?: 'cli' | 'tui' | 'gui' | 'acp' | 'tool' | 'oneshot' | 'managed_worker'
   cwd?: string | null
   row_cwd?: string | null
   model?: string | null
@@ -5326,6 +5395,7 @@ export interface CanonicalSnapshotInfo {
   tool_availability_warnings?: string[] | null
   unknown_toolsets?: string[] | null
   usage?: Usage | null
+  read_only?: boolean
   desktop_protocol: 'hermes-gateway-v1'
   source?: string | null
   model?: string | null
@@ -5388,6 +5458,7 @@ export interface CanonicalSessionListRow {
   started_at: number | null
   message_count: number
   running: boolean
+  read_only?: boolean
   model?: string | null
   resolved_id?: string | null
   root_title?: string | null
@@ -6890,6 +6961,20 @@ export interface RpcMethods {
   'subscription.state': { params: ProfileParams; result: SubscriptionStateResult }
   /** Prorate, charge and flip the plan (billing:manage, idempotent). */
   'subscription.upgrade': { params: SubscriptionUpgradeParams; result: SubscriptionUpgradeResult }
+  /** Become the chain master: generate the 24-word mnemonic (shown once). */
+  'sync.create_chain': { params: SyncCreateChainParams; result: SyncCreateChainResult }
+  /** Leave the chain (secondary): pairing is discarded, synced files stay. */
+  'sync.disconnect': { params: SyncCreateChainParams; result: SyncAckResult }
+  /** Sync once: refresh the record log as master, pull+apply as secondary. */
+  'sync.now': { params: SyncNowParams; result: SyncNowResult }
+  /** Join a chain as secondary: full pull + apply, then persist the pairing (all-or-nothing). */
+  'sync.pair': { params: SyncPairParams; result: SyncPairResult }
+  /** Kill the chain (master): stop serving and discard this device's pairing. */
+  'sync.reset_chain': { params: SyncCreateChainParams; result: SyncAckResult }
+  /** Start or stop the master-role TLS sync server inside this backend process. */
+  'sync.serve': { params: SyncServeParams; result: SyncServeResult }
+  /** Pairing and sync state for one profile's KouriChat Link membership. */
+  'sync.status': { params: SyncStatusParams; result: SyncStatusResult }
   /** Host battery for the status bar; always resolves, ``available: false`` when unreadable. */
   'system.battery': { params: SystemBatteryParams; result: SystemBatteryResult }
   /** Record the client's column width for server-side rendering. */
@@ -7183,6 +7268,13 @@ export const RPC_METHODS = [
   'subscription.resume',
   'subscription.state',
   'subscription.upgrade',
+  'sync.create_chain',
+  'sync.disconnect',
+  'sync.now',
+  'sync.pair',
+  'sync.reset_chain',
+  'sync.serve',
+  'sync.status',
   'system.battery',
   'terminal.resize',
   'tools.configure',
