@@ -10,6 +10,7 @@
 # happens to have on PATH.
 param([switch]$RebuildPayload)
 
+$ErrorActionPreference = 'Stop'
 $env:HERMES_DESKTOP_VARIANT = "bundled";
 $env:HERMES_BUNDLE_TOOLS = "python,uv";
 $env:HERMES_DESKTOP_LOCAL_ROOT = (Resolve-Path "$PSScriptRoot\..").Path;
