@@ -149,6 +149,26 @@ def bound_session_key() -> str:
     return "" if value is _UNSET else value
 
 
+def is_human_chat_input(event: Any) -> bool:
+    from gateway.platforms.event import MessageType
+    return (event is not None and not event.internal and event.allow_gateway_control
+            and not event.inherit_channel_pin and not event.source.is_bot and event.user_id != ""
+            and event.source.platform.value not in {"api_server", "webhook"}
+            and event.message_type == MessageType.TEXT and not event.media_urls
+            and bool(event.text and event.text.strip()) and not event.is_command())
+
+
+def bound_chat_input() -> dict | None:
+    """The current human text and route, from the admitted event, for in-process chat tools."""
+    event = _SESSION_TURN_EVENT.get()
+    key = bound_session_key()
+    from agent.delegation_context import is_delegated_child_context
+    if not key or is_delegated_child_context() or not is_human_chat_input(event):
+        return None
+    return {"text": event.text, "message_id": event.message_id or "", "session_key": key,
+            "source": event.source.to_dict(), "actor_id": event.sender_id() or ""}
+
+
 def source_route_metadata(source: Any, metadata: dict | None) -> dict | None:
     """Keep inbound route anchors for durable deliveries after the source is gone."""
     anchors = {key: str(value) for key in ("scope_id", "parent_chat_id")

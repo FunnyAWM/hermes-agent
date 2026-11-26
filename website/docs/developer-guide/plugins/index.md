@@ -940,6 +940,7 @@ def register(ctx):
 - Called exactly once at startup
 - `ctx.register_tool()` puts your tool in the registry — the model sees it immediately
 - `ctx.register_hook()` subscribes to lifecycle events
+- An in-process chat tool can call `await ctx.in_gateway_chat(callback)` to run an async callback on the owning gateway loop. The callback receives the admitted human text, message ID, session key, source and actor ID. The call requires a live human text turn.
 - `ctx.register_cli_command()` registers a CLI subcommand (e.g. `hermes my-plugin <subcommand>`)
 - `ctx.register_command()` registers an in-session slash command (e.g. `/myplugin <args>` inside CLI / gateway chat) — see [Register slash commands](#register-slash-commands) below
 - `ctx.dispatch_tool(name, arguments)` — call any other tool (built-in or from another plugin) with the parent agent's context (approvals, credentials, task_id) wired up automatically. Useful from slash-command handlers that need to invoke `terminal`, `read_file`, or any other tool as if the model had called it directly.

@@ -53,6 +53,15 @@ class SuperAgentStore:
             conn.executescript(
                 """
                 PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS chat_offers (
+                    profile TEXT NOT NULL, conversation TEXT NOT NULL, actor TEXT NOT NULL,
+                    offer_id TEXT NOT NULL, task TEXT NOT NULL,
+                    PRIMARY KEY(profile, conversation, actor)
+                );
+                CREATE TABLE IF NOT EXISTS chat_forwards (
+                    ticket_id TEXT NOT NULL REFERENCES tickets(id), message_id TEXT NOT NULL,
+                    PRIMARY KEY(ticket_id, message_id)
+                );
                 CREATE TABLE IF NOT EXISTS triggers (
                     id TEXT PRIMARY KEY,
                     profile TEXT NOT NULL,
@@ -257,7 +266,7 @@ class SuperAgentStore:
 
     def submit(
         self, *, task: str, sandbox: str, workspace_root: str, source_instance: str,
-        external_event_id: str, source: dict | None,
+        external_event_id: str, source: dict | None, offer_actor: str | None = None,
     ) -> tuple[dict, bool]:
         task = task.strip()
         if not task:
@@ -272,8 +281,18 @@ class SuperAgentStore:
                 "WHERE g.profile=? AND g.source_instance=? AND g.external_event_id=?",
                 (self.profile, source_instance, external_event_id),
             ).fetchone()
+            if offer_actor is not None and not conn.execute(
+                "DELETE FROM chat_offers WHERE profile=? AND conversation=? AND actor=? AND offer_id=?",
+                (self.profile, source_instance, offer_actor, external_event_id),
+            ).rowcount and existing is None:
+                raise ValueError(t("super_agent.no_handoff"))
             if existing is not None:
                 return dict(existing), False
+            if offer_actor is None and source:
+                conn.execute("DELETE FROM chat_offers WHERE profile=? AND conversation=? AND actor=?",
+                             (self.profile, source_instance, source.get("actor_id", source.get("user_id")) or ""))
+            elif offer_actor is None and source_instance.startswith("slash:"):
+                conn.execute("DELETE FROM chat_offers WHERE profile=? AND conversation=?", (self.profile, source_instance))
             conn.execute(
                 "INSERT INTO triggers VALUES(?,?,?,?,?,?,?)",
                 (trigger_id, self.profile, source_instance, external_event_id, source_json, task, now),
@@ -341,6 +360,38 @@ class SuperAgentStore:
             return [dict(row) for row in conn.execute(
                 "SELECT * FROM tickets WHERE profile=? ORDER BY created_at DESC LIMIT ?", (self.profile, limit)
             ).fetchall()]
+
+    def chat_tickets(self, conversation: str, actor: str, ticket_id: str = "") -> list[dict]:
+        """Routing briefs from durable user input, including tickets created before chat routing."""
+        with self._connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT t.id,t.status,substr(t.task,1,320) AS goal, "
+                "(SELECT substr(i.text,1,200) FROM inbox i WHERE i.ticket_id=t.id "
+                " ORDER BY i.id DESC LIMIT 1) AS latest_followup "
+                "FROM tickets t JOIN triggers g ON g.id=t.trigger_id WHERE t.profile=? AND g.source_instance=? "
+                "AND (g.source_json IS NULL OR COALESCE(json_extract(g.source_json,'$.actor_id'), "
+                "json_extract(g.source_json,'$.user_id'),'')=?) "
+                "AND ((?='' AND t.status IN ('queued','running')) OR t.id=?) ORDER BY t.created_at DESC",
+                (self.profile, conversation, actor, ticket_id, ticket_id),
+            )]
+
+    def offer_handoff(self, conversation: str, actor: str, text: str, message_id: str) -> None:
+        with self._tx() as conn:
+            conn.execute("INSERT OR REPLACE INTO chat_offers VALUES(?,?,?,?,?)",
+                         (self.profile, conversation, actor, "offer:" + message_id if message_id else _id("offer"), text))
+
+    def chat_offer(self, conversation: str, actor: str) -> dict | None:
+        with self._connect() as conn:
+            row = conn.execute("SELECT offer_id,task FROM chat_offers WHERE profile=? AND conversation=? AND actor=?",
+                               (self.profile, conversation, actor)).fetchone()
+            return dict(row) if row else None
+
+    def clear_offer(self, conversation: str, actor: str, offer_id: str | None = None) -> bool:
+        with self._tx() as conn:
+            return bool(conn.execute(
+                "DELETE FROM chat_offers WHERE profile=? AND conversation=? AND actor=? AND (? IS NULL OR offer_id=?)",
+                (self.profile, conversation, actor, offer_id, offer_id),
+            ).rowcount)
 
     def scan_watchdog(self, stale_seconds: float) -> list[dict]:
         """Record alerts for persisted state that has not advanced; never alter execution state."""
@@ -574,7 +625,7 @@ class SuperAgentStore:
                     f"UPDATE inbox SET status='consumed' WHERE id IN ({','.join('?' for _ in ids)})", ids
                 )
 
-    def add_inbox(self, ticket_id: str, text: str) -> bool:
+    def add_inbox(self, ticket_id: str, text: str, *, message_id: str = "") -> bool:
         text = text.strip()
         if not text:
             raise ValueError("message is required")
@@ -584,9 +635,17 @@ class SuperAgentStore:
             ).fetchone()
             if ticket is None or ticket["status"] in TERMINAL_TICKET_STATES:
                 return False
-            conn.execute("INSERT INTO inbox(ticket_id,text,status,created_at) VALUES(?,?,'pending',?)",
-                         (ticket_id, text, _now()))
+            self._append_inbox(conn, ticket_id, text, message_id)
             return True
+
+    @staticmethod
+    def _append_inbox(conn, ticket_id: str, text: str, message_id: str) -> None:
+        if message_id and not conn.execute(
+            "INSERT OR IGNORE INTO chat_forwards VALUES(?,?)", (ticket_id, message_id)
+        ).rowcount:
+            return
+        conn.execute("INSERT INTO inbox(ticket_id,text,status,created_at) VALUES(?,?,'pending',?)",
+                     (ticket_id, text, _now()))
 
     def complete_if_idle(self, assignment_id: str, result: str) -> bool:
         now = _now()
@@ -926,7 +985,7 @@ class SuperAgentStore:
 
     # --- Fan-out delivery to subscribed tickets (SA-05) ---
 
-    def fanout_to_subscribers(self, thread_id: str, text: str) -> list[str]:
+    def fanout_to_subscribers(self, thread_id: str, text: str, message_id: str = "") -> list[str]:
         """Deliver a message to every live subscriber of a thread; returns accepted ticket IDs."""
         accepted: list[str] = []
         with self._tx() as conn:
@@ -939,11 +998,8 @@ class SuperAgentStore:
             for sub in subscribers:
                 if sub["mode"] == "context":
                     continue
-                conn.execute(
-                    "INSERT INTO inbox(ticket_id,text,status,created_at) VALUES(?,?,'pending',?)",
-                    (sub["ticket_id"], text, _now()),
-                )
                 accepted.append(sub["ticket_id"])
+                self._append_inbox(conn, sub["ticket_id"], text, message_id)
         return accepted
 
     # --- Per-turn metrics (SA-07) ---

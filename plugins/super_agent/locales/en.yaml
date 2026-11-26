@@ -1,4 +1,10 @@
 super_agent:
+  chat_help: "In ordinary chat the model checks ticket briefs with super_agent_route. A clear follow-up goes to the matching ticket. For a new task you will be asked to confirm the handoff."
+  handoff_question: "Create a Super Agent ticket for “{task}”? Reply yes or no."
+  handoff_declined: "Handoff declined. No ticket was created."
+  no_handoff: "There is no pending handoff to confirm."
+  confirmation_required: "Please reply yes or no to the pending Super Agent handoff."
+  chat_disabled: "Super Agent chat routing is disabled here. Continue the conversation normally."
   blocked: "Super Agent Worker has no active sandbox assignment."
   set_root: "Set plugins.entries.{plugin_id}.settings.workspace_root to an absolute Git repository root."
   invalid_root: "Super Agent workspace_root must be an existing absolute directory."

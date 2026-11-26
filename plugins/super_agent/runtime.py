@@ -96,8 +96,8 @@ class SuperAgentRuntime:
         self.wake()
         return ticket, created
 
-    async def tell(self, ticket_id: str, text: str) -> bool:
-        accepted = await asyncio.to_thread(self.store.add_inbox, ticket_id, text)
+    async def tell(self, ticket_id: str, text: str, *, message_id: str = "") -> bool:
+        accepted = await asyncio.to_thread(self.store.add_inbox, ticket_id, text, message_id=message_id)
         if accepted:
             self.wake()
         return accepted
@@ -150,10 +150,7 @@ class SuperAgentRuntime:
 
     # --- SA-06: observe mode ---
 
-    async def fanout(self, source_instance: str, thread_key: str, text: str) -> list[str] | None:
-        thread = await asyncio.to_thread(self.store.find_thread, source_instance, thread_key)
-        if thread is None:
-            return []
+    async def fanout(self, thread: dict, text: str, *, message_id: str) -> list[str] | None:
         if thread["accept_mode"] == "observe":
             await asyncio.to_thread(
                 self.store.record_observe,
@@ -163,7 +160,7 @@ class SuperAgentRuntime:
             return None
         if thread["accept_mode"] == "off":
             return None
-        accepted = await asyncio.to_thread(self.store.fanout_to_subscribers, thread["id"], text)
+        accepted = await asyncio.to_thread(self.store.fanout_to_subscribers, thread["id"], text, message_id)
         if accepted:
             self.wake()
         return accepted
@@ -348,12 +345,11 @@ class SuperAgentRuntime:
         while True:
             turn = await asyncio.to_thread(self.store.pending_turn, assignment["id"])
             if turn is None:
+                if await asyncio.to_thread(self.store.complete_if_idle, assignment["id"], last_result):
+                    return
                 turn = await asyncio.to_thread(self.store.create_followup_turn, assignment["id"])
-            if turn is None:
-                await asyncio.to_thread(
-                    self.store.complete_if_idle, assignment["id"], last_result
-                )
-                return
+                if turn is None:
+                    return
             result = await self._execute_turn(client, session_id, turn)
             last_result = result
             await asyncio.to_thread(self.store.mark_turn_terminal, turn["id"], result)

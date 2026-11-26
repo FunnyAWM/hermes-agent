@@ -44,8 +44,13 @@ From any configured Gateway robot channel, including Weixin/OpenClaw, send:
 implement the requested change and run focused tests
 ```
 
-Admitted text messages automatically open Router tickets. The optional `sa:` prefix still starts a
-new ticket even on a subscribed thread. Commands and media stay with their channel handlers.
+Ordinary chat in Desktop, Web and admitted robot channels checks the sender's open tickets in the
+current conversation. The `super_agent_route` tool reads a short brief for each candidate from the
+original goal and latest user follow-up. A clear match appends the message. If multiple tickets
+fit, the assistant asks which one. A new task requires a separate yes/no reply before it is queued.
+In robot channels, starting a message with a ticket ID directs the follow-up to that ticket.
+An explicit `sa:` on a robot channel or `/super-agent new` creates a ticket immediately.
+Subscribed threads continue to deliver updates to their subscribers. Commands and media keep their channel handlers.
 The sandbox token is optional and defaults to `default_sandbox`. The same operations are available
 with `/super-agent new|status|list|tell|stop|retry|takeover|pause|resume|health`. Completion, failure,
 takeover, and Watchdog messages return to the

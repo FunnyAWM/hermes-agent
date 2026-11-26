@@ -305,7 +305,7 @@ class GatewayInboundHooksMixin:
         call = functools.partial(
             invoke_plugin_command, plugin_handler, user_args, source=source,
             session_id=_plugin_context.session_id or "", session_key=_plugin_context.session_key or "",
-            platform=source.platform.value)
+            platform=source.platform.value, **({"actor_id": event.user_id} if event.user_id is not None else {}))
         # ctx.post_message from the handler reaches this chat even before its session is stored;
         # ctx.ask_choice asks it with the clarify prompt.
         with (self._session_env_scope(_plugin_context), bind_live_source(source),

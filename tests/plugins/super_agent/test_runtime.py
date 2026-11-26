@@ -113,6 +113,30 @@ class _Gateway:
 
 
 @pytest.mark.asyncio
+async def test_followup_arriving_at_completion_runs_in_the_same_worker(tmp_path, monkeypatch):
+    store = SuperAgentStore(tmp_path, "default")
+    ticket = _submit(store, "completion-race")
+    assignment = store.claim_next()
+    runtime = SuperAgentRuntime(_Context(), store)
+    complete = store.complete_if_idle
+    gateway = _Gateway()
+    attempts = 0
+
+    def complete_with_arrival(assignment_id, result):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            assert store.add_inbox(ticket["id"], "also check Firefox")
+        return complete(assignment_id, result)
+
+    monkeypatch.setattr(store, "complete_if_idle", complete_with_arrival)
+    await runtime._run_turns(gateway, assignment, "worker")
+    submits = [params for method, params in gateway.calls if method == "prompt.submit"]
+    assert len(submits) == 2 and "also check Firefox" in submits[1]["text"]
+    assert store.get_ticket(ticket["id"])["status"] == "succeeded"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("overrides", [
     {}, {"provider": "test-provider"}, {"model": "test-model"},
     {"provider": "test-provider", "model": "test-model"},

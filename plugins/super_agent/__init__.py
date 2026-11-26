@@ -41,14 +41,17 @@ def _workspace_root(ctx: Any) -> str:
     return str(root.resolve())
 
 
-def _source_snapshot(source: Any) -> dict | None:
+def _source_snapshot(source: Any, actor_id: str | None = None) -> dict | None:
     if source is None:
         return None
     if hasattr(source, "to_dict"):
         source = source.to_dict()
     if not isinstance(source, Mapping) or source.get("platform") == "local":
         return None
-    return dict(source)
+    snapshot = dict(source)
+    if actor_id is not None and actor_id != (source.get("user_id") or ""):
+        snapshot["actor_id"] = actor_id
+    return snapshot
 
 
 def _source_instance(source: dict | None, fallback: str) -> str:
@@ -78,10 +81,14 @@ def _parse_new(ctx: Any, text: str) -> tuple[str, str]:
         if not separator or not rest.strip():
             raise ValueError(t("super_agent.no_sandbox_task"))
         return level, rest.strip()
+    return _default_sandbox(ctx), text
+
+
+def _default_sandbox(ctx: Any) -> str:
     sandbox = str(ctx.get_config("default_sandbox", "workspace-write") or "workspace-write").strip()
     if sandbox not in SANDBOX_LEVELS:
         raise ValueError(t("super_agent.invalid_sandbox"))
-    return sandbox, text
+    return sandbox
 
 
 async def _new_ticket(
@@ -92,9 +99,10 @@ async def _new_ticket(
     source: Any = None,
     source_instance: str = "local",
     external_event_id: str | None = None,
+    offer_actor: str | None = None,
 ) -> str:
-    sandbox, task = _parse_new(ctx, text)
-    snapshot = _source_snapshot(source)
+    sandbox, task = _parse_new(ctx, text) if offer_actor is None else (_default_sandbox(ctx), text)
+    snapshot = _source_snapshot(source, offer_actor)
     ticket, created = await runtime.submit(
         task=task,
         sandbox=sandbox,
@@ -102,6 +110,7 @@ async def _new_ticket(
         source_instance=_source_instance(snapshot, source_instance),
         external_event_id=external_event_id or uuid.uuid4().hex,
         source=snapshot,
+        offer_actor=offer_actor,
     )
     duplicate = t("super_agent.duplicate") if not created else ""
     paused = await asyncio.to_thread(runtime.store.is_paused)
@@ -251,16 +260,17 @@ async def _command(
     *,
     source: Any = None,
     session_key: str = "",
+    actor_id: str | None = None,
     **_kwargs: Any,
 ) -> str:
     command, _, rest = raw_args.strip().partition(" ")
     command = command.lower()
     if command in {"", "help", "-h", "--help"}:
-        return t("super_agent.help")
+        return t("super_agent.help") + "\n\n" + t("super_agent.chat_help")
     if command == "new":
         try:
             return await _new_ticket(
-                ctx, runtime, rest, source=source, source_instance=f"slash:{session_key or 'local'}"
+                ctx, runtime, rest, source=_source_snapshot(source, actor_id), source_instance=f"slash:{session_key or 'local'}"
             )
         except (OSError, ValueError) as exc:
             return t("super_agent.rejected", exc=exc)
@@ -294,6 +304,8 @@ async def _post_gateway_admission(
     message_id: str = "",
     session_key: str = "",
     message_type: str = "text",
+    actor_id: str | None = None,
+    human_chat: bool = True,
     **_kwargs: Any,
 ):
     if message_type != "text" or not text.strip() or text.lstrip().startswith("/") or not _source_snapshot(source):
@@ -303,21 +315,18 @@ async def _post_gateway_admission(
     try:
         if not _allows_message_source(ctx, source):
             return None
-        if not is_sa:
-            forwarded = await runtime.fanout(f"gateway:{session_key}", _source_instance(source, ""), text)
-            if forwarded is None:  # Explicit off/observe mode leaves the channel session in control.
+        if is_sa:
+            reply = await _new_ticket(ctx, runtime, task, source=_source_snapshot(source, actor_id), source_instance=f"gateway:{session_key}",
+                                      external_event_id=message_id)
+        else:
+            if not human_chat:
                 return None
-            if forwarded:
-                return {"action": "handled", "reply": t("super_agent.forwarded", count=len(forwarded))}
-            task = text
-        reply = await _new_ticket(
-            ctx,
-            runtime,
-            task,
-            source=source,
-            source_instance=f"gateway:{session_key}",
-            external_event_id=message_id,
-        )
+            from .chat import route_chat
+            chat = {"text": text, "source": source, "session_key": session_key, "message_id": message_id,
+                    "actor_id": (source.get("user_id") or "") if actor_id is None else actor_id}
+            reply = await route_chat(ctx, runtime, chat, action="inbound")
+            if reply is None:
+                return None
     except Exception as exc:
         logger.exception("Super Agent gateway admission failed")
         reply = t("super_agent.rejected", exc=exc)
@@ -334,6 +343,8 @@ def register(ctx: Any) -> None:
         return
 
     runtime = SuperAgentRuntime(ctx, store)
+    from .chat import register_chat_tool
+    register_chat_tool(ctx, runtime)
     ctx.register_hook(
         "post_gateway_admission",
         lambda **kwargs: _post_gateway_admission(ctx, runtime, **kwargs),

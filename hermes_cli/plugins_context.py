@@ -411,6 +411,20 @@ class PluginContext(PluginCapabilityCtxMixin):
         from hermes_cli.plugin_session import context_surface
         return context_surface(self._manager)
 
+    async def in_gateway_chat(self, callback: Callable) -> Any:
+        """Run an async chat-tool callback with the bound human input on its gateway's event loop."""
+        import asyncio
+        from gateway.session_context import bound_chat_input
+        from hermes_cli.plugin_messages import _gateway_loop
+
+        chat = bound_chat_input()
+        _, loop = _gateway_loop()
+        if chat is None or loop is None:
+            raise RuntimeError("a live gateway chat turn is required")
+        if loop is asyncio.get_running_loop():
+            return await callback(chat)
+        return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(callback(chat), loop))
+
     def post_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
         """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
         place. A gateway admission hook may retain its plain ``source`` snapshot and pass it from a
