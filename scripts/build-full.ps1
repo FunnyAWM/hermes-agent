@@ -36,7 +36,7 @@ try {
   $env:NO_PROXY = ($savedNoProxy, "mirrors.aliyun.com" | Where-Object { $_ }) -join ","
   pnpm run payload; if ($LASTEXITCODE -ne 0) { throw "payload staging failed ($LASTEXITCODE)" }
   pnpm run build; if ($LASTEXITCODE -ne 0) { throw "desktop build failed ($LASTEXITCODE)" }
-  pnpm exec electron-builder --config electron-builder.fork.cjs --win nsis --x64 --publish never "-c.directories.output=release-full";
+  pnpm run builder:fork --win nsis --x64 --publish never "-c.directories.output=release-full";
   if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
 } finally {
   $env:UV_DEFAULT_INDEX = $savedIndex

@@ -6,9 +6,9 @@
 // Editing it in place would conflict on every upstream tag sync. A new file that
 // upstream does not have can never conflict.
 //
-// Usage (bypassing scripts/run-electron-builder.mjs, see the note below):
+// The fork uses NSIS and portable targets with the same lossless resource copy as upstream.
 //   pnpm run build
-//   npx electron-builder --config electron-builder.fork.cjs --win nsis --x64
+//   pnpm run builder:fork --win nsis --x64
 //
 // @ts-check
 'use strict'

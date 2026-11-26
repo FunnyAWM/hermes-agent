@@ -4,4 +4,4 @@ $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/";
 $env:HTTP_PROXY = "";
 $env:HTTPS_PROXY = "";
 pnpm run build
-pnpm exec electron-builder --config electron-builder.fork.cjs --win nsis portable --x64 --publish never "-c.directories.output=release-headless"
+pnpm run builder:fork --win nsis portable --x64 --publish never "-c.directories.output=release-headless"
