@@ -102,3 +102,32 @@ async def test_no_bound_session_is_refused_without_sending(tmp_path):
         edit = await asyncio.to_thread(handle.edit, "still nothing")
     assert (handle.ok, handle.error, edit["ok"]) == (False, "no_conversation", False)
     assert adapter.calls == []
+
+
+@pytest.mark.asyncio
+async def test_background_post_uses_the_admitted_source_snapshot(tmp_path):
+    adapter = _EditingAdapter()
+    runner, ctx, entry = _setup(tmp_path, adapter)
+    source = entry.origin.to_dict()
+    runner.session_store.remove_by_session_id(entry.session_id)
+    with patch("gateway.run._gateway_runner_ref", lambda: runner), \
+            patch.object(GatewayRunner, "_plugin_messaging_session_owned", return_value=True), \
+            patch.object(GatewayRunner, "_plugin_injection_authorized", return_value=True):
+        handle = await ctx.apost_message("finished in background", source=source)
+    assert handle.ok is True
+    assert adapter.calls == [("send", "42", "finished in background")]
+
+
+@pytest.mark.asyncio
+async def test_background_post_refuses_invalid_or_revoked_source_without_fallback(tmp_path):
+    adapter = _EditingAdapter()
+    runner, ctx, entry = _setup(tmp_path, adapter)
+    with patch("gateway.run._gateway_runner_ref", lambda: runner):
+        invalid = await ctx.apost_message("must not send", source={})
+    with patch("gateway.run._gateway_runner_ref", lambda: runner), \
+            patch.object(GatewayRunner, "_plugin_injection_authorized", return_value=False):
+        revoked = await ctx.apost_message("must not send", source=entry.origin.to_dict())
+
+    assert (invalid.ok, invalid.error) == (False, "invalid_source")
+    assert (revoked.ok, revoked.error) == (False, "permission_denied")
+    assert adapter.calls == []

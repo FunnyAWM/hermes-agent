@@ -411,16 +411,17 @@ class PluginContext(PluginCapabilityCtxMixin):
         from hermes_cli.plugin_session import context_surface
         return context_surface(self._manager)
 
-    def post_message(self, text: str) -> Any:
+    def post_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
         """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
-        place. Never raises (``ok=False`` + ``error`` with no conversation): ``plugin_messages.py``."""
+        place. A gateway admission hook may retain its plain ``source`` snapshot and pass it from a
+        background task. Never raises (``ok=False`` + ``error``): ``plugin_messages.py``."""
         from hermes_cli.plugin_messages import post
-        return post(self, text)
+        return post(self, text, source=source)
 
-    async def apost_message(self, text: str) -> Any:
+    async def apost_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
         """``post_message`` for async code on the gateway loop (edit with ``await handle.aedit``)."""
         from hermes_cli.plugin_messages import apost
-        return await apost(self, text)
+        return await apost(self, text, source=source)
 
     def ask_choice(self, question: str, choices: list) -> Optional[str]:
         """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or
