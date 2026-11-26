@@ -37,7 +37,7 @@ import { notify, notifyError } from '@/store/notifications'
 import { $settingsRequestProfile, setSettingsScope } from '@/store/settings-scope'
 
 import { desktopPackageName } from '../capabilities/plugins/plugin-packages'
-import type { OverlayNavLink } from '../overlays/overlay-split-layout'
+import type { OverlayNavGroup, OverlayNavLink } from '../overlays/overlay-split-layout'
 import { CAPABILITIES_ROUTE } from '../routes'
 
 import { PluginSettingsForm } from './plugin-settings-form'
@@ -218,24 +218,43 @@ export function pluginSettingsNavChildren(
   target: null | PluginSettingsTarget,
   open: OpenPluginSettings
 ): OverlayNavLink[] {
-  return entries.map(entry => {
-    const active = target?.entry.uid === entry.uid
+  return entries
+    .filter(entry => entry.location === 'plugins')
+    .map(entry => {
+      const active = target?.entry.uid === entry.uid
 
-    return {
-      active,
-      children: entry.children.map(child => ({
-        active: isActiveNode(target, entry, child),
-        icon: iconFor(child.agentKey ? 'settings-gear' : 'list-flat'),
-        id: pluginSettingsNavId(entry, child),
-        label: child.title,
-        onSelect: () => open(pluginSettingsRouteOf(entry, child))
-      })),
+      return {
+        active,
+        children: entry.children.map(child => ({
+          active: isActiveNode(target, entry, child),
+          icon: iconFor(child.agentKey ? 'settings-gear' : 'list-flat'),
+          id: pluginSettingsNavId(entry, child),
+          label: child.title,
+          onSelect: () => open(pluginSettingsRouteOf(entry, child))
+        })),
+        icon: entryIcon(entry),
+        id: pluginSettingsNavId(entry),
+        label: entry.title,
+        onSelect: () => open(pluginSettingsRouteOf(entry))
+      }
+    })
+}
+
+/** Manifest-promoted agent settings pages rendered as independent first-level Settings entries. */
+export function pluginSettingsTopLevelNav(
+  entries: readonly PluginSettingsEntry[],
+  target: null | PluginSettingsTarget,
+  open: OpenPluginSettings
+): OverlayNavGroup[] {
+  return entries
+    .filter(entry => entry.location === 'root')
+    .map(entry => ({
+      active: target?.entry.uid === entry.uid,
       icon: entryIcon(entry),
       id: pluginSettingsNavId(entry),
       label: entry.title,
       onSelect: () => open(pluginSettingsRouteOf(entry))
-    }
-  })
+    }))
 }
 
 // Lead copy under a page heading, the same caption rhythm native pages use.

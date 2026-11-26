@@ -8,7 +8,12 @@ import { $agentPlugins, $agentPluginsStatus, type AgentPluginRow } from '@/store
 
 import { OverlayNav } from '../overlays/overlay-split-layout'
 
-import { pluginSettingsNavChildren, PluginSettingsPane, usePluginSettingsEntries } from './plugin-settings'
+import {
+  pluginSettingsNavChildren,
+  PluginSettingsPane,
+  pluginSettingsTopLevelNav,
+  usePluginSettingsEntries
+} from './plugin-settings'
 
 const notesRow: AgentPluginRow = {
   description: 'Daily notes',
@@ -48,8 +53,9 @@ function Harness() {
     <>
       <OverlayNav
         groups={[
+          ...pluginSettingsTopLevelNav(entries, target, open),
           {
-            active: true,
+            active: target?.entry.location !== 'root',
             children: pluginSettingsNavChildren(entries, target, open),
             icon: Icon,
             id: 'plugins',
@@ -63,7 +69,7 @@ function Harness() {
   )
 }
 
-const railItem = (id: string) => document.querySelector<HTMLButtonElement>(`[data-tour="nav-${id}"]`)
+const railItem = (id: string) => window.document.querySelector<HTMLButtonElement>(`[data-tour="nav-${id}"]`)
 
 describe('Settings ▸ Plugins', () => {
   const disposers: Array<() => void> = []
@@ -107,6 +113,40 @@ describe('Settings ▸ Plugins', () => {
     fireEvent.click(railItem('plugins:desktop:weather:main:units')!)
     expect(screen.getByText('Units content')).toBeTruthy()
     expect(screen.queryByText('Weather home')).toBeNull()
+  })
+
+  it('opens a promoted bundled page from one rail entry alongside legacy plugin settings', async () => {
+    const promoted: AgentPluginRow = {
+      ...notesRow,
+      key: 'super_agent',
+      name: 'super_agent',
+      settings_page: { icon: 'hubot', location: 'root', order: 85, title: 'Super Agent' },
+      source: 'bundled'
+    }
+
+    requestGateway.mockResolvedValueOnce({ plugins: [notesRow, promoted] })
+    const { container } = render(<Harness />)
+
+    const id = 'plugins:agent:super_agent'
+    await waitFor(() => expect(railItem(id)?.textContent).toBe('Super Agent'))
+    expect(container.querySelectorAll(`[data-tour="nav-${id}"]`)).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse: Plugins' }))
+    expect(railItem('plugins:agent:notes')!.closest('[hidden]')).toBeTruthy()
+    expect(railItem(id)!.closest('[hidden]')).toBeNull()
+    fireEvent.click(railItem(id)!)
+    expect(railItem(id)?.getAttribute('aria-current')).toBe('page')
+    expect(railItem('plugins')?.getAttribute('aria-current')).toBeNull()
+    const region = screen.getByLabelText(/Region/)
+    fireEvent.change(region, { target: { value: 'hk' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
+    await waitFor(() =>
+      expect(requestGateway).toHaveBeenCalledWith('plugins.manage', {
+        action: 'settings',
+        key: 'super_agent',
+        profile: 'default',
+        values: { region: 'hk' }
+      })
+    )
   })
 
   it('renders a config_schema page that saves through plugins.manage settings', async () => {

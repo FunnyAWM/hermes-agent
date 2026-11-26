@@ -620,6 +620,7 @@ this Kouri Harness understands still loads with a warning.
 | `python_dependencies` | list of str | Declared Python requirements (e.g. `"requests>=2.0,<3"`). Installation requests consent; enabling admits the candidate through PM with the existing core, extras, and enabled-plugin union. Successful preparation publishes the environment and configuration transactionally; failure preserves the previous selection and enabled set. Declining leaves the installed plugin disabled. Pin upper bounds. |
 | `python_runtime` | str | `external` — the plugin manages its own interpreter/venv (sidecar pattern); Kouri Harness installs nothing and leaves any `pyproject.toml` alone. |
 | `config_schema` | mapping | JSON-schema-ish description of keys under `plugins.entries.<id>.settings`: `api_url: {type: str, default: "", description: "...", required: false}`. Validated at load; mismatches log actionable warnings naming the key and expected type — never load failures. Types: `str`, `int`, `float`, `bool`, `list`, `dict` (plus JSON-schema aliases) and `secret`. Also drives the settings form in the Desktop Plugins tab — see [Settings form in the Desktop](#settings-form-in-the-desktop). |
+| `settings_page` | mapping | Optional presentation for a native plugin's automatic Desktop settings page. `location: root` promotes it to a first-level Settings item; optional `title`, Codicon `icon`, and integer `order` control its rail entry. Without it, the page stays under **Settings → Plugins**. |
 | `config_keys` | list | Dotted paths in Kouri Harness' own config sections that your code reads (e.g. `memory.retaindb`). Each path covers itself and everything below it, so `hermes config get/set` recognizes those keys instead of warning "not a recognized config key", but only while the plugin is active (enabled, or the selected `memory.provider`). A path must be at least two segments deep, and paths Kouri Harness already defines are ignored, so a declaration never hides a typo elsewhere in the section. Settings for your plugin alone belong in `config_schema`; use this only for a core section your plugin reads. Portable `plugin.json` packages put it under `extensions."com.nousresearch.hermes".config_keys`. |
 | `license` | str | SPDX-style license id (e.g. `MIT`). |
 | `homepage` | str | Project URL. |
@@ -644,6 +645,10 @@ python_dependencies:
   - "somepkg>=1.0,<2"     # consent before PM admission
 config_schema:
   api_url: {type: str, default: "", description: "Service endpoint"}
+settings_page:
+  location: root
+  title: My Plugin
+  icon: extensions
 ```
 
 :::note Shared dependency admission
@@ -1014,6 +1019,20 @@ reads back. The form is table-driven by `type`:
 Every entry also accepts `label` (or `title`; without one the key is shown in
 sentence case, `maps_api_key` → "Maps API key"), `description` (help text under
 the label), `default` and `required` (marks the row **Required**).
+
+Native plugins that own a primary product surface can promote the same generated
+form into the first-level Settings rail without adding Desktop code:
+
+```yaml
+settings_page:
+  location: root
+  title: My Plugin
+  icon: extensions
+  order: 80
+```
+
+The route and persistence remain the ordinary plugin settings path; this metadata
+only changes where Desktop lists the page.
 
 ```yaml
 config_schema:

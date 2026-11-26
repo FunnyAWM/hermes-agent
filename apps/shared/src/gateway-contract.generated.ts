@@ -4659,6 +4659,7 @@ export interface AgentPluginRow {
   update_target?: string | null
   pinned_sha?: string | null
   settings_schema?: PluginSettingField[] | null
+  settings_page?: PluginSettingsPage | null
   tools?: string[]
 }
 export interface PluginServerRow {
@@ -4681,6 +4682,14 @@ export interface PluginSettingField {
   has_value?: boolean | null
 }
 export type PluginSettingFieldType = 'string' | 'number' | 'boolean' | 'enum' | 'secret' | 'json'
+/** Optional presentation metadata for a manifest-backed Desktop settings page. */
+export interface PluginSettingsPage {
+  location: PluginSettingsPageLocation
+  title?: string | null
+  icon?: string | null
+  order?: number | null
+}
+export type PluginSettingsPageLocation = 'root'
 /** What a plugin loaded mid-run does NOW vs later (``hermes_cli.plugins_activation``). ``activated_now`` kinds (``{kind: [names]}``): ``gateway_commands`` (slash names), ``locales`` (``<lang>.<surface>`` language-pack layers), ``gateway_transforms`` / ``hooks`` (hook names), ``callbacks`` (platforms / ``slack:<action_id>``) — live in the running gateway once it reloaded (``gateway_reloaded``). ``live_now``: the plugin's MCP servers (connected, with their tools, or the error) and skills, usable in every open chat of the profile from its next turn — the chats also get a note listing them. ``deferred`` kinds: ``tools`` (Python tool names) and ``prompt`` (section ids) apply from the next session. ``missing_dependencies``: the plugin's declared Python requirements a running process cannot import (installed after it booted, or never); ``missing_in`` names which processes (``gateway``, ``backend`` = the Desktop / dashboard process) — only restarting them loads them. */
 export interface PluginActivation {
   name: string

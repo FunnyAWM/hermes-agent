@@ -1,7 +1,7 @@
 {
   "openrpc": "1.3.2",
   "info": {
-    "title": "Kouri Harness TUI/Desktop gateway",
+    "title": "Hermes TUI/Desktop gateway",
     "version": "1",
     "description": "Generated from tui_gateway/contracts by scripts/gen_gateway_contracts.py."
   },
@@ -5346,6 +5346,17 @@
             ],
             "default": null,
             "title": "Settings Schema"
+          },
+          "settings_page": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginSettingsPage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "tools": {
             "items": {
@@ -14218,7 +14229,7 @@
               }
             ],
             "default": null,
-            "title": "Requires Kouri Harness"
+            "title": "Requires Hermes"
           },
           "has_desktop_half": {
             "anyOf": [
@@ -28853,6 +28864,63 @@
         "title": "PluginSettingFieldType",
         "type": "string"
       },
+      "PluginSettingsPage": {
+        "additionalProperties": false,
+        "description": "Optional presentation metadata for a manifest-backed Desktop settings page.",
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/PluginSettingsPageLocation"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Icon"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          }
+        },
+        "required": [
+          "location"
+        ],
+        "title": "PluginSettingsPage",
+        "type": "object"
+      },
+      "PluginSettingsPageLocation": {
+        "enum": [
+          "root"
+        ],
+        "title": "PluginSettingsPageLocation",
+        "type": "string"
+      },
       "PluginToolsetRow": {
         "additionalProperties": false,
         "properties": {
@@ -30560,7 +30628,6 @@
         "type": "object"
       },
       "ProfileCreateReceipt": {
-        "additionalProperties": false,
         "description": "What ``hermes profile create`` prints about a new profile, read on the machine (and in the\nprofile scope) that made it: built after a local create, or sent by the gateway that made it\n(``profiles.create`` with ``report``). The contract uses this type itself; a stdlib dataclass, so a\nlocal create never loads pydantic. A client treats a receipt missing a field, or with a wrong type,\nas an unknown outcome.",
         "properties": {
           "path": {

@@ -12,6 +12,7 @@ from tui_gateway import server
 MANIFEST = """\
 name: demo-plugin
 version: 1.0.0
+settings_page: {location: root, title: " Super Agent ", icon: hubot, order: 85}
 config_schema:
   api_url: {type: str, default: "https://example.invalid", description: "Service endpoint"}
   retries: {type: int, default: 3}
@@ -19,6 +20,8 @@ config_schema:
   mode: {type: str, choices: [fast, careful], default: fast}
   api_key: {type: secret, description: "Token"}
 """
+
+PAGE = {"location": "root", "title": "Super Agent", "icon": "hubot", "order": 85}
 
 
 @pytest.fixture
@@ -41,6 +44,7 @@ def test_list_carries_schema_fields_with_current_values_and_no_secret_values(plu
 
     rows = _manage(action="list")["result"]["plugins"]
     row = next(r for r in rows if r["key"] == "demo-plugin")
+    assert row["settings_page"] == PAGE
     fields = {f["key"]: f for f in row["settings_schema"]}
 
     assert fields["api_url"]["type"] == "string" and fields["api_url"]["value"] == "https://example.invalid"
@@ -55,6 +59,7 @@ def test_settings_writes_the_plugin_namespace_and_refuses_secrets_and_bad_types(
     resp = _manage(action="settings", key="demo-plugin", values={"api_url": "https://real.invalid", "retries": 2, "mode": "careful"})
 
     assert resp["result"]["ok"] is True and sorted(resp["result"]["written"]) == ["api_url", "mode", "retries"]
+    assert resp["result"]["plugin"]["settings_page"] == PAGE
     from hermes_cli.config import load_config_readonly
     assert load_config_readonly()["plugins"]["entries"]["demo-plugin"]["settings"] == {
         "api_url": "https://real.invalid", "retries": 2, "mode": "careful"}
@@ -89,7 +94,9 @@ def test_portable_plugin_json_schema_lists_and_saves_like_a_native_one(plugins_h
     (plugins_home / "plugins" / "portable-demo" / "plugin.json").write_text(PORTABLE_MANIFEST, encoding="utf-8")
 
     rows = _manage(action="list")["result"]["plugins"]
-    fields = {f["key"]: f for f in next(r for r in rows if r["key"] == "portable-demo")["settings_schema"]}
+    row = next(r for r in rows if r["key"] == "portable-demo")
+    assert row.get("settings_page") is None
+    fields = {f["key"]: f for f in row["settings_schema"]}
     assert fields["show_chip"]["type"] == "boolean" and fields["show_chip"]["value"] is True
     assert fields["api_key"]["type"] == "secret" and fields["api_key"]["env"] == "PORTABLE_DEMO_KEY"
 

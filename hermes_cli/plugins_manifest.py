@@ -36,6 +36,7 @@ _KNOWN_MANIFEST_FIELDS: set[str] = {
     "manifest_version", "api_version", "requires_plugins", "python_dependencies", "config_schema",
     "license", "homepage", "tags", "capabilities", "emits", "listens", "hermes", "depends",
     "requires_hermes", "python_runtime", "provides_locales", "requires_auth", "oauth", "config_keys",
+    "settings_page",
 }
 
 # Highest manifest schema version this Kouri Harness understands.

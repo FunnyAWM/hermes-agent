@@ -66,6 +66,32 @@ def _portable_config_schema(plugin_dir: Path) -> Any:
     return manifest_config_schema(json.loads(portable.read_text(encoding="utf-8-sig")))
 
 
+def plugin_settings_page(plugin_dir: Optional[Path]) -> Optional[dict[str, Any]]:
+    """Validated native ``settings_page`` presentation metadata for Desktop."""
+    if plugin_dir is None:
+        return None
+    manifest = Path(plugin_dir) / "plugin.yaml"
+    if not manifest.is_file():
+        return None
+    try:
+        from utils import fast_safe_load
+        data = fast_safe_load(manifest.read_text(encoding="utf-8-sig")) or {}
+    except Exception:
+        logger.debug("plugin settings: cannot read settings_page in %s", plugin_dir, exc_info=True)
+        return None
+    raw = data.get("settings_page") if isinstance(data, Mapping) else None
+    if not isinstance(raw, Mapping) or raw.get("location") != "root":
+        return None
+    page: dict[str, Any] = {"location": "root"}
+    for key in ("title", "icon"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            page[key] = value.strip()
+    order = raw.get("order")
+    if isinstance(order, int) and not isinstance(order, bool):
+        page["order"] = order
+    return page
+
 
 def secret_env_name(plugin_id: str, key: str, spec: Mapping[str, Any]) -> str:
     """``.env`` variable a ``type: secret`` field is stored under: the manifest's ``env:`` or
