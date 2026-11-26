@@ -55,7 +55,7 @@ def test_native_worker_passes_shared_toolchain_to_native_owner(tmp_path, monkeyp
 def test_native_cli_consumes_real_minimal_preparation_without_bootstrap(tmp_path):
     from scripts.build.inputs import AgentInputs, RESOURCE_ENV
     from scripts.bundles.native_prepared import publish_prepared
-    from pm import SCHEMA
+    from pm.lock import SCHEMA
     from pm.store import current_target
 
     out = tmp_path / "payload"

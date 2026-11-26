@@ -35,7 +35,7 @@ def _prepared_manifest(tmp_path: Path, subset) -> Path:
     `subset` is the lane the preparation ran (None = the full lock). That recorded
     subset is the fact `native.bundle_tools_of` reads and cross-checks against the
     staged tools."""
-    from pm import SCHEMA
+    from pm.lock import SCHEMA
     from scripts.bundles import native
     from scripts.bundles.native_prepared import prepared_path
 
@@ -64,7 +64,7 @@ def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, 
     prepared = SimpleNamespace(request=request, validate=lambda: None, node=Path("node"), icon_python=Path("python"),
                                packager=tmp_path / "packager", native=tmp_path / "native",
                                native_toolchain="fixture",
-                               payload=_prepared_manifest(tmp_path, {"python"} if sealed else None))
+                               payload=_prepared_manifest(tmp_path, {"python", "uv"} if sealed else None))
 
     def finish(prepared_payload, frontends):
         assert prepared_payload == prepared.payload
@@ -96,7 +96,7 @@ def test_every_payload_bundle_plants_the_prebuilt_webapp(tmp_path, monkeypatch, 
 
 def test_payload_tool_mismatch_fails_the_bundle_build(tmp_path):
     """A payload whose staged tools disagree with its manifest's recorded subset fails closed."""
-    from pm import SCHEMA
+    from pm.lock import SCHEMA
     from scripts.bundles import native
 
     manifest = _prepared_manifest(tmp_path, {"python"})
