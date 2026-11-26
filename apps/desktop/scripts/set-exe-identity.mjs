@@ -40,6 +40,7 @@ import { existsSync } from 'node:fs'
 
 import { rcedit } from 'rcedit'
 
+import identity from '../product-identity.cjs'
 import { isMain } from './utils.mjs'
 
 // A real-time file scanner (AV/EDR) holds a short exclusive handle on a freshly
@@ -86,7 +87,7 @@ async function stampExeIdentity(
   const options = {
     icon,
     'version-string': {
-      ProductName: 'Hermes',
+      ProductName: identity.displayName,
       FileDescription: 'Kal\'tsit',
       CompanyName: 'FunnyAWM',
       LegalCopyright: 'Copyright (c) 2026 FunnyAWM'

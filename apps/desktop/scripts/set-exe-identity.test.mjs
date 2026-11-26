@@ -22,7 +22,8 @@ test('retries transient rcedit commit failures with bounded backoff', async () =
 
   try {
     await stampExeIdentity(exe, root, {
-      rcedit: async () => {
+      rcedit: async (_exe, options) => {
+        assert.equal(options['version-string'].ProductName, 'Kouri Harness')
         attempts += 1
         if (attempts < 3) throw new Error('Unable to commit changes')
       },

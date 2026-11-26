@@ -148,7 +148,7 @@ test('stable headless pins userData to its historical directory', async (): Prom
 
 test.each([
   [undefined, 'Kouri Harness', 'hermes', 'latest', 'canary'],
-  ['bundled', 'Kouri Harness Agent', 'hermes', 'latest', 'canary'],
+  ['bundled', 'Kouri Harness', 'hermes', 'latest', 'canary'],
   ['light', 'Kouri Harness Light', 'hermes-light', 'light', 'light-canary'],
   // The installed face carries no "Headless" suffix (user request); the package
   // files keep the HermesHeadless prefix and appId stays hermes-headless.
@@ -219,11 +219,9 @@ test('light and bundled retain distinct OS markers from the full client', async 
   for (const variant of ['bundled', 'light', 'headless']) {
     const other: ProductIdentity = await identityForVariant(variant)
 
-    // Headless's displayName INTENTIONALLY matches the full client now (user request:
-    // no "Headless" suffix on the installed face) — its separation lives in appId,
-    // the package prefix, and the pinned userDataDirName instead.
+    // Bundled and headless share the product name while keeping distinct package identities.
     const distinctFields: readonly (keyof ProductIdentity)[] =
-      variant === 'headless' ? ['appId', 'appNamePascal'] : ['displayName', 'appId', 'appNamePascal']
+      variant === 'light' ? ['displayName', 'appId', 'appNamePascal'] : ['appId', 'appNamePascal']
     for (const field of distinctFields) {
       assert.notEqual(other[field], full[field])
     }
