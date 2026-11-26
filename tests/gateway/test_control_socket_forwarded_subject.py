@@ -6,7 +6,11 @@ authenticated subject when one is named — ``authorize_history`` compares that 
 cold row's stored owner — while an unverified peer, or a malformed subject, still fails closed.
 """
 
+import asyncio
 import json
+from types import SimpleNamespace
+
+import pytest
 
 from gateway.control_socket import GatewayControlServer
 from gateway.runtime_bootstrap import TicketStore
@@ -20,11 +24,11 @@ def _server(tmp_path):
     return server
 
 
-def _mint_line(profile, subject=None, *, with_subject=True):
+def _mint_line(profile, subject=None, *, with_subject=True, purpose="interactive"):
     params = {
         "profile_id": str(profile),
         "instance_id": "inst-1",
-        "purpose": "interactive",
+        "purpose": purpose,
     }
     if with_subject:
         params["subject"] = subject
@@ -47,6 +51,38 @@ def test_a_verified_peer_mints_for_the_named_dashboard_principal(tmp_path):
     assert grant["subject"] == FORWARDED
     # authorize_history's capability gate: the forwarded actor must still carry it.
     assert "session:create" in grant["capabilities"]
+
+
+@pytest.mark.asyncio
+async def test_router_obtains_managed_ticket_over_local_control(tmp_path):
+    from hermes_cli.gateway_client import _session_ticket
+
+    home = tmp_path.resolve()
+    server = _server(home)
+    endpoint = SimpleNamespace(profile_id=str(home), instance_id="inst-1", control_home=None)
+    assert await server.start()
+    try:
+        ticket = await asyncio.to_thread(
+            _session_ticket, home, endpoint, subject="plugin:super_agent", purpose="managed-session"
+        )
+        grant = server.ticket_store.redeem(ticket, profile_id=str(home), purpose="managed-session")
+        assert grant["subject"] == "plugin:super_agent"
+        assert "session:manage-worker" in grant["capabilities"]
+    finally:
+        await server.stop()
+
+
+@pytest.mark.parametrize(("subject", "purpose", "peer"), [
+    ("plugin:super_agent", "interactive", "uid:501"),
+    ("plugin:super_agent", "managed-session", None),
+    ("plugin:", "managed-session", "uid:501"),
+    ("plugin:other:admin", "managed-session", "uid:501"),
+])
+def test_router_subject_requires_verified_peer_managed_purpose_and_plugin_id(tmp_path, subject, purpose, peer):
+    response = json.loads(_server(tmp_path).handle_request_line(
+        _mint_line(tmp_path, subject, purpose=purpose), peer_subject=peer
+    ))
+    assert response["ok"] is False
 
 
 def test_an_unverified_peer_cannot_name_a_principal(tmp_path):
