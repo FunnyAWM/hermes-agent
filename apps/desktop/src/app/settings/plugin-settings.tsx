@@ -23,6 +23,7 @@ import {
   SETTINGS_PLUGINS_AREA
 } from '@/contrib/settings-pages'
 import { useI18n } from '@/i18n'
+import { localizeAgentPlugin } from '@/i18n/agent-plugin-settings'
 import type { IconComponent } from '@/lib/icons'
 import {
   $agentPluginBusy,
@@ -93,7 +94,9 @@ const ownerKey = (scope: string | undefined): null | string => scope ?? null
  *  still holds another profile's rows (a switch in flight, or Capabilities
  *  loaded a different profile). */
 function useOwnedAgentPlugins(owner: null | string) {
-  const rows = useStore($agentPlugins)
+  const storedRows = useStore($agentPlugins)
+  const { locale } = useI18n()
+  const rows = useMemo(() => storedRows.map(row => localizeAgentPlugin(row, locale)), [storedRows, locale])
   const loadedFor = useStore($agentPluginsProfile)
   const status = useStore($agentPluginsStatus)
   const owned = loadedFor === owner
@@ -402,7 +405,8 @@ function PluginSchemaSettingsPage({ agentKey, owner }: { agentKey: string; owner
 
           return ok
         }}
-        title={row.name}
+        scope={owner}
+        title={row.settings_page?.title || row.name}
       />
     </SettingsContent>
   )

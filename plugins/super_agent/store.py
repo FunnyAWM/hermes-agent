@@ -10,6 +10,8 @@ import sqlite3
 import time
 import uuid
 
+from agent.i18n import t
+
 
 TERMINAL_TICKET_STATES = frozenset({"succeeded", "failed", "cancelled", "taken_over"})
 SANDBOX_LEVELS = frozenset({"read-only", "workspace-write", "workspace-exec"})
@@ -343,7 +345,7 @@ class SuperAgentStore:
     def scan_watchdog(self, stale_seconds: float) -> list[dict]:
         """Record alerts for persisted state that has not advanced; never alter execution state."""
         if not math.isfinite(stale_seconds) or stale_seconds <= 0:
-            raise ValueError("watchdog_seconds must be greater than zero")
+            raise ValueError(t("super_agent.watchdog_config"))
         now = _now()
         stale_before = now - stale_seconds
         with self._tx() as conn:
@@ -371,20 +373,11 @@ class SuperAgentStore:
                 metrics = json.loads(assignment["turn_metrics"] or "{}") if assignment["turn_metrics"] else {}
                 tokens_used = (metrics.get("input_tokens") or 0) + (metrics.get("output_tokens") or 0)
                 if tokens_used > 0:
-                    detail = (
-                        f"No persisted state change for {age} seconds despite {tokens_used} tokens "
-                        f"consumed in the current turn; the Worker may be looping without progress."
-                    )
-                    suggestion = (
-                        "Inspect the Worker Session for repeated tool calls; consider stop or takeover "
-                        "if the same operation keeps failing."
-                    )
+                    detail = t("super_agent.stale_tokens", age=age, tokens_used=tokens_used)
+                    suggestion = t("super_agent.inspect_loop")
                 else:
-                    detail = f"No persisted Assignment or Turn state change for {age} seconds."
-                    suggestion = (
-                        "Inspect the Worker Session and worktree; then take over or stop, "
-                        "and retry only from a terminal state."
-                    )
+                    detail = t("super_agent.stale_state", age=age)
+                    suggestion = t("super_agent.inspect")
                 prior = existing.get(assignment["id"])
                 conn.execute(
                     "INSERT INTO watchdog_alerts("
@@ -401,8 +394,7 @@ class SuperAgentStore:
                     ).fetchone()
                     self._enqueue_outbox(
                         conn, ticket, f"watchdog:{assignment['id']}:{_id('notice')}",
-                        f"Super Agent {assignment['ticket_id']} has no recorded state progress for "
-                        f"{age} seconds. {suggestion}", now,
+                        t("super_agent.stale", ticket_id=assignment['ticket_id'], age=age, suggestion=suggestion), now,
                     )
                     new_alerts.append({
                         **dict(assignment), "assignment_id": assignment["id"],
@@ -623,7 +615,7 @@ class SuperAgentStore:
             conn.execute("DELETE FROM subscriptions WHERE ticket_id=?", (assignment["ticket_id"],))
             self._enqueue_outbox(
                 conn, ticket, f"assignment:{assignment_id}:succeeded",
-                f"Super Agent {ticket['id']} completed.\n\n{result}", now,
+                t("super_agent.completed", id=ticket['id'], result=result), now,
             )
             return True
 
@@ -647,7 +639,7 @@ class SuperAgentStore:
                          (error, now, assignment["ticket_id"]))
             self._enqueue_outbox(
                 conn, ticket, f"assignment:{assignment_id}:failed",
-                f"Super Agent {ticket['id']} failed: {error}", now,
+                t("super_agent.failed", id=ticket['id'], error=error), now,
             )
             return True
 
@@ -696,7 +688,7 @@ class SuperAgentStore:
                 ticket_id=ticket_id,
             )
             self._enqueue_outbox(
-                conn, ticket, "cancelled", f"Super Agent {ticket['id']} cancelled.", now,
+                conn, ticket, "cancelled", t("super_agent.cancelled", ticket_id=ticket['id']), now,
             )
             current = conn.execute(
                 "SELECT a.*,tr.admission_id AS turn_admission_id FROM assignments a "
@@ -735,8 +727,7 @@ class SuperAgentStore:
             )
             self._enqueue_outbox(
                 conn, ticket, "taken_over",
-                f"Super Agent {ticket['id']} was taken over by an operator. "
-                "Its Worker Session and worktree were retained.",
+                t("super_agent.taken_over", id=ticket['id']),
                 now,
             )
             return dict(current) if current is not None else {**dict(ticket), "status": "taken_over"}

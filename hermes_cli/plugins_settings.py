@@ -137,6 +137,10 @@ def plugin_settings_fields(plugin_id: str, plugin_dir: Optional[Path]) -> list[d
             "description": str(spec.get("description") or ""),
             "required": bool(spec.get("required")),
         }
+        provider_key = spec.get("model_provider_key")
+        if (kind == "string" and isinstance(provider_key, str) and provider_key != key
+                and provider_key in schema and _field_type(schema[provider_key]) == "string"):
+            field["model_provider_key"] = provider_key
         if kind == "secret":
             env = secret_env_name(plugin_id, key, spec)
             field.update({"env": env, "has_value": get_env_value(env) is not None})

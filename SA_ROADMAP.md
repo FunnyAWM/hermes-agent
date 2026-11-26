@@ -86,7 +86,7 @@ Router 创建的 Worker Session 全部出现在会话列表中，普通用户只
 ### 4.3.1 设置入口
 
 Super Agent 通过原生 `config_schema` 暴露 profile 级设置，并用通用 `settings_page.location: root`
-元数据提升为 Desktop 独立一级菜单。设置包括 Gateway 消息来源、Worker provider/model、Router
+元数据提升为 Desktop 独立一级菜单「超级代理」。Worker 提供商和模型通过当前配置档的联动下拉列表选择。其他设置包括 Gateway 消息来源、Router
 最大并发 Worker 数、工作区、默认沙箱和 Watchdog 阈值。当前调度器每个 Ticket 只创建一个
 Worker，因此并发设置控制 Router 全局槽位；单 Ticket 多 Worker 汇聚不在当前实现范围内。
 
@@ -96,7 +96,7 @@ Worker，因此并发设置控制 Router 全局槽位；单 Ticket 多 Worker �
 
 - **身份与去重**：携带 owning profile、平台、机器人账号／连接实例、稳定 sender ID、conversation ID、message ID，以及平台提供的 thread / reply ID；沿用 Gateway 准入规则，再校验任务 Policy。显示名与消息正文不能充当授权身份。
 - **Thread 与任务定位**：有原生话题时使用稳定 topic / thread ID；无话题时保留会话及回复关系，结合显式 Ticket 引用定位。同一私聊或群聊可承载多个任务，取消／改向的目标不明确时先澄清，不能默认作用于所有 Worker。
-- **分派与回复**：按配置将选定机器人会话交给 SuperAgent，或使用显式入口标记；同一入站消息只能由普通会话处理链或 SuperAgent 其中一方承接，避免双重执行与双重回复。Router 生成回复意图，Outbox 调用现有发送能力，保留原渠道、会话与回复目标；Worker 不直接发消息。
+- **分派与回复**：启用插件后，已准入且来源获准的普通文本自动交给 Router。有活跃订阅时转发给对应 Worker，否则创建工单。`sa:` 可显式新建工单。设为 off 或 observe 的线程、斜杠命令及媒体仍由原渠道处理。每条消息只交给一方。Router 生成回复意图，Outbox 调用现有发送能力，保留原渠道、会话与回复目标；Worker 不直接发消息。
 - **可靠性与兼容**：忽略自身消息回声，处理平台重投、消息编辑及断线重连。已持久接收的事件可恢复；平台支持补拉时维护游标，不支持时明确断线缺口，不承诺补回未接收事件。未启用 SuperAgent 的机器人会话保持原有处理方式。
 
 ## 5. 最小领域模型与不变量

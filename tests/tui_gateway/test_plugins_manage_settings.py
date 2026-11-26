@@ -16,6 +16,8 @@ settings_page: {location: root, title: " Super Agent ", icon: hubot, order: 85}
 config_schema:
   api_url: {type: str, default: "https://example.invalid", description: "Service endpoint"}
   retries: {type: int, default: 3}
+  worker_provider: {type: str, default: ""}
+  worker_model: {type: str, default: "", model_provider_key: worker_provider}
   verbose: {type: bool, default: false}
   mode: {type: str, choices: [fast, careful], default: fast}
   api_key: {type: secret, description: "Token"}
@@ -49,6 +51,7 @@ def test_list_carries_schema_fields_with_current_values_and_no_secret_values(plu
 
     assert fields["api_url"]["type"] == "string" and fields["api_url"]["value"] == "https://example.invalid"
     assert fields["retries"]["type"] == "number" and fields["retries"]["value"] == 7  # config.yaml wins over default
+    assert fields["worker_model"]["model_provider_key"] == "worker_provider"
     assert fields["verbose"]["type"] == "boolean" and fields["verbose"]["value"] is False
     assert fields["mode"]["type"] == "enum" and fields["mode"]["choices"] == ["fast", "careful"]
     assert fields["api_key"] == {"key": "api_key", "type": "secret", "label": "api_key", "description": "Token",

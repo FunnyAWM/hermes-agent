@@ -41,9 +41,11 @@ sandbox backend even if the profile normally uses a remote terminal backend.
 From any configured Gateway robot channel, including Weixin/OpenClaw, send:
 
 ```text
-sa: workspace-write implement the requested change and run focused tests
+implement the requested change and run focused tests
 ```
 
+Admitted text messages automatically open Router tickets. The optional `sa:` prefix still starts a
+new ticket even on a subscribed thread. Commands and media stay with their channel handlers.
 The sandbox token is optional and defaults to `default_sandbox`. The same operations are available
 with `/super-agent new|status|list|tell|stop|retry|takeover|pause|resume|health`. Completion, failure,
 takeover, and Watchdog messages return to the
@@ -63,8 +65,8 @@ if needed. `/super-agent health` shows
 active alerts and recent pause, resume, recovery, retry, cancel, and takeover records; ticket
 `status` includes its recovery record.
 
-To close the proactive `sa:` entry entirely, disable the plugin. Existing non-Super-Agent
-conversations continue normally. Unload best-effort cancels every known active admission; durable
+Set `message_sources: []` to return all channels to their own sessions. Disabling the plugin
+also removes the command. Unload best-effort cancels every known active admission; durable
 state is recovered into the queue with an audit record if the plugin is enabled again.
 
 Worktrees are retained after success, failure, and cancellation so changes remain reviewable. Remove

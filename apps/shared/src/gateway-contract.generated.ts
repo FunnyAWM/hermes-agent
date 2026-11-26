@@ -4678,6 +4678,7 @@ export interface PluginSettingField {
   value?: unknown | null
   default?: unknown | null
   choices?: string[] | null
+  model_provider_key?: string | null
   env?: string | null
   has_value?: boolean | null
 }

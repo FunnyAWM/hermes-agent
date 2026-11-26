@@ -6,6 +6,7 @@ import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { $pluginRecords } from '@/contrib/plugins-store'
 import { getEnvVars, getHermesConfigSchema } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { localizeAgentPlugin } from '@/i18n/agent-plugin-settings'
 import { type IconComponent, Monitor, Package, Settings2, Wrench } from '@/lib/icons'
 import { $agentPlugins, isDesktopRelevantPlugin, loadAgentPlugins } from '@/store/agent-plugins'
 import { $gatewayState } from '@/store/session'
@@ -38,7 +39,7 @@ export interface PluginSearchEntry {
  * contributes the deep, schema-driven targets.
  */
 export function useSettingsSearchCatalog(enabled: boolean) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const configQuery = useHermesConfigRecord()
 
   const schemaQuery = useQuery({
@@ -93,15 +94,18 @@ export function useSettingsSearchCatalog(enabled: boolean) {
       label: record.name,
       plugin: record.id
     })),
-    ...agentPlugins.filter(isDesktopRelevantPlugin).map(row => ({
-      context: t.skills.plugins.agentTitle,
-      description: row.description || undefined,
-      icon: Package,
-      id: `plugin:agent:${row.key ?? row.name}`,
-      keywords: ['plugin', 'extension', 'agent', ...(row.key ? [row.key] : [])],
-      label: row.name,
-      plugin: row.key ?? row.name
-    }))
+    ...agentPlugins
+      .filter(isDesktopRelevantPlugin)
+      .map(row => localizeAgentPlugin(row, locale))
+      .map(row => ({
+        context: t.skills.plugins.agentTitle,
+        description: row.description || undefined,
+        icon: Package,
+        id: `plugin:agent:${row.key ?? row.name}`,
+        keywords: ['plugin', 'extension', 'agent', ...(row.key ? [row.key] : [])],
+        label: row.name,
+        plugin: row.key ?? row.name
+      }))
   ]
 
   // Never expose stale profile-scoped targets while a catalog is refreshing.

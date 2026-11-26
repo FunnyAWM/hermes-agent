@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from agent.i18n import t
 from hermes_cli.gateway_client import connect_gateway
 from tools.environments.local_command_sandbox import resolve_binary, settings
 
@@ -39,7 +40,7 @@ class SuperAgentRuntime:
         get_config = getattr(ctx, "get_config", lambda _name, default=None: default)
         self.watchdog_seconds = float(get_config("watchdog_seconds", DEFAULT_WATCHDOG_SECONDS))
         if not math.isfinite(self.watchdog_seconds) or self.watchdog_seconds <= 0:
-            raise ValueError("watchdog_seconds must be greater than zero")
+            raise ValueError(t("super_agent.watchdog_config"))
 
     @property
     def max_workers(self) -> int:
@@ -47,9 +48,9 @@ class SuperAgentRuntime:
         try:
             value = int(raw)
         except (TypeError, ValueError) as exc:
-            raise ValueError("max_concurrent_workers must be an integer from 1 to 8") from exc
+            raise ValueError(t("super_agent.concurrency")) from exc
         if isinstance(raw, bool) or not 1 <= value <= 8 or str(value) != str(raw).strip():
-            raise ValueError("max_concurrent_workers must be an integer from 1 to 8")
+            raise ValueError(t("super_agent.concurrency"))
         return value
 
     def worker_model(self) -> tuple[str, str]:
@@ -149,7 +150,7 @@ class SuperAgentRuntime:
 
     # --- SA-06: observe mode ---
 
-    async def fanout(self, source_instance: str, thread_key: str, text: str) -> list[str]:
+    async def fanout(self, source_instance: str, thread_key: str, text: str) -> list[str] | None:
         thread = await asyncio.to_thread(self.store.find_thread, source_instance, thread_key)
         if thread is None:
             return []
@@ -159,9 +160,9 @@ class SuperAgentRuntime:
                 thread_id=thread["id"], trigger_id=None,
                 action="would_fanout", detail=text[:500],
             )
-            return []
+            return None
         if thread["accept_mode"] == "off":
-            return []
+            return None
         accepted = await asyncio.to_thread(self.store.fanout_to_subscribers, thread["id"], text)
         if accepted:
             self.wake()
@@ -284,9 +285,9 @@ class SuperAgentRuntime:
     def _sandbox_preflight(self) -> None:
         cfg = settings()
         if not cfg.enabled:
-            raise RuntimeError("terminal.sandbox.enabled must be true before a Worker can start")
+            raise RuntimeError(t("super_agent.enable_sandbox"))
         if resolve_binary(cfg) is None:
-            raise RuntimeError("sandctl is required before a Worker can start")
+            raise RuntimeError(t("super_agent.sandctl"))
 
     async def _ensure_worktree(self, assignment: dict) -> Path:
         root = await asyncio.to_thread(
@@ -296,15 +297,15 @@ class SuperAgentRuntime:
         top = await self._git("-C", str(root), "rev-parse", "--show-toplevel")
         resolved_top = await asyncio.to_thread(Path(top).resolve)
         if os.path.normcase(str(resolved_top)) != os.path.normcase(str(root)):
-            raise RuntimeError(f"workspace_root is not a Git repository root: {root}")
+            raise RuntimeError(t("super_agent.git_root", root=root))
         if await asyncio.to_thread(workspace.exists):
             existing = await self._git("-C", str(workspace), "rev-parse", "--show-toplevel")
             resolved_existing = await asyncio.to_thread(Path(existing).resolve)
             if os.path.normcase(str(resolved_existing)) != os.path.normcase(str(workspace)):
-                raise RuntimeError(f"existing Worker workspace is not its Git worktree root: {workspace}")
+                raise RuntimeError(t("super_agent.wrong_tree", workspace=workspace))
             return workspace
         if await self._git("-C", str(root), "status", "--porcelain"):
-            raise RuntimeError(f"workspace_root has uncommitted changes; commit or stash the dirty checkout: {root}")
+            raise RuntimeError(t("super_agent.dirty", root=root))
         await asyncio.to_thread(workspace.parent.mkdir, parents=True, exist_ok=True)
         await self._git(
             "-C", str(root), "worktree", "add", "--detach", str(workspace), "HEAD"

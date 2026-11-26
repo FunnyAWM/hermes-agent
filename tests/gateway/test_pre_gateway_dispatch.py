@@ -546,6 +546,8 @@ async def test_relay_resend_of_a_rewritten_media_delivery_reuses_its_admission_a
     outgoing, ready, outcomes, fired = [], asyncio.Queue(), [], []
     descriptor = CapabilityDescriptor(1, "telegram", "Fixture", 4096, False, True, False, "plain", "chars")
     monkeypatch.setattr(SessionAuthority, "_schedule", lambda self, ref: None)  # the row stays queued, bytes held
+    # Native Windows urllib otherwise inherits the machine's HTTP proxy for this loopback fixture.
+    monkeypatch.setenv("no_proxy", "127.0.0.1")
     media = ThreadingHTTPServer(("127.0.0.1", 0), _Media)
     threading.Thread(target=media.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{media.server_port}/photo.png"

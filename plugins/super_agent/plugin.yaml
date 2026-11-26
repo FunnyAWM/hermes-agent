@@ -7,6 +7,7 @@ settings_page:
   title: Super Agent
   icon: hubot
   order: 85
+provides_locales: [en, zh]
 provides_hooks:
   - post_gateway_admission
   - pre_tool_call
@@ -24,6 +25,7 @@ config_schema:
     description: Provider for new Worker Sessions. Leave blank to use the profile default.
   worker_model:
     type: string
+    model_provider_key: worker_provider
     default: ""
     label: Worker model
     description: Model for new Worker Sessions. Leave blank to use the profile default.

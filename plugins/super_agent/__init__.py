@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
-import hashlib
 import logging
 from pathlib import Path
 import uuid
 from typing import Any
 
+from agent.i18n import t
 from agent.runtime_session_store import is_worker_process
 
 from .runtime import DEFAULT_WATCHDOG_SECONDS, SuperAgentRuntime
@@ -19,28 +19,12 @@ from .store import MAX_RETRIES, SANDBOX_LEVELS, SuperAgentStore
 logger = logging.getLogger(__name__)
 
 
-_HELP = """Super Agent commands:
-/super-agent new [read-only|workspace-write|workspace-exec] <task>
-/super-agent status <ticket-id>
-/super-agent list
-/super-agent tell <ticket-id> <message>
-/super-agent stop|cancel <ticket-id>
-/super-agent retry <ticket-id>
-/super-agent takeover <ticket-id>
-/super-agent pause|resume
-/super-agent health
-/super-agent subscribe <ticket-id> <thread-key> [follow|context]
-/super-agent unsubscribe <ticket-id> <thread-key>
-/super-agent handback <ticket-id> <trigger-id> <reason>
-/super-agent observe <thread-key> [off|observe|auto]"""
-
-
 def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id: str = "", **_kwargs: Any):
     if tool_name != "terminal":
         return None
     sandbox = store.assignment_sandbox(session_id)
     if sandbox is None:
-        return {"action": "block", "message": "Super Agent Worker has no active sandbox assignment."}
+        return {"action": "block", "message": t("super_agent.blocked")}
     return {
         "action": "modify",
         "args": {**args, "sandbox": sandbox, "_host_local": True, "_sandbox_required": True},
@@ -50,12 +34,10 @@ def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id
 def _workspace_root(ctx: Any) -> str:
     raw = str(ctx.get_config("workspace_root", "") or "").strip()
     if not raw:
-        raise ValueError(
-            f"Set plugins.entries.{ctx.plugin_id}.settings.workspace_root to an absolute Git repository root."
-        )
+        raise ValueError(t("super_agent.set_root", plugin_id=ctx.plugin_id))
     root = Path(raw).expanduser()
     if not root.is_absolute() or not root.is_dir():
-        raise ValueError("Super Agent workspace_root must be an existing absolute directory.")
+        raise ValueError(t("super_agent.invalid_root"))
     return str(root.resolve())
 
 
@@ -78,7 +60,7 @@ def _source_instance(source: dict | None, fallback: str) -> str:
 def _allows_message_source(ctx: Any, source: Mapping[str, Any]) -> bool:
     raw = ctx.get_config("message_sources", ["*"])
     if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
-        raise ValueError("message_sources must be a JSON list of Gateway platform IDs")
+        raise ValueError(t("super_agent.invalid_sources"))
     allowed = {item.strip().lower() for item in raw if item.strip()}
     platform = str(source.get("platform") or "").strip().lower()
     return "*" in allowed or platform in allowed
@@ -87,18 +69,18 @@ def _allows_message_source(ctx: Any, source: Mapping[str, Any]) -> bool:
 def _parse_new(ctx: Any, text: str) -> tuple[str, str]:
     text = text.strip()
     if not text:
-        raise ValueError("A task is required.")
+        raise ValueError(t("super_agent.no_task"))
     first, separator, rest = text.partition(" ")
     level = first.lower()
     if level == "full-access":
-        raise ValueError("full-access is not available to Super Agent Workers.")
+        raise ValueError(t("super_agent.full_access"))
     if level in SANDBOX_LEVELS:
         if not separator or not rest.strip():
-            raise ValueError("A task is required after the sandbox level.")
+            raise ValueError(t("super_agent.no_sandbox_task"))
         return level, rest.strip()
     sandbox = str(ctx.get_config("default_sandbox", "workspace-write") or "workspace-write").strip()
     if sandbox not in SANDBOX_LEVELS:
-        raise ValueError("default_sandbox must be read-only, workspace-write, or workspace-exec.")
+        raise ValueError(t("super_agent.invalid_sandbox"))
     return sandbox, text
 
 
@@ -121,40 +103,44 @@ async def _new_ticket(
         external_event_id=external_event_id or uuid.uuid4().hex,
         source=snapshot,
     )
-    duplicate = " (already queued)" if not created else ""
+    duplicate = t("super_agent.duplicate") if not created else ""
     paused = await asyncio.to_thread(runtime.store.is_paused)
-    waiting = " Router is paused; launch and delivery will resume explicitly." if paused else ""
-    return f"Super Agent {ticket['id']} queued with {ticket['sandbox']} sandbox{duplicate}.{waiting}"
+    waiting = t("super_agent.waiting") if paused else ""
+    return t("super_agent.queued", id=ticket['id'], sandbox=ticket['sandbox'], duplicate=duplicate, waiting=waiting)
+
+
+def _status_text(status: str) -> str:
+    return t(f"super_agent.status_{status}")
 
 
 def _ticket_text(ticket: dict) -> str:
     assignment = ticket.get("assignment") or {}
     lines = [
-        f"{ticket['id']}: {ticket['status']} ({ticket['sandbox']})",
-        f"Task: {ticket['task']}",
+        f"{ticket['id']}: {_status_text(ticket['status'])} ({ticket['sandbox']})",
+        t("super_agent.task", task=ticket['task']),
     ]
     if assignment.get("worker_session_id"):
-        lines.append(f"Worker Session: {assignment['worker_session_id']} (read-only)")
+        lines.append(t("super_agent.session", worker_session_id=assignment['worker_session_id']))
     if assignment.get("workspace"):
-        lines.append(f"Worktree: {assignment['workspace']}")
+        lines.append(t("super_agent.worktree", workspace=assignment['workspace']))
     alert = ticket.get("watchdog_alert")
     if alert:
-        lines.extend((f"Watchdog: {alert['detail']}", f"Suggested action: {alert['suggestion']}"))
-    lines.append(f"Retry budget: {ticket['retry_count']}/{MAX_RETRIES}")
+        lines.extend((t("super_agent.watchdog", detail=alert['detail']), t("super_agent.suggestion", suggestion=alert['suggestion'])))
+    lines.append(t("super_agent.budget", retry_count=ticket['retry_count'], limit=MAX_RETRIES))
     if ticket.get("last_error"):
-        lines.append(f"Error: {ticket['last_error']}")
+        lines.append(t("super_agent.error", last_error=ticket['last_error']))
     if ticket.get("result"):
-        lines.append(f"Result: {ticket['result']}")
+        lines.append(t("super_agent.result", result=ticket['result']))
     return "\n".join(lines)
 
 
 async def _router_command(runtime: SuperAgentRuntime, command: str) -> str | None:
     if command == "pause":
         changed = await runtime.pause()
-        return "Super Agent Router paused." if changed else "Super Agent Router is already paused."
+        return t("super_agent.paused") if changed else t("super_agent.already_paused")
     if command == "resume":
         changed = await runtime.resume()
-        return "Super Agent Router resumed." if changed else "Super Agent Router is already running."
+        return t("super_agent.resumed") if changed else t("super_agent.already_running")
     if command in {"health", "watchdog"}:
         state = await asyncio.to_thread(runtime.store.router_state)
         counts = await asyncio.to_thread(runtime.store.counts)
@@ -162,18 +148,18 @@ async def _router_command(runtime: SuperAgentRuntime, command: str) -> str | Non
         events = await asyncio.to_thread(runtime.store.list_control_events)
         threshold = getattr(runtime, "watchdog_seconds", DEFAULT_WATCHDOG_SECONDS)
         lines = [
-            f"Router: {'paused' if state['paused'] else 'running'}",
-            f"Watchdog: {len(alerts)} active; threshold {threshold:g}s",
-            "Tickets: " + (
-                ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+            t("super_agent.router", state=t("super_agent.state_paused") if state["paused"] else t("super_agent.state_running")),
+            t("super_agent.health", count=len(alerts), threshold=threshold),
+            t("super_agent.tickets") + (
+                ", ".join(f"{_status_text(key)}={value}" for key, value in sorted(counts.items())) or t("super_agent.none")
             ),
         ]
         lines.extend(
-            f"Alert {alert['ticket_id']}: {alert['detail']} {alert['suggestion']}"
+            t("super_agent.alert", ticket_id=alert['ticket_id'], detail=alert['detail'], suggestion=alert['suggestion'])
             for alert in alerts
         )
         if events:
-            lines.append("Recent controls: " + "; ".join(
+            lines.append(t("super_agent.controls") + "; ".join(
                 f"{event['action']} {event['ticket_id'] or 'router'}" for event in events
             ))
         return "\n".join(lines)
@@ -182,12 +168,9 @@ async def _router_command(runtime: SuperAgentRuntime, command: str) -> str | Non
         state = await asyncio.to_thread(runtime.store.router_state)
         alerts = await asyncio.to_thread(runtime.store.list_watchdog_alerts)
         header = (
-            f"Router: {'paused' if state['paused'] else 'running'}; "
-            f"Watchdog alerts: {len(alerts)}"
+            t("super_agent.list", state=t("super_agent.state_paused") if state["paused"] else t("super_agent.state_running"), count=len(alerts))
         )
         return "\n".join([header, *(_ticket_text(ticket).splitlines()[0] for ticket in tickets)])
-    if command == "observe":
-        return None  # handled in _command with thread context
     return None
 
 
@@ -197,68 +180,68 @@ async def _ticket_command(
     if command == "status":
         ticket = await asyncio.to_thread(runtime.store.get_ticket, ticket_id)
         if ticket is None:
-            return f"Unknown Super Agent ticket: {ticket_id}"
+            return t("super_agent.unknown", ticket_id=ticket_id)
         events = await asyncio.to_thread(runtime.store.list_control_events, ticket_id)
         text = _ticket_text(ticket)
         if events:
-            text += "\nRecovery record: " + "; ".join(event["action"] for event in events)
+            text += t("super_agent.recovery") + "; ".join(event["action"] for event in events)
         return text
     if command == "tell":
         if not value.strip():
-            return "Usage: /super-agent tell <ticket-id> <message>"
+            return t("super_agent.usage_tell")
         return (
-            f"Follow-up queued for {ticket_id}."
+            t("super_agent.followup", ticket_id=ticket_id)
             if await runtime.tell(ticket_id, value)
-            else f"Ticket {ticket_id} is missing or already terminal."
+            else t("super_agent.terminal", ticket_id=ticket_id)
         )
     if command in {"stop", "cancel"}:
         return (
-            f"Super Agent {ticket_id} cancelled."
+            t("super_agent.cancelled", ticket_id=ticket_id)
             if await runtime.cancel(ticket_id) is not None
-            else f"Ticket {ticket_id} is missing or already terminal."
+            else t("super_agent.terminal", ticket_id=ticket_id)
         )
     if command == "takeover":
         return (
-            f"Super Agent {ticket_id} taken over; its Worker Session and worktree were retained."
+            t("super_agent.takeover", ticket_id=ticket_id)
             if await runtime.takeover(ticket_id) is not None
-            else f"Ticket {ticket_id} is missing or already terminal."
+            else t("super_agent.terminal", ticket_id=ticket_id)
         )
     if command == "retry":
         return (
-            f"Super Agent {ticket_id} queued for retry."
+            t("super_agent.retry", ticket_id=ticket_id)
             if await runtime.retry(ticket_id)
-            else f"Ticket {ticket_id} is missing, not retryable, or reached the {MAX_RETRIES}-retry limit."
+            else t("super_agent.cannot_retry", ticket_id=ticket_id, limit=MAX_RETRIES)
         )
     if command == "subscribe":
         thread_key, _, mode = value.strip().partition(" ")
         if not thread_key:
-            return "Usage: /super-agent subscribe <ticket-id> <thread-key> [follow|context]"
+            return t("super_agent.usage_subscribe")
         mode = (mode.strip() or "follow").lower()
         if mode not in ("follow", "context"):
-            return "Subscription mode must be follow or context."
+            return t("super_agent.bad_subscription")
         result = await runtime.subscribe(ticket_id, source_instance, thread_key, mode)
         if result["accepted"]:
-            return f"Ticket {ticket_id} subscribed to {thread_key} ({mode})."
-        return f"Ticket {ticket_id} is missing, terminal, or already subscribed."
+            return t("super_agent.subscribed", ticket_id=ticket_id, thread_key=thread_key, mode=mode)
+        return t("super_agent.cannot_subscribe", ticket_id=ticket_id)
     if command == "unsubscribe":
         thread_key = value.strip()
         if not thread_key:
-            return "Usage: /super-agent unsubscribe <ticket-id> <thread-key>"
+            return t("super_agent.usage_unsubscribe")
         removed = await runtime.unsubscribe(ticket_id, source_instance, thread_key)
         return (
-            f"Ticket {ticket_id} unsubscribed from {thread_key}."
-            if removed else f"No subscription found for {ticket_id} on {thread_key}."
+            t("super_agent.unsubscribed", ticket_id=ticket_id, thread_key=thread_key)
+            if removed else t("super_agent.no_subscription", ticket_id=ticket_id, thread_key=thread_key)
         )
     if command == "handback":
         trigger_id, _, reason = value.strip().partition(" ")
         if not trigger_id or not reason.strip():
-            return "Usage: /super-agent handback <ticket-id> <trigger-id> <reason>"
+            return t("super_agent.usage_handback")
         recorded = await runtime.handback(ticket_id, trigger_id, reason.strip())
         return (
-            f"Trigger {trigger_id} handed back from {ticket_id}."
-            if recorded else f"Could not record handback for {ticket_id}."
+            t("super_agent.handback", trigger_id=trigger_id, ticket_id=ticket_id)
+            if recorded else t("super_agent.cannot_handback", ticket_id=ticket_id)
         )
-    return _HELP
+    return t("super_agent.help")
 
 
 async def _command(
@@ -273,32 +256,32 @@ async def _command(
     command, _, rest = raw_args.strip().partition(" ")
     command = command.lower()
     if command in {"", "help", "-h", "--help"}:
-        return _HELP
+        return t("super_agent.help")
     if command == "new":
         try:
             return await _new_ticket(
                 ctx, runtime, rest, source=source, source_instance=f"slash:{session_key or 'local'}"
             )
         except (OSError, ValueError) as exc:
-            return f"Super Agent request rejected: {exc}"
+            return t("super_agent.rejected", exc=exc)
     source_instance = f"gateway:{session_key}" if _source_snapshot(source) else "slash"
     if command == "observe":
         thread_key, _, mode = rest.strip().partition(" ")
         if not thread_key:
-            return "Usage: /super-agent observe <thread-key> [off|observe|auto]"
+            return t("super_agent.usage_observe")
         mode = (mode.strip() or "observe").lower()
         if mode not in ("off", "observe", "auto"):
-            return "Accept mode must be off, observe, or auto."
+            return t("super_agent.bad_mode")
         thread = await asyncio.to_thread(runtime.store.ensure_thread, source_instance, thread_key, mode)
         changed = await asyncio.to_thread(runtime.store.set_thread_accept_mode, thread["id"], mode)
-        action = f"set to {mode}" if changed else f"already {mode}"
-        return f"Thread {thread_key} accept mode {action}."
+        action = t("super_agent.mode_changed", mode=mode) if changed else t("super_agent.mode_unchanged", mode=mode)
+        return t("super_agent.thread_mode", thread_key=thread_key, action=action)
     router_reply = await _router_command(runtime, command)
     if router_reply is not None:
         return router_reply
     ticket_id, _, value = rest.strip().partition(" ")
     if not ticket_id:
-        return _HELP
+        return t("super_agent.help")
     return await _ticket_command(runtime, command, ticket_id, value, source_instance)
 
 
@@ -310,38 +293,34 @@ async def _post_gateway_admission(
     source: dict,
     message_id: str = "",
     session_key: str = "",
+    message_type: str = "text",
     **_kwargs: Any,
 ):
+    if message_type != "text" or not text.strip() or text.lstrip().startswith("/") or not _source_snapshot(source):
+        return None
     prefix, separator, task = text.partition(":")
     is_sa = separator and prefix.strip().lower() == "sa"
     try:
         if not _allows_message_source(ctx, source):
             return None
-    except ValueError as exc:
-        return {"action": "handled", "reply": f"Super Agent request rejected: {exc}"} if is_sa else None
-    if not is_sa:
-        thread_key = ":".join(
-            str(source.get(key) or "") for key in ("platform", "chat_id", "thread_id")
-        )
-        fanout_tickets = await runtime.fanout(f"gateway:{session_key}", thread_key, text)
-        if fanout_tickets:
-            return {"action": "handled", "reply": f"Forwarded to {len(fanout_tickets)} Super Agent ticket(s)."}
-        return None
-    try:
-        event_id = message_id or hashlib.sha256(
-            f"{session_key}\0{text}".encode()
-        ).hexdigest()
+        if not is_sa:
+            forwarded = await runtime.fanout(f"gateway:{session_key}", _source_instance(source, ""), text)
+            if forwarded is None:  # Explicit off/observe mode leaves the channel session in control.
+                return None
+            if forwarded:
+                return {"action": "handled", "reply": t("super_agent.forwarded", count=len(forwarded))}
+            task = text
         reply = await _new_ticket(
             ctx,
             runtime,
             task,
             source=source,
             source_instance=f"gateway:{session_key}",
-            external_event_id=event_id,
+            external_event_id=message_id,
         )
     except Exception as exc:
         logger.exception("Super Agent gateway admission failed")
-        reply = f"Super Agent request rejected: {exc}"
+        reply = t("super_agent.rejected", exc=exc)
     return {"action": "handled", "reply": reply}
 
 
@@ -362,7 +341,7 @@ def register(ctx: Any) -> None:
     ctx.register_command(
         "super-agent",
         lambda raw_args, **kwargs: _command(ctx, runtime, raw_args, **kwargs),
-        description="Queue and control isolated Super Agent Worker sessions.",
+        description=t("super_agent.description"),
         args_hint="<new|status|list|tell|stop|retry|takeover|pause|resume|health> ...",
         argument_mode="text",
     )

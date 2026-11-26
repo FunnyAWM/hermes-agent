@@ -681,6 +681,7 @@ class PluginSettingField(Result):
     value: JsonValue | None = None
     default: JsonValue | None = None
     choices: list[str] | None = None
+    model_provider_key: str | None = None
     env: str | None = None
     has_value: bool | None = None
 

@@ -594,7 +594,7 @@ export const PluginsTab = memo(function PluginsTab({
   /** Display name of the selected profile for the Agent half label. */
   scopeLabel?: string
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const p = t.skills.plugins
   const { requestGateway } = useGatewayRequest()
 
@@ -615,8 +615,8 @@ export const PluginsTab = memo(function PluginsTab({
   }, [requestGateway, scope, gatewayState])
 
   const packages = useMemo(
-    () => mergePluginPackages(Object.values(desktopRecords), agentRows.filter(isDesktopRelevantPlugin)),
-    [agentRows, desktopRecords]
+    () => mergePluginPackages(Object.values(desktopRecords), agentRows.filter(isDesktopRelevantPlugin), locale),
+    [agentRows, desktopRecords, locale]
   )
 
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)

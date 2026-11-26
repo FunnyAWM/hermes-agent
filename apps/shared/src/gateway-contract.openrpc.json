@@ -28817,6 +28817,18 @@
             "default": null,
             "title": "Choices"
           },
+          "model_provider_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Model Provider Key"
+          },
           "env": {
             "anyOf": [
               {

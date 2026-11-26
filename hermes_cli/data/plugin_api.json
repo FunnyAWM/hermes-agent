@@ -22,6 +22,7 @@
         "hermes_cli.auth_model_picker:prompt_model_selection",
         "hermes_cli.auth:resolve_external_process_provider_credentials",
         "hermes_cli.model_setup",
+        "agent.i18n:t",
         "agent.image_gen_provider",
         "agent.memory_manager",
         "agent.memory_provider",
