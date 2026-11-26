@@ -2,8 +2,14 @@
 # inside the package; tools beyond the interpreter resolve from the user's
 # PATH, exactly as a headless build's do. NSIS only - a portable build would
 # re-extract the multi-hundred-MB payload on every launch.
+#
+# uv travels with the interpreter: stage_manager_runtime resolves both from the
+# staged store only (never PATH, never a lazy install), so a python-only subset
+# fails pm-runtime with "stage pinned tools before building the manager runtime".
+# Shipping the lock-matched uv also keeps `hermes pm` off whatever uv the user
+# happens to have on PATH.
 $env:HERMES_DESKTOP_VARIANT = "bundled";
-$env:HERMES_BUNDLE_TOOLS = "python";
+$env:HERMES_BUNDLE_TOOLS = "python,uv";
 $env:HERMES_DESKTOP_LOCAL_ROOT = (Resolve-Path "$PSScriptRoot\..").Path;
 $env:HERMES_PYTHON = (Resolve-Path "$PSScriptRoot\..\.venv\Scripts\python.exe").Path;
 $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/";
