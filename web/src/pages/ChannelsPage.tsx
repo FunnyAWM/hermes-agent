@@ -25,7 +25,8 @@ import { Spinner } from '@nous-research/ui/ui/components/spinner'
 import { Switch } from '@nous-research/ui/ui/components/switch'
 import { Toast } from '@nous-research/ui/ui/components/toast'
 import { useToast } from '@nous-research/ui/hooks/use-toast'
-import { api } from '@/lib/api'
+import { api, getManagementProfile } from '@/lib/api'
+import { WeixinOnboardingPanel } from './ChannelsWeixin'
 import type {
   MessagingPlatform,
   MessagingPlatformEnvVar,
@@ -59,6 +60,14 @@ const STATE_BADGE: Record<
 
 function stateBadge(state: string) {
   return STATE_BADGE[state] ?? { tone: 'outline' as const, label: state }
+}
+
+function PlatformStateIcon({ state }: { state: string }) {
+  const failed = state === 'fatal' || state === 'startup_failed'
+  const Icon = state === 'connected' ? CheckCircle2 : failed ? AlertTriangle : Radio
+  const color = state === 'connected' ? 'text-success' : failed ? 'text-destructive' : 'text-muted-foreground'
+
+  return <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', color)} />
 }
 
 function platformBadge(platform: MessagingPlatform) {
@@ -554,27 +563,12 @@ export default function ChannelsPage() {
           const viaRelay = Boolean(platform.relay_exclusive)
           const badge = platformBadge(platform)
           const busy = togglingId === platform.id
-          const StateIcon =
-            platform.state === 'connected'
-              ? CheckCircle2
-              : platform.state === 'fatal' || platform.state === 'startup_failed'
-                ? AlertTriangle
-                : Radio
           return (
             <Card key={platform.id} className="border-border">
               <CardContent className="flex flex-col gap-4 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3 min-w-0">
-                    <StateIcon
-                      className={cn(
-                        'h-5 w-5 shrink-0 mt-0.5',
-                        platform.state === 'connected'
-                          ? 'text-success'
-                          : platform.state === 'fatal' || platform.state === 'startup_failed'
-                            ? 'text-destructive'
-                            : 'text-muted-foreground'
-                      )}
-                    />
+                    <PlatformStateIcon state={platform.state} />
                     <div className="flex flex-col gap-0.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mondwest normal-case text-sm font-medium">{platform.name}</span>
@@ -639,6 +633,16 @@ export default function ChannelsPage() {
                     platform={platform}
                     setRestartNeeded={setRestartNeeded}
                     showToast={showToast}
+                  />
+                )}
+                {platform.id === 'weixin' && !platform.disabled_by_relay && !viaRelay && (
+                  <WeixinOnboardingPanel
+                    key={getManagementProfile()}
+                    profile={getManagementProfile()}
+                    onSaved={needed => {
+                      setRestartNeeded(needed)
+                      void load()
+                    }}
                   />
                 )}
                 {platform.id === 'whatsapp' && !viaRelay && (

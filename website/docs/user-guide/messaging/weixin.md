@@ -42,6 +42,8 @@ python -c "import pm; pm.sync_venv(['messaging'], explicit=True)"
 
 ## Setup
 
+In Desktop or the web dashboard, select Weixin under messaging channels and choose **Connect with WeChat QR**. Scan the code and confirm on your phone. Kouri Harness saves the account in the selected profile, enables the channel, and asks the gateway to apply the change. If a restart is pending, use the restart action on the channels page.
+
 ### 1. Run the Setup Wizard
 
 The easiest way to connect your WeChat account is through the interactive setup:

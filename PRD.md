@@ -203,6 +203,7 @@
 | `gateway/{run_api,run_inbound_consumer,runtime_bootstrap}.py`、`hermes_cli/{plugin_messages,plugins_context}.py` | Gateway 在准入后向插件提供消息类型，供 Router 接管普通文本。插件可使用持久化的已准入来源快照定向后台回信；Gateway 重新校验 profile、平台与授权，非法或撤销来源拒绝且不回退到当前会话 | 用户指令 2026-11-26（T-50）；Super Agent 原渠道回信 | 中：扩展通用插件消息面；当前只支持 bundled host-process live surface，第三方 plugin-host 不得假定可用 |
 | `tools/terminal_tool.py`、`tools/environments/local_command_sandbox.py` | 为受管 Worker 强制本地 sandctl 与 Router 指定的 `read-only` / `workspace-write` / `workspace-exec`；模型不能覆盖档位，`full-access`、未知或失效 Session 均拒绝 | 用户指令 2026-11-26（T-50）；Super Agent Worker 隔离 | 高：terminal 是执行安全边界；任何后端或参数变更都必须重跑三档强制、降级绕过和沙箱不可用的失败关闭测试 |
 | `hermes_cli/{plugins_manifest,plugins_settings}.py`、`tui_gateway/{methods_tools.py,contracts/tools_mcp_plugins.py}`、`apps/shared/src/gateway-contract.*`、`apps/desktop/src/{store/agent-plugins.ts,contrib/settings-pages.ts,app/settings/{index,plugin-settings}.tsx}` | 原生插件可用通用 `settings_page.location: root` 元数据把既有 `config_schema` 表单提升为 Desktop 一级设置菜单。模型字段通过 `model_provider_key` 关联提供商字段，从当前配置档目录选择提供商和模型。未声明菜单及旧后端继续归入「设置 → 插件」，core 不判断具体插件名 | 用户指令 2026-11-26（T-50）；Super Agent 设置 | 低：新增可选 wire 字段与纯展示元数据；上游改插件设置列表、设置导航或生成契约时按行 rebase，并保留旧后端回落行为 |
+| `gateway/platform_registry.py`、`hermes_cli/web_routers/messaging*.py`、`plugins/platforms/weixin/adapter.py`、`apps/shared/src/weixin-onboarding.ts`、桌面与网页渠道页 | 微信 OpenClaw 在渠道页显示二维码。手机确认后，服务端将凭据写入发起配对的配置档，启用渠道并通知网关应用配置 | 用户指令 2026-11-26，微信扫码连接 | 升级时复验配对归属、既有授权保留、热加载和重启提示 |
 
 每条补丁的底线要求：
 

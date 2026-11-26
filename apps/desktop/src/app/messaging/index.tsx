@@ -51,6 +51,7 @@ import { AllowlistField } from './allowlist-field'
 import { PlatformAvatar } from './platform-icon'
 import { RelayLinkSetup } from './relay-link'
 import { TelegramQrSetup } from './telegram-qr-setup'
+import { WeixinQrSetup } from './weixin-qr-setup'
 
 interface MessagingViewProps extends React.ComponentProps<'section'> {
   setStatusbarItemGroup?: SetStatusbarItemGroup
@@ -643,6 +644,10 @@ export function MessagingView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
                     }
                     onRevoke={setPendingRevoke}
                     onTelegramApplied={result => void handleTelegramApplied(result)}
+                    onWeixinSaved={needed => {
+                      setRestartNeeded(needed)
+                      void refreshPlatforms(true)
+                    }}
                     pending={pendingByPlatform[selected.id] ?? []}
                     platform={selected}
                     saving={saving}
@@ -725,6 +730,7 @@ function PlatformDetail({
   onEdit,
   onRevoke,
   onTelegramApplied,
+  onWeixinSaved,
   pending,
   platform,
   saving,
@@ -738,6 +744,7 @@ function PlatformDetail({
   onEdit: (key: string, value: string) => void
   onRevoke: (user: PairingUser) => void
   onTelegramApplied: (result: TelegramOnboardingApplyResponse) => void
+  onWeixinSaved: (restartNeeded: boolean) => void
   pending: PairingUser[]
   platform: MessagingPlatformInfo
   saving: string | null
@@ -856,6 +863,13 @@ function PlatformDetail({
 
       {/* Under an exclusive relay a direct bot is switched off at every start: the shared-bot link
           above is the whole setup, so the credential sections would only lead nowhere (#141546). */}
+      {platform.id === 'weixin' && !platform.disabled_by_relay && !platform.relay_exclusive && (
+        <WeixinQrSetup
+          key={JSON.stringify([connectionId, scopeProfile])}
+          onSaved={onWeixinSaved}
+          scope={{ connectionId, profile: scopeProfile }}
+        />
+      )}
       {!platform.relay_exclusive && (
         <DirectSetupSections
           edits={edits}
@@ -1084,8 +1098,7 @@ const PLATFORM_INTRO: Record<string, string> = {
     'Add a group robot in WeCom and copy its webhook key as WECOM_BOT_ID. Send-only — use the WeCom (app) option for two-way.',
   wecom_callback:
     'Set up a WeCom self-built app, expose its callback URL, and provide the corp ID, secret, agent ID, and AES key.',
-  weixin:
-    "Run `hermes gateway setup`, select Weixin, then scan and confirm the QR code with a personal WeChat account. Kouri Harness connects through Tencent's iLink Bot API and saves the credentials.",
+  weixin: 'Scan and confirm with your personal WeChat account to connect through Tencent’s iLink Bot API.',
   qqbot: 'Register an app on the QQ Open Platform (q.qq.com) and copy the App ID and Client Secret.',
   api_server:
     'Expose Kouri Harness as an OpenAI-compatible API. Set an auth key, then point Open WebUI / LobeChat / etc. at the host:port.',

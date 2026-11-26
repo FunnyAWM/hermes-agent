@@ -602,62 +602,69 @@ def _print_qr(qrcode_value: str, qrcode_url: str, *, report_render_error: bool) 
             print(f"（终端二维码渲染失败: {_qr_exc}，请直接打开上面的二维码链接）")
 
 
-async def qr_login(hermes_home: str, *, bot_type: str = "3", timeout_seconds: int = 480) -> Optional[dict[str, str]]:
+async def qr_login(hermes_home: str, *, bot_type: str = "3", timeout_seconds: int = 480,
+                   on_qr: Optional[Callable[[str], None]] = None) -> Optional[dict[str, str]]:
     if not AIOHTTP_AVAILABLE:
         raise RuntimeError("aiohttp is required for Weixin QR login")
+
+    def show_qr(value: str, url: str) -> None:
+        if on_qr is None:
+            print("\n请使用微信扫描并确认以下二维码：")
+            _print_qr(value, url, report_render_error=True)
+        elif url:
+            on_qr(url)
+        else:
+            raise ValueError("Weixin did not return a scannable QR URL")
+
     async with _new_session() as session:
-        try:
-            qrcode_value, qrcode_url = await _fetch_qr(session, bot_type)
-        except Exception as exc:
-            logger.error("weixin: failed to fetch QR code: %s", exc)
-            return None
-        if not qrcode_value:
-            logger.error("weixin: QR response missing qrcode")
-            return None
-        print("\n请使用微信扫描以下二维码：")
-        _print_qr(qrcode_value, qrcode_url, report_render_error=True)
         deadline = time.monotonic() + timeout_seconds
-        current_base_url, refresh_count = ILINK_BASE_URL, 0
-        while time.monotonic() < deadline:
-            try:
-                status_resp = await _api_get(session, base_url=current_base_url, endpoint=f"{EP_GET_QR_STATUS}?qrcode={qrcode_value}", timeout_ms=QR_TIMEOUT_MS)
-            except Exception as exc:
-                if not isinstance(exc, asyncio.TimeoutError):
-                    logger.warning("weixin: QR poll error: %s", exc)
-                await asyncio.sleep(1)
-                continue
-            status = str(status_resp.get("status") or "wait")
-            if status == "wait":
-                print(".", end="", flush=True)
-            elif status == "scaned":
-                print("\n已扫码，请在微信里确认...")
-            elif status == "scaned_but_redirect" and status_resp.get("redirect_host"):
-                current_base_url = f"https://{status_resp['redirect_host']}"
-            elif status == "expired":
-                refresh_count += 1
-                if refresh_count > 3:
-                    print("\n二维码多次过期，请重新执行登录。")
-                    return None
-                print(f"\n二维码已过期，正在刷新... ({refresh_count}/3)")
+        for _ in range(4):
+            value, url = await _fetch_qr(session, bot_type)
+            if not value:
+                return None
+            show_qr(value, url)
+            current_base_url = ILINK_BASE_URL
+            while time.monotonic() < deadline:
                 try:
-                    qrcode_value, qrcode_url = await _fetch_qr(session, bot_type)
-                    _print_qr(qrcode_value, qrcode_url, report_render_error=False)
-                except Exception as exc:
-                    logger.error("weixin: QR refresh failed: %s", exc)
-                    return None
-            elif status == "confirmed":
-                creds = {
-                    "account_id": str(status_resp.get("ilink_bot_id") or ""), "token": str(status_resp.get("bot_token") or ""),
-                    "base_url": str(status_resp.get("baseurl") or ILINK_BASE_URL), "user_id": str(status_resp.get("ilink_user_id") or "")}
-                if not creds["account_id"] or not creds["token"]:
-                    logger.error("weixin: QR confirmed but credential payload was incomplete")
-                    return None
-                save_weixin_account(hermes_home, **creds)
-                print(f"\n微信连接成功，account_id={creds['account_id']}")
-                return creds
-            await asyncio.sleep(1)
-        print("\n微信登录超时。")
-        return None
+                    response = await _api_get(session, base_url=current_base_url,
+                                              endpoint=f"{EP_GET_QR_STATUS}?qrcode={value}", timeout_ms=QR_TIMEOUT_MS)
+                except (aiohttp.ClientError, TimeoutError, RuntimeError, ValueError):
+                    await asyncio.sleep(1)
+                    continue
+                status = response.get("status")
+                if status == "expired":
+                    break
+                if status == "scaned_but_redirect" and response.get("redirect_host"):
+                    current_base_url = f"https://{response['redirect_host']}"
+                elif status == "scaned" and on_qr is None:
+                    print("已扫码，请在微信里确认。")
+                elif status == "confirmed":
+                    creds = {
+                        "account_id": str(response.get("ilink_bot_id") or ""),
+                        "token": str(response.get("bot_token") or ""),
+                        "base_url": str(response.get("baseurl") or ILINK_BASE_URL),
+                        "user_id": str(response.get("ilink_user_id") or ""),
+                    }
+                    if not creds["account_id"] or not creds["token"]:
+                        return None
+                    save_weixin_account(hermes_home, **creds)
+                    if on_qr is None:
+                        print(f"微信连接成功，account_id={creds['account_id']}")
+                    return creds
+                await asyncio.sleep(1)
+            else:
+                return None
+    return None
+
+
+async def _dashboard_qr_login(home: str, on_qr: Callable[[str], None]) -> dict[str, str]:
+    credentials = await qr_login(home, on_qr=on_qr)
+    if not credentials:
+        raise ValueError("Weixin QR setup expired or returned incomplete credentials")
+    env = {f"WEIXIN_{key.upper()}": credentials[key] for key in ("account_id", "token", "base_url")}
+    if credentials["user_id"] and not _wx_secret("WEIXIN_ALLOWED_USERS"):
+        env["WEIXIN_ALLOWED_USERS"] = credentials["user_id"]
+    return env
 
 
 # Outbound item shapes: item type -> (item key, extra fields after the shared ``media`` block).
@@ -1429,7 +1436,7 @@ def register(ctx) -> None:
         dashboard_env_vars=("WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN", "WEIXIN_BASE_URL"),
         is_connected=_is_connected, required_env=["WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN"], install_hint=_INSTALL_HINT,
         config_connected_fn=_config_connected,
-        setup_fn=interactive_setup,
+        setup_fn=interactive_setup, dashboard_qr_login=_dashboard_qr_login,
         cron_deliver_env_var="WEIXIN_HOME_CHANNEL",
         # Out-of-process send_message/cron; the adapter's own send() chunks (MAX_MESSAGE_LENGTH), so
         # max_message_length stays 0: send_message hands the full text + all media to one native send.

@@ -182,6 +182,8 @@ class PlatformEntry:
     # Env names whose presence drives that enable, cited by the explicit-disable WARNING and used by
     # ``hermes_cli.profile_channels`` as the platform's credential set; () = none declared.
     env_enable_credentials: tuple = ()
+    # login(profile_home, show_qr) publishes scannable URLs and returns server-side credentials.
+    dashboard_qr_login: Optional[Callable[[str, Callable[[str], None]], Awaitable[dict[str, str]]]] = None
 
 
 def core_ships_platform(name: str) -> bool:

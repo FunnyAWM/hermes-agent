@@ -43,8 +43,12 @@ from hermes_cli.web_models import (
     WhatsAppOnboardingApply, WhatsAppOnboardingStart,
 )
 
+from hermes_cli.web_routers.messaging_weixin import router as weixin_router
+
 _log = logging.getLogger("hermes_cli.web_server")
+
 router = APIRouter()
+router.include_router(weixin_router)
 
 # Late-bound so a test's monkeypatch on the owning module wins at call time.
 _config_profile_scope = late("_config_profile_scope", "hermes_cli.web_server_profiles")
