@@ -71,15 +71,24 @@ Router 处理用户对话、候选事件研判、跨任务关系和结果汇聚�
 
 Worker 承接一个 Ticket 的执行，接收后续 inbox 消息并回报进展／结论。复用 Hermes 的模型、工具与环境能力，但不开放直接发送 IM、评论或通知的能力。
 
-每个 Assignment 独立 session、工作目录和执行代次。代码修改优先采用独立 Git worktree；共享依赖缓存不等于共享可写工作区。工作目录隔离不能替代 OS / 容器权限隔离。MVP 使用受限本地执行，必要时复用已有沙箱后端，不默认授予完整 OS 权限。
+每个 Assignment 独立 session、工作目录和执行代次。代码修改采用独立 Git worktree；共享依赖缓存不等于共享可写工作区。Router 创建 Worker 前必须指定 `read-only`、`workspace-write` 或 `workspace-exec` 之一，`full-access` 一律拒绝。Worker 的每次 terminal 调用都强制使用该等级和本地 sandctl，模型参数不能降低或绕过隔离；沙箱不可用时在创建 Worker Session 前失败。
+
+Router 创建的 Worker Session 全部出现在会话列表中，普通用户只能查看，不能提交、控制或修改。用户创建的 Session 与 Router 双向只读：Router 可读取其上下文，但双方都不能通过对方身份提交、控制或修改 Session；其他 Router 也不能读取或控制不属于自己的 Worker。
 
 现有同步子代理是否能脱离父轮次继续工作、能否恢复与增量投递，都必须实测。若不满足，Worker 使用独立持久会话与服务监督的执行进程，不把一次工具调用强行包装成长驻 Worker。
 
 ### 4.3 插件与内核边界
 
-编排业务作为独立扩展模块／服务，优先通过公开插件接口接入。P0 必须验证插件 host 模式可用的能力，不以进程内私有对象作为默认依赖。
+编排业务作为默认关闭、显式启用的 bundled 插件，通过公开插件接口接入。当前后台定向回信依赖宿主进程的 live surface，因此只支持 bundled host-process 模式，不宣称兼容第三方 plugin-host 隔离模式。
 
 若缺少启动／恢复 Worker、投递 inbox 或限制工具面的通用能力，先定义最小宿主接口及具体消费者，再实现通用接缝。扩展不能自行修改内核文件。必要宿主补丁独立提交，按 [PRD 的受控补丁规则](./PRD.md) 登记，并补接口行为测试；不提前开放整套内部 SessionDB 或 turn loop。
+
+### 4.3.1 设置入口
+
+Super Agent 通过原生 `config_schema` 暴露 profile 级设置，并用通用 `settings_page.location: root`
+元数据提升为 Desktop 独立一级菜单。设置包括 Gateway 消息来源、Worker provider/model、Router
+最大并发 Worker 数、工作区、默认沙箱和 Watchdog 阈值。当前调度器每个 Ticket 只创建一个
+Worker，因此并发设置控制 Router 全局槽位；单 Ticket 多 Worker 汇聚不在当前实现范围内。
 
 ### 4.4 Harness 自带机器人入口
 
@@ -192,12 +201,12 @@ MVP 保留 Hermes 作为 Worker 内核。DSH 原型作为领域模型、权限�
 
 ## 10. 下一批可直接拆分的任务
 
-- [ ] SA-01：完成 P0 接口勘察，验证独立 Worker 启动、后续投递、取消与恢复。
-- [ ] SA-02：固化事件身份、profile 作用域、Policy / Mandate 与状态转移契约。
-- [ ] SA-03：实现最小 SQLite 内核、Effects / Outbox、inbox 收据和故障回放。
-- [ ] SA-04：完成受限 Router + 双 Worker 的本地闭环与工具权限验证。
-- [ ] SA-05：加入订阅直通、handback、改向、取消和 Inline / Spill。
-- [ ] SA-06：优先接入一个 Harness 自带机器人入口，验证消息承接、任务定位与原渠道回复，开展 observe 与计量对照。
-- [ ] SA-07：加入只告警 Watchdog、人工接管与恢复手册，评审小范围可用版。
+- [x] SA-01：完成 P0 接口勘察，验证独立 Worker 启动、后续投递、取消与恢复。
+- [x] SA-02：固化事件身份、profile 作用域、Policy / Mandate 与状态转移契约。
+- [x] SA-03：实现最小 SQLite 内核、Effects / Outbox、inbox 收据和故障回放。
+- [x] SA-04：完成受限 Router + 双 Worker 的本地闭环与工具权限验证。
+- [ ] **部分完成** SA-05：已实现 `tell` 直投、取消、重试与终态幂等；多对多订阅、handback 和 Inline / Spill 仍待实现。
+- [ ] **部分完成** SA-06：已接入通用 Gateway 机器人来源和原渠道定向回信；当前已配置机器人及微信 OpenClaw 的真实闭环仍待人工冒烟，observe 与计量对照尚未开展。
+- [ ] **部分完成** SA-07：已加入持久化 pause/resume、独立只告警 Watchdog、三次重试上限、stop/takeover、运行状态 CLI、恢复审计与运维手册；当前 Gateway receipt 只提供提交与终态，尚不能可靠区分正常长命令和无效重复循环，也没有逐 Turn token/耗时预算事件。
 
-当前优先执行 SA-01 和 SA-02。只有 Worker 生命周期、运行时权限边界与持久化契约被验证后，才进入完整业务实现；首版目标是让真实任务闭环可验证、可恢复，再决定哪些高级模块值得投入。
+当前优先完成 SA-06 的真实渠道冒烟，并补齐 SA-05 的订阅与 handback。首版插件内核、本地恢复、双 Worker、强制沙箱、Session 权限边界和 SA-07 的人工恢复闭环已落地；真实机器人闭环通过后再开展 observe、计量，并以通用 Worker 进度事件收口 Watchdog 的停滞判定。
