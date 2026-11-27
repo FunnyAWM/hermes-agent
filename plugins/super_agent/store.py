@@ -12,6 +12,7 @@ import uuid
 
 from agent.i18n import t
 
+from . import delivery
 from .workspace import WORKTREE_DIRECTORY
 
 
@@ -61,6 +62,17 @@ class SuperAgentStore:
                 CREATE TABLE IF NOT EXISTS chat_forwards (
                     ticket_id TEXT NOT NULL REFERENCES tickets(id), message_id TEXT NOT NULL,
                     PRIMARY KEY(ticket_id, message_id)
+                );
+                CREATE TABLE IF NOT EXISTS chat_decisions (
+                    profile TEXT NOT NULL, conversation TEXT NOT NULL, actor TEXT NOT NULL,
+                    message_id TEXT NOT NULL, ticket_id TEXT NOT NULL, kind TEXT NOT NULL,
+                    PRIMARY KEY(profile, conversation, actor, message_id)
+                );
+                CREATE INDEX IF NOT EXISTS chat_forwards_message ON chat_forwards(message_id);
+                CREATE TABLE IF NOT EXISTS retired_tickets (
+                    profile TEXT NOT NULL, source_instance TEXT NOT NULL, external_event_id TEXT NOT NULL,
+                    id TEXT NOT NULL, sandbox TEXT NOT NULL, status TEXT NOT NULL,
+                    PRIMARY KEY(profile,source_instance,external_event_id)
                 );
                 CREATE TABLE IF NOT EXISTS triggers (
                     id TEXT PRIMARY KEY,
@@ -131,6 +143,10 @@ class SuperAgentStore:
                     text TEXT NOT NULL,
                     status TEXT NOT NULL,
                     created_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS worker_inputs (
+                    turn_id TEXT PRIMARY KEY REFERENCES turns(id) ON DELETE CASCADE,
+                    path TEXT NOT NULL, device TEXT NOT NULL, inode TEXT NOT NULL, digest TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS outbox (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,14 +229,20 @@ class SuperAgentStore:
                 CREATE INDEX IF NOT EXISTS idx_observe_log ON observe_log(profile, created_at);
                 """
             )
+            conn.execute("BEGIN IMMEDIATE")
             columns = {row[1] for row in conn.execute("PRAGMA table_info(outbox)")}
             if "kind" not in columns:
                 conn.execute("ALTER TABLE outbox ADD COLUMN kind TEXT NOT NULL DEFAULT 'legacy'")
                 conn.execute("UPDATE outbox SET kind='legacy:' || id")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_ticket_kind ON outbox(ticket_id, kind)")
+            delivery.migrate(conn, columns)
             turn_columns = {row[1] for row in conn.execute("PRAGMA table_info(turns)")}
             if "metrics_json" not in turn_columns:
                 conn.execute("ALTER TABLE turns ADD COLUMN metrics_json TEXT")
+            for column, kind in (("started_at", "REAL"), ("deadline_at", "REAL"), ("stop_reason", "TEXT"),
+                                 ("stop_confirmed", "INTEGER NOT NULL DEFAULT 0")):
+                if column not in turn_columns:
+                    conn.execute(f"ALTER TABLE turns ADD COLUMN {column} {kind}")
 
     def recover(self) -> None:
         """Make only operations with a known retry identity runnable after a crash."""
@@ -243,7 +265,8 @@ class SuperAgentStore:
             )
             conn.execute(
                 "UPDATE turns SET status='pending',updated_at=? WHERE status='running' AND assignment_id IN ("
-                "SELECT a.id FROM assignments a JOIN tickets t ON t.id=a.ticket_id WHERE t.profile=?)",
+                "SELECT a.id FROM assignments a JOIN tickets t ON t.id=a.ticket_id "
+                "WHERE t.profile=? AND a.status='interrupted')",
                 (now, self.profile),
             )
             conn.execute(
@@ -258,15 +281,14 @@ class SuperAgentStore:
                 "UPDATE effects SET status='pending',updated_at=? WHERE status='running' AND ticket_id IN ("
                 "SELECT id FROM tickets WHERE profile=?)", (now, self.profile),
             )
-            # Delivery may already have reached a platform. Never resend without a platform receipt.
             conn.execute(
-                "UPDATE outbox SET status='unknown',updated_at=? WHERE status='sending' AND ticket_id IN ("
+                "UPDATE outbox SET status='pending',error='unconfirmed',updated_at=? WHERE status='sending' AND ticket_id IN ("
                 "SELECT id FROM tickets WHERE profile=?)", (now, self.profile),
             )
 
     def submit(
         self, *, task: str, sandbox: str, workspace_root: str, source_instance: str,
-        external_event_id: str, source: dict | None, offer_actor: str | None = None,
+        external_event_id: str, source: dict | None, offer_actor: str | None = None, answer_id: str = "",
     ) -> tuple[dict, bool]:
         task = task.strip()
         if not task:
@@ -276,6 +298,11 @@ class SuperAgentStore:
         now, trigger_id, ticket_id = _now(), _id("trigger"), _id("sa")
         source_json = json.dumps(source, ensure_ascii=False, sort_keys=True) if source else None
         with self._tx() as conn:
+            retired = conn.execute("SELECT id,sandbox,status FROM retired_tickets WHERE profile=? "
+                                   "AND source_instance=? AND external_event_id=?",
+                                   (self.profile, source_instance, external_event_id)).fetchone()
+            if retired:
+                return {**dict(retired), "retired": True}, False
             existing = conn.execute(
                 "SELECT t.* FROM triggers g JOIN tickets t ON t.trigger_id=g.id "
                 "WHERE g.profile=? AND g.source_instance=? AND g.external_event_id=?",
@@ -307,6 +334,9 @@ class SuperAgentStore:
                 "VALUES(?,1,'dispatch','pending',?,?)",
                 (ticket_id, now, now),
             )
+            if offer_actor is not None and answer_id:
+                conn.execute("INSERT INTO chat_decisions VALUES(?,?,?,?,?,'submit')",
+                             (self.profile, source_instance, offer_actor, answer_id, ticket_id))
             return dict(conn.execute("SELECT * FROM tickets WHERE id=?", (ticket_id,)).fetchone()), True
 
     def get_ticket(self, ticket_id: str) -> dict | None:
@@ -315,11 +345,17 @@ class SuperAgentStore:
             if row is None:
                 return None
             result = dict(row)
+            result["deliveries"] = delivery.ticket_deliveries(conn, ticket_id)
             assignment = conn.execute(
                 "SELECT * FROM assignments WHERE ticket_id=? ORDER BY generation DESC LIMIT 1", (ticket_id,)
             ).fetchone()
             if assignment is not None:
                 result["assignment"] = dict(assignment)
+                prefix = f"assignment:{assignment['id']}:"
+                result["notice_denied"] = any(
+                    row["kind"].startswith(prefix) and row["error"] == "permission_denied"
+                    for row in result["deliveries"]
+                )
                 alert = conn.execute(
                     "SELECT * FROM watchdog_alerts WHERE profile=? AND assignment_id=? AND status='active'",
                     (self.profile, assignment["id"]),
@@ -376,9 +412,10 @@ class SuperAgentStore:
             )]
 
     def offer_handoff(self, conversation: str, actor: str, text: str, message_id: str) -> None:
+        offer_id = f"offer:{message_id or uuid.uuid4().hex}"
         with self._tx() as conn:
             conn.execute("INSERT OR REPLACE INTO chat_offers VALUES(?,?,?,?,?)",
-                         (self.profile, conversation, actor, "offer:" + message_id if message_id else _id("offer"), text))
+                         (self.profile, conversation, actor, offer_id, text))
 
     def chat_offer(self, conversation: str, actor: str) -> dict | None:
         with self._connect() as conn:
@@ -474,6 +511,30 @@ class SuperAgentStore:
                 " ORDER BY w.last_seen DESC LIMIT ?", (self.profile, limit),
             ).fetchall()]
 
+    def chat_receipt(self, conversation: str, actor: str, message_id: str) -> dict | None:
+        """Find a committed handoff before a redelivered message reaches the classifier."""
+        if not message_id:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT ticket_id AS id,kind FROM chat_decisions WHERE profile=? AND conversation=? AND actor=? "
+                "AND message_id=? UNION ALL SELECT t.id,'submit' FROM triggers g JOIN tickets t ON t.trigger_id=g.id "
+                "WHERE g.profile=? AND g.source_instance=? AND g.external_event_id IN (?,?) AND "
+                "(g.source_json IS NULL OR COALESCE(json_extract(g.source_json,'$.actor_id'),"
+                "json_extract(g.source_json,'$.user_id'),'')=?) UNION ALL "
+                "SELECT id,'retired' FROM retired_tickets WHERE profile=? AND source_instance=? "
+                "AND external_event_id IN (?,?)",
+                (self.profile, conversation, actor, message_id,
+                 self.profile, conversation, message_id, f"offer:{message_id}", actor,
+                 self.profile, conversation, message_id, f"offer:{message_id}"),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def forwarded_count(self, message_id: str) -> int:
+        with self._connect() as conn:
+            return conn.execute("SELECT count(*) FROM chat_forwards f JOIN tickets t ON t.id=f.ticket_id "
+                                "WHERE t.profile=? AND f.message_id=?", (self.profile, message_id)).fetchone()[0]
+
     def list_control_events(self, ticket_id: str | None = None, limit: int = 10) -> list[dict]:
         with self._connect() as conn:
             if ticket_id:
@@ -495,6 +556,11 @@ class SuperAgentStore:
                 "SELECT e.*,t.task,t.sandbox,t.workspace_root FROM effects e "
                 "JOIN tickets t ON t.id=e.ticket_id "
                 "WHERE t.profile=? AND t.status='queued' AND e.status='pending' "
+                "AND NOT EXISTS(SELECT 1 FROM assignments old JOIN turns tr ON tr.assignment_id=old.id "
+                "WHERE old.ticket_id=t.id AND old.status IN ('failed','cancelled','taken_over') "
+                "AND old.worker_session_id IS NOT NULL AND (tr.admission_id IS NOT NULL OR tr.started_at IS NOT NULL) "
+                "AND tr.status IN ('running','pending') AND tr.stop_confirmed=0 "
+                "AND (tr.stop_reason IS NOT NULL OR old.status IN ('cancelled','taken_over'))) "
                 "AND NOT EXISTS(SELECT 1 FROM router_state r WHERE r.profile=? AND r.paused=1) "
                 "ORDER BY e.created_at LIMIT 1", (self.profile, self.profile),
             ).fetchone()
@@ -563,6 +629,55 @@ class SuperAgentStore:
             ).fetchone()
             return dict(row) if row is not None else None
 
+    def start_turn(self, turn_id: str, timeout: float) -> dict | None:
+        with self._tx() as conn:
+            row = conn.execute(
+                "SELECT tr.* FROM turns tr JOIN assignments a ON a.id=tr.assignment_id "
+                "JOIN tickets t ON t.id=a.ticket_id WHERE tr.id=? AND t.profile=? AND t.status='running' "
+                "AND a.status='running' AND tr.status IN ('pending','running')", (turn_id, self.profile),
+            ).fetchone()
+            if row is None:
+                return None
+            if row["started_at"] is not None:
+                return dict(row)
+            start = row["created_at"] if row["admission_id"] else _now()
+            deadline = start + timeout if timeout else None
+            conn.execute("UPDATE turns SET started_at=?,deadline_at=? WHERE id=?", (start, deadline, turn_id))
+            return {**dict(row), "started_at": start, "deadline_at": deadline}
+
+    def stop_turn(self, turn_id: str, reason: str) -> None:
+        with self._tx() as conn:
+            conn.execute("UPDATE turns SET stop_reason=COALESCE(stop_reason,?) WHERE id=? AND status!='terminal'",
+                         (reason, turn_id))
+
+    def record_input(self, turn_id: str, path: str, device: str, inode: str, digest: str) -> None:
+        with self._tx() as conn:
+            conn.execute("INSERT OR REPLACE INTO worker_inputs VALUES(?,?,?,?,?)", (turn_id, path, device, inode, digest))
+
+    def note_worker_progress(self, session_id: str, admission_id: str) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                "UPDATE turns SET updated_at=? WHERE admission_id=? AND status='running' AND assignment_id IN ("
+                "SELECT a.id FROM assignments a JOIN tickets t ON t.id=a.ticket_id WHERE a.worker_session_id=? "
+                "AND a.status='running' AND t.profile=?)", (_now(), admission_id, session_id, self.profile),
+            )
+
+    def pending_stops(self) -> list[dict]:
+        with self._connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT tr.id,tr.input_id,tr.admission_id,a.worker_session_id,a.id AS assignment_id,t.id AS ticket_id "
+                "FROM turns tr JOIN assignments a ON tr.assignment_id=a.id JOIN tickets t ON t.id=a.ticket_id "
+                "WHERE t.profile=? AND tr.status IN ('running','pending') "
+                "AND (tr.admission_id IS NOT NULL OR tr.started_at IS NOT NULL) "
+                "AND tr.stop_confirmed=0 "
+                "AND a.worker_session_id IS NOT NULL AND (tr.stop_reason IS NOT NULL "
+                "OR a.status IN ('cancelled','taken_over'))", (self.profile,),
+            )]
+
+    def confirm_stopped(self, turn_id: str) -> None:
+        with self._tx() as conn:
+            conn.execute("UPDATE turns SET stop_confirmed=1 WHERE id=?", (turn_id,))
+
     def create_followup_turn(self, assignment_id: str) -> dict | None:
         now = _now()
         with self._tx() as conn:
@@ -612,13 +727,23 @@ class SuperAgentStore:
                 (admission_id, now, turn_id),
             )
 
-    def mark_turn_terminal(self, turn_id: str, result: str) -> None:
+    def mark_turn_terminal(self, turn_id: str, result: str, *, home_platforms=(), metrics=None) -> None:
         now = _now()
         with self._tx() as conn:
-            row = conn.execute("SELECT inbox_ids_json,status FROM turns WHERE id=?", (turn_id,)).fetchone()
-            if row is None or row["status"] == "terminal":
+            row = conn.execute(
+                "SELECT tr.*,t.id AS ticket_id,t.trigger_id FROM turns tr JOIN assignments a ON a.id=tr.assignment_id "
+                "JOIN tickets t ON t.id=a.ticket_id WHERE tr.id=? AND t.profile=? AND tr.status IN ('pending','running') "
+                "AND tr.stop_reason IS NULL AND a.status='running' AND t.status='running' AND NOT EXISTS (SELECT 1 FROM assignments later "
+                "WHERE later.ticket_id=t.id AND later.generation>a.generation)", (turn_id, self.profile),
+            ).fetchone()
+            if row is None:
                 return
-            conn.execute("UPDATE turns SET status='terminal',result=?,updated_at=? WHERE id=?", (result, now, turn_id))
+            conn.execute("UPDATE turns SET status='terminal',result=?,updated_at=?,metrics_json=COALESCE(?,metrics_json) WHERE id=?",
+                         (result, now, json.dumps(metrics) if metrics is not None else None, turn_id))
+            kind = f"assignment:{row['assignment_id']}:turn:{turn_id}"
+            report = t("super_agent.turn_report", id=row["ticket_id"], sequence=row["sequence"], result=result)
+            self._enqueue_outbox(conn, {"id": row["ticket_id"], "trigger_id": row["trigger_id"]},
+                                 kind, report, now, home_platforms=home_platforms)
             ids = json.loads(row["inbox_ids_json"] or "[]")
             if ids:
                 conn.execute(
@@ -666,19 +791,30 @@ class SuperAgentStore:
             ).fetchone()
             if pending is not None:
                 return False
+            turn = conn.execute(
+                "SELECT id,result FROM turns WHERE assignment_id=? AND status='terminal' ORDER BY sequence DESC LIMIT 1",
+                (assignment_id,),
+            ).fetchone()
+            if turn and not result:
+                result = turn["result"] or ""
             conn.execute("UPDATE assignments SET status='succeeded',result=?,updated_at=? WHERE id=?",
                          (result, now, assignment_id))
             conn.execute("UPDATE effects SET status='done',updated_at=? WHERE id=?", (now, assignment["effect_id"]))
             conn.execute("UPDATE tickets SET status='succeeded',result=?,updated_at=? WHERE id=?",
                          (result, now, assignment["ticket_id"]))
             conn.execute("DELETE FROM subscriptions WHERE ticket_id=?", (assignment["ticket_id"],))
-            self._enqueue_outbox(
-                conn, ticket, f"assignment:{assignment_id}:succeeded",
-                t("super_agent.completed", id=ticket['id'], result=result), now, home_platforms=home_platforms,
-            )
+            if turn is None or not conn.execute(
+                "SELECT 1 FROM outbox WHERE ticket_id=? AND (kind=? OR kind LIKE ?) LIMIT 1",
+                (ticket["id"], f"assignment:{assignment_id}:turn:{turn['id']}",
+                 f"assignment:{assignment_id}:turn:{turn['id']}:%"),
+            ).fetchone():
+                self._enqueue_outbox(
+                    conn, ticket, f"assignment:{assignment_id}:succeeded",
+                    t("super_agent.completed", id=ticket['id'], result=result), now, home_platforms=home_platforms,
+                )
             return True
 
-    def fail_assignment(self, assignment_id: str, error: str) -> bool:
+    def fail_assignment(self, assignment_id: str, error: str, *, home_platforms=()) -> bool:
         now, error = _now(), str(error)[:4000]
         with self._tx() as conn:
             assignment = conn.execute("SELECT * FROM assignments WHERE id=?", (assignment_id,)).fetchone()
@@ -698,22 +834,13 @@ class SuperAgentStore:
                          (error, now, assignment["ticket_id"]))
             self._enqueue_outbox(
                 conn, ticket, f"assignment:{assignment_id}:failed",
-                t("super_agent.failed", id=ticket['id'], error=error), now,
+                t("super_agent.failed", id=ticket['id'], error=error), now, home_platforms=home_platforms,
             )
             return True
 
     @staticmethod
     def _enqueue_outbox(conn, ticket, kind: str, text: str, now: float, *, home_platforms=()) -> None:
-        source = conn.execute(
-            "SELECT source_json FROM triggers WHERE id=?", (ticket["trigger_id"],)
-        ).fetchone()["source_json"]
-        targets = [(kind, source)] if source else []
-        targets.extend((f"{kind}:home:{platform}", json.dumps({"home_channel": platform})) for platform in home_platforms)
-        for delivery_kind, destination in targets:
-            conn.execute(
-                "INSERT OR IGNORE INTO outbox(ticket_id,kind,source_json,text,status,created_at,updated_at) "
-                "VALUES(?,?,?,?, 'pending',?,?)", (ticket["id"], delivery_kind, destination, text, now, now),
-            )
+        delivery.enqueue(conn, ticket, kind, text, now, home_platforms)
 
     @staticmethod
     def _record_event(
@@ -726,7 +853,7 @@ class SuperAgentStore:
             (profile, ticket_id, assignment_id, action, detail, now),
         )
 
-    def cancel(self, ticket_id: str) -> dict | None:
+    def cancel(self, ticket_id: str, *, withdrawal: tuple[str, str, str] | None = None) -> dict | None:
         now = _now()
         with self._tx() as conn:
             ticket = conn.execute(
@@ -737,6 +864,13 @@ class SuperAgentStore:
             if ticket["status"] in TERMINAL_TICKET_STATES:
                 return dict(ticket) if ticket["status"] == "cancelled" else None
             conn.execute("UPDATE tickets SET status='cancelled',updated_at=? WHERE id=?", (now, ticket_id))
+            if withdrawal:
+                conversation, actor, message_id = withdrawal
+                conn.execute("INSERT OR REPLACE INTO chat_offers VALUES(?,?,?,?,?)",
+                             (self.profile, conversation, actor, f"ordinary:{message_id}", ticket["task"]))
+                if message_id:
+                    conn.execute("INSERT INTO chat_decisions VALUES(?,?,?,?,?,'withdraw')",
+                                 (self.profile, conversation, actor, message_id, ticket_id))
             conn.execute("UPDATE effects SET status='done',updated_at=? WHERE ticket_id=? AND status!='done'",
                          (now, ticket_id))
             conn.execute(
@@ -805,6 +939,7 @@ class SuperAgentStore:
                 or ticket["retry_count"] >= MAX_RETRIES
             ):
                 return False
+            conn.execute("UPDATE inbox SET status='pending' WHERE ticket_id=? AND status='delivering'", (ticket_id,))
             attempt = conn.execute(
                 "SELECT COALESCE(MAX(attempt),0)+1 FROM effects WHERE ticket_id=?", (ticket_id,)
             ).fetchone()[0]
@@ -832,27 +967,44 @@ class SuperAgentStore:
             return dict(row) if row is not None else None
 
     def assignment_sandbox(self, session_id: str) -> str | None:
-        policy = self.assignment_policy(session_id)
-        return policy["sandbox"] if policy is not None and policy["status"] == "running" else None
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT a.sandbox FROM assignments a JOIN tickets t ON t.id=a.ticket_id "
+                "WHERE a.worker_session_id=? AND a.status='running' AND t.profile=? AND NOT EXISTS("
+                "SELECT 1 FROM turns tr WHERE tr.assignment_id=a.id AND tr.stop_reason IS NOT NULL)",
+                (session_id, self.profile),
+            ).fetchone()
+            return row[0] if row else None
 
     def claim_outbox(self) -> dict | None:
         with self._tx() as conn:
-            row = conn.execute(
-                "SELECT o.* FROM outbox o JOIN tickets t ON t.id=o.ticket_id "
-                "WHERE t.profile=? AND o.status='pending' "
-                "AND NOT EXISTS(SELECT 1 FROM router_state r WHERE r.profile=? AND r.paused=1) "
-                "ORDER BY o.id LIMIT 1", (self.profile, self.profile),
-            ).fetchone()
-            if row is None:
-                return None
-            conn.execute("UPDATE outbox SET status='sending',updated_at=? WHERE id=?", (_now(), row["id"]))
-            return dict(row)
+            row = delivery.claim(conn, self.profile, _now())
+            return dict(row) if row else None
 
-    def settle_outbox(self, outbox_id: int, *, delivered: bool, error: str = "") -> None:
-        status = "delivered" if delivered else "unknown" if error == "timeout" else "failed"
+    def settle_outbox(self, outbox_id: int, *, delivered: bool, error: str = "", receipt=None, attempt=None,
+                      checkpoint=None) -> None:
         with self._tx() as conn:
-            conn.execute("UPDATE outbox SET status=?,error=?,updated_at=? WHERE id=?",
-                         (status, str(error)[:1000] or None, _now(), outbox_id))
+            delivery.settle(conn, self.profile, outbox_id, delivered=delivered, error=error, receipt=receipt,
+                            attempt=attempt, now=_now(), checkpoint=checkpoint)
+
+    def expand_outbox_homes(self, row, platforms):
+        with self._tx() as conn:
+            ticket = conn.execute("SELECT * FROM tickets WHERE id=? AND profile=?", (row["ticket_id"], self.profile)).fetchone()
+            if ticket and conn.execute(
+                "UPDATE outbox SET status='expanded',error=NULL,updated_at=? WHERE id=? AND status='sending' AND attempts=?",
+                (_now(), row["id"], row["attempts"]),
+            ).rowcount:
+                delivery.enqueue(conn, ticket, row["kind"].removesuffix(":homes"), row["text"], _now(), platforms)
+
+    def redeliver(self, ticket_id: str, outbox_id: int | None = None) -> int:
+        with self._tx() as conn:
+            return conn.execute(
+                "UPDATE outbox SET status='pending',error=NULL,next_attempt_at=0,updated_at=? "
+                "WHERE ticket_id=? AND (? IS NULL OR id=?) AND status IN ('failed','unknown') "
+                "AND COALESCE(error,'')!='watchdog alert resolved before delivery' "
+                "AND ticket_id IN (SELECT id FROM tickets WHERE profile=?)",
+                (_now(), ticket_id, outbox_id, outbox_id, self.profile),
+            ).rowcount
 
     # --- Threads and subscriptions (SA-05 multi-to-many) ---
 
@@ -1035,6 +1187,24 @@ class SuperAgentStore:
         if not path.is_file():
             return None
         return path.read_text(encoding="utf-8-sig")
+
+    def thread_observations(self, source_instance: str, thread_key: str) -> list[dict]:
+        with self._connect() as conn:
+            return [dict(row) for row in conn.execute(
+                "SELECT l.action,l.detail FROM observe_log l JOIN threads th ON th.id=l.thread_id WHERE "
+                "l.profile=? AND th.profile=l.profile AND th.source_instance=? AND th.thread_key=? "
+                "ORDER BY l.id DESC LIMIT 20", (self.profile, source_instance, thread_key),
+            )]
+
+    def ticket_details(self, ticket_id: str) -> dict:
+        from .history import details
+        with self._connect() as conn:
+            return details(conn, self.profile, ticket_id)
+
+    def prune_history(self, days: int) -> int:
+        from .history import prune
+        with self._tx() as conn:
+            return prune(conn, self.profile, days, self.data_dir)
 
     def counts(self) -> dict[str, int]:
         with self._connect() as conn:

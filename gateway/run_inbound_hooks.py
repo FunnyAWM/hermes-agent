@@ -315,7 +315,7 @@ class GatewayInboundHooksMixin:
         if session_entry is None:
             _plugin_context.session_key = self._session_key_for_source(source)
         user_args = event.get_command_args().strip() if args is None else args
-        from hermes_cli.plugin_command_dispatch import invoke_plugin_command
+        from hermes_cli.plugin_command_dispatch import PluginNotice, invoke_plugin_command
         from gateway.plugin_messages import bind_live_source
         from gateway.plugin_command_choice import chat_choices
         from gateway.run_inbound_consumer import is_bot_chat, record_channel_exchange
@@ -341,4 +341,9 @@ class GatewayInboundHooksMixin:
                 result = await self._run_in_executor_with_context(call)
                 if inspect.isawaitable(result):
                     result = await result
+        if isinstance(result, PluginNotice):
+            if source.platform.value == "local":
+                return result
+            from gateway.platforms.base import EphemeralReply
+            return EphemeralReply(str(result))
         return str(result) if result else None

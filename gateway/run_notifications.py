@@ -460,6 +460,11 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
 
     async def _send_home_channel_message(self, platform, home, transport, message: str, failure_fmt: str) -> bool:
         """Best-effort send to one home channel; True on success, failures logged with ``failure_fmt``."""
+        ok, _ = await self._send_home_channel_receipt(platform, home, transport, message, failure_fmt, resume_partial=False)
+        return ok
+
+    async def _send_home_channel_receipt(self, platform, home, transport, message: str, failure_fmt: str, *, resume_partial=True):
+        """Retain the platform's message ID when its transport provides one."""
         from gateway.run import _non_conversational_metadata
         try:
             metadata = self._thread_metadata_for_target(platform, home.chat_id, home.thread_id, adapter=transport.adapter)
@@ -470,17 +475,21 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
                 if home.scope_id:
                     metadata["scope_id"] = home.scope_id
             send_metadata = _non_conversational_metadata(metadata, platform=platform)
-            if send_metadata is not None or transport.is_relay:
+            if resume_partial and not transport.is_relay:
+                from gateway.plugin_messages import send_report
+                result = await send_report(transport.adapter, str(home.chat_id), message, send_metadata)
+            elif send_metadata is not None or transport.is_relay:
                 result = await transport.send(platform, str(home.chat_id), message, metadata=send_metadata)
             else:
                 result = await transport.adapter.send(str(home.chat_id), message)
             if _send_failed(result):
                 logger.warning(failure_fmt, platform.value, home.chat_id, _send_error(result))
-                return False
-            return True
+                return False, None
+            message_id = getattr(result, "message_id", None)
+            return True, str(message_id) if message_id is not None else None
         except Exception as exc:
-            logger.warning(failure_fmt, platform.value, home.chat_id, exc)
-            return False
+            logger.warning(failure_fmt, platform.value, home.chat_id, exc, exc_info=True)
+            return False, None
 
     _planned_restart_notice_lock: Optional[asyncio.Lock] = None
 

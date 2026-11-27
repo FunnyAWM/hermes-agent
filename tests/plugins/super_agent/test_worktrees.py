@@ -91,7 +91,8 @@ async def test_named_project_uses_its_own_head_and_local_worktree(tmp_path, monk
     _git("-C", child, "commit", "-m", "android")
     (root / "parent-wip").touch()
     store = SuperAgentStore(tmp_path / "data", "default")
-    ctx = SimpleNamespace(plugin_id="super_agent", get_config={"workspace_root": str(root)}.get)
+    ctx = SimpleNamespace(plugin_id="super_agent", get_config={"workspace_root": str(root)}.get,
+                          gateway_injection_allowed=lambda: False)
     runtime = SuperAgentRuntime(ctx, store)
     monkeypatch.setattr(runtime, "wake", lambda: None)
     await _command(ctx, runtime, "new 请检查kourichat-next的构建")
@@ -169,7 +170,6 @@ async def test_git_timeout_kills_and_reaps_child(monkeypatch):
 
     async def timeout(awaitable, *, timeout):
         if timeout == 60:
-            awaitable.close()
             raise TimeoutError
         assert timeout == 5
         return await awaitable

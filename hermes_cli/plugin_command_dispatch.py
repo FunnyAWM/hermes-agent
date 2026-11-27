@@ -8,6 +8,18 @@ from typing import Any, Callable
 _KEYWORD_KINDS = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 
 
+class PluginNotice(str):
+    """A keyed, transient confirmation shown to the user outside the conversation."""
+
+    def __new__(cls, text: str, key: str):
+        notice = super().__new__(cls, text)
+        notice.key = key
+        return notice
+
+    def payload(self):
+        return {"text": str(self), "key": self.key, "kind": "ttl", "level": "info", "ttl_ms": 10000}
+
+
 def invoke_plugin_command(handler: Callable, raw_args: str, **context: Any) -> Any:
     """Call *handler* once with *raw_args* plus the *context* keywords it declares.
 

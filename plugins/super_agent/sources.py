@@ -30,5 +30,5 @@ class MessageSources:
     def write_only(self, ctx):
         if self.write == self.read or "*" in self.read:
             return ()
-        platforms = ctx.home_channel_platforms() if "*" in self.write else self.write
+        platforms = ctx.home_channel_platforms(require_gateway=True) if "*" in self.write else self.write
         return sorted(platform for platform in platforms if not self.reads(platform))

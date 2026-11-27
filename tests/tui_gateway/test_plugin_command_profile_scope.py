@@ -24,6 +24,9 @@ def _plugin_pkg(home, slug: str, command: str) -> None:
     (pkg / "__init__.py").write_text(
         "def register(ctx):\n"
         "    def _handler(args):\n"
+        "        if args == 'notice':\n"
+        "            from hermes_cli.plugin_command_dispatch import PluginNotice\n"
+        "            return PluginNotice('Queued ticket', 'queue.probe')\n"
         "        import hermes_constants\n"
         "        from agent.secret_scope import get_secret\n"
         "        try:\n"
@@ -93,6 +96,20 @@ def test_secondary_plugin_command_runs_under_its_own_scope(plugin_homes):
     output = res["result"]["output"]
     assert output.startswith("probe@infra:"), output
     assert output.endswith(":infra-key"), output
+
+
+def test_plugin_notice_is_emitted_outside_tui_command_output(plugin_homes, monkeypatch):
+    from tui_gateway import server
+
+    emit = MagicMock()
+    monkeypatch.setattr(server, "_emit", emit)
+    monkeypatch.setitem(server._sessions, "sid-infra", _infra_session(plugin_homes["secondary"]))
+    result = server._methods["command.dispatch"](1, {
+        "session_id": "sid-infra", "name": "infraonly", "arg": "notice",
+    })
+    assert result["result"] == {"type": "plugin", "output": ""}
+    kind, sid, payload = emit.call_args.args
+    assert (kind, sid, payload["key"], payload["text"]) == ("notification.show", "sid-infra", "queue.probe", "Queued ticket")
 
 
 def test_slash_exec_launch_only_falls_through_in_secondary_chat(plugin_homes):

@@ -18,11 +18,11 @@ import type {
   WebhooksResponse
 } from '@/types/webhooks'
 
-import { hermesApi, profileScoped } from './client'
+import { capabilityScoped, hermesApi, type ProfileScope, profileScoped } from './client'
 
-export function getMessagingPlatforms(profile?: null | string): Promise<MessagingPlatformsResponse> {
+export function getMessagingPlatforms(profile?: ProfileScope): Promise<MessagingPlatformsResponse> {
   return hermesApi<MessagingPlatformsResponse>({
-    ...profileScoped(profile),
+    ...capabilityScoped(profile),
     path: '/api/messaging/platforms'
   })
 }

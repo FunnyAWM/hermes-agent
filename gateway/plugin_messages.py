@@ -13,6 +13,7 @@ The route is never chosen by the plugin. It is the session whose key is bound in
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from contextlib import contextmanager
@@ -83,10 +84,10 @@ def bound_route():
     return _LIVE_SOURCE.get()
 
 
-def resolve(runner, *, session_key: str, route, plugin_home, plugin_id: str):
+def resolve(runner, *, session_key: str, route, plugin_home, plugin_id: str, directed: bool = False):
     """``(PostTarget, None)`` for the session *session_key* names, or ``(None, error dict)``. *route*
     is the live source the gateway bound for this call, used only while the session is not stored."""
-    entry = runner.session_store.lookup_by_session_key(session_key)
+    entry = None if directed else runner.session_store.lookup_by_session_key(session_key)
     if entry is not None and entry.origin is not None:
         from gateway.session_identity import replace_source
         source = replace_source(runner._restored_source(entry))
@@ -121,6 +122,30 @@ def _publish_local(target: PostTarget, text: str) -> dict:
     return {"ok": True, "message_id": target.notice_key, "delivered": bool(delivered)}
 
 
+async def publish_tool_notice(runner, chat, notice, *, plugin_home, plugin_id) -> bool:
+    from gateway.platforms.base import BasePlatformAdapter, EphemeralReply
+    from gateway.session import SessionSource
+
+    source = SessionSource.from_dict(chat["source"])
+    key = chat["session_key"]
+    if source.platform == Platform.LOCAL:
+        live = runner._plugin_local_session(source, key, plugin_home=plugin_home, plugin_id=plugin_id)
+        if live is None:
+            return False
+        live.event_stream.publish(source.chat_id, notice.payload(), event_type="notification.show")
+        return True
+    target, _ = await asyncio.to_thread(resolve, runner, session_key=key, route=source,
+                                        plugin_home=plugin_home, plugin_id=plugin_id)
+    if target is None:
+        return False
+    result = await post(target, str(notice), plugin_id=plugin_id)
+    if result.get("message_id") and isinstance(target.adapter, BasePlatformAdapter):
+        _, ttl = target.adapter._unwrap_ephemeral(EphemeralReply(str(notice)))
+        if ttl:
+            target.adapter._schedule_ephemeral_delete(target.chat_id, result["message_id"], ttl)
+    return result["ok"]
+
+
 async def _send(target: PostTarget, text: str) -> dict:
     # Never the turn's answer: a relay stream open for the reply must not be sealed with it.
     metadata = {**(target.metadata or {}), "_interim_send": True}
@@ -131,10 +156,39 @@ async def _send(target: PostTarget, text: str) -> dict:
     return {"ok": True, "message_id": str(result.message_id) if result.message_id is not None else None}
 
 
-async def post(target: PostTarget, text: str, *, plugin_id: str) -> dict:
+async def send_report(adapter: Any, chat_id: str, text: str, metadata: Optional[dict]) -> Any:
+    """Deliver a full report using native splitting or the gateway's per-chat Markdown splitter."""
+    from gateway.platforms.base_chunking import chunk_markdown_message
+
+    chunks = [text]
+    if getattr(adapter, "splits_long_messages", True) is False:
+        limit = adapter.max_message_length_for_chat(chat_id)
+        if limit > 0:
+            chunks = chunk_markdown_message(text, limit, adapter.message_len_fn_for_chat(chat_id))
+    for chunk in chunks:
+        result = await adapter.send(chat_id, chunk, metadata=metadata)
+        if not getattr(result, "success", False):
+            raw = getattr(result, "raw_response", None)
+            if isinstance(raw, dict) and (raw.get("undelivered_chunks") or raw.get("undelivered_rich_parts")):
+                resumed = await adapter._resume_partial_send(chat_id, result, reply_to=None, metadata=metadata)
+                if resumed is not None:
+                    result = resumed
+            if not getattr(result, "success", False):
+                break
+    return result
+
+
+async def post(target: PostTarget, text: str, *, plugin_id: str, editable: bool = True) -> dict:
     """First message of a handle."""
     try:
-        result = _publish_local(target, text) if target.live is not None else await _send(target, text)
+        if target.live is not None:
+            result = _publish_local(target, text)
+        elif editable:
+            result = await _send(target, text)
+        else:
+            sent = await send_report(target.adapter, target.chat_id, text, {**(target.metadata or {}), "_interim_send": True})
+            result = ({"ok": True, "message_id": sent.message_id} if getattr(sent, "success", False)
+                      else _err("send_failed", str(getattr(sent, "error", "") or "")[:512]))
     except Exception as exc:  # adapter boundary: the plugin gets a result, never the raise
         logger.warning("plugin_message plugin=%s op=post send raised", plugin_id, exc_info=True)
         result = _err("send_failed", str(exc)[:512])

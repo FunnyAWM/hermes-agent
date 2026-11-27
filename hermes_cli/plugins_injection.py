@@ -33,7 +33,7 @@ def inject_plugin_message(
     if origin is not None and not isinstance(origin, Mapping):
         logger.warning("inject_message: origin must be a mapping in the SessionSource.to_dict() shape")
         return False
-    if not ctx._gateway_injection_allowed():
+    if not ctx.gateway_injection_allowed():
         logger.warning("inject_message: gateway injection denied for plugin %s; set "
                        "plugins.entries.%s.allow_gateway_injection: true to allow it",
                        ctx.plugin_id, ctx.plugin_id)

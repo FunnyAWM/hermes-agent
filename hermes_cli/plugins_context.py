@@ -430,14 +430,27 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         import asyncio
         from gateway.session_context import bound_chat_input
         from hermes_cli.plugin_messages import _gateway_loop
+        from hermes_cli.plugin_command_dispatch import PluginNotice
 
         chat = bound_chat_input()
-        _, loop = _gateway_loop()
+        runner, loop = _gateway_loop()
         if chat is None or loop is None:
             raise RuntimeError("a live gateway chat turn is required")
+        async def invoke():
+            result = await callback(chat)
+            if chat.get("ordinary_text"):
+                return "Continue ordinary chat with the user's original request:\n" + chat["ordinary_text"]
+            if isinstance(result, PluginNotice):
+                from gateway.plugin_messages import publish_tool_notice
+                if await publish_tool_notice(runner, chat, result, plugin_home=self._manager.home_path,
+                                             plugin_id=self.plugin_id):
+                    return "Request accepted. The user has received a system notice."
+                return "Request accepted. The system notice could not be delivered."
+            return result
+
         if loop is asyncio.get_running_loop():
-            return await callback(chat)
-        return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(callback(chat), loop))
+            return await invoke()
+        return await asyncio.wrap_future(asyncio.run_coroutine_threadsafe(invoke(), loop))
 
     def post_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
         """Post *text* into the session bound to this call; the handle's ``edit(text)`` updates it in
@@ -446,20 +459,27 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         from hermes_cli.plugin_messages import post
         return post(self, text, source=source)
 
-    async def apost_message(self, text: str, *, source: Mapping[str, Any] | None = None) -> Any:
-        """``post_message`` for async code on the gateway loop (edit with ``await handle.aedit``)."""
+    async def apost_message(self, text: str, *, source: Mapping[str, Any] | None = None, editable: bool = True,
+                            delivery_id: str | None = None, checkpoint: Mapping[str, Any] | None = None) -> Any:
+        """Async post. Pass ``editable=False`` for a full report that may span platform messages."""
         from hermes_cli.plugin_messages import apost
-        return await apost(self, text, source=source)
+        return await apost(self, text, source=source, editable=editable, delivery_id=delivery_id, checkpoint=checkpoint)
 
-    def home_channel_platforms(self) -> list[str]:
+    def home_channel_platforms(self, *, require_gateway: bool = False) -> list[str]:
         """Platform IDs with a configured home in this plugin's profile."""
         from hermes_cli.plugin_messages import home_platforms
-        return home_platforms(self)
+        return home_platforms(self, require_gateway=require_gateway)
 
-    async def apost_home_channel(self, text: str, *, platform: str) -> Any:
+    async def apost_home_channel(self, text: str, *, platform: str, delivery_id: str | None = None,
+                                 checkpoint: Mapping[str, Any] | None = None) -> Any:
         """Post to a configured Home Channel (or the canonical local Bot Chat). Requires the injection grant."""
         from hermes_cli.plugin_messages import post_home
-        return await post_home(self, text, platform)
+        return await post_home(self, text, platform, delivery_id, checkpoint)
+
+    async def apost_local_session(self, text: str, *, session_id: str, actor_id: str, delivery_id: str) -> Any:
+        """Deliver an idempotent notice back to an admitted local user conversation."""
+        from hermes_cli.plugin_messages import post_local_session
+        return await post_local_session(self, text, session_id, actor_id, delivery_id)
 
     def ask_choice(self, question: str, choices: list) -> Optional[str]:
         """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or
@@ -467,7 +487,7 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         from hermes_cli.plugin_choices import ask_choice
         return ask_choice(question, choices)
 
-    def _gateway_injection_allowed(self) -> bool:
+    def gateway_injection_allowed(self) -> bool:
         """Return whether this plugin may trigger gateway session turns (read from the plugin's
         own profile config, never the calling thread's ambient home)."""
         try:

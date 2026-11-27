@@ -166,7 +166,13 @@ export function CapabilitiesView({
       <ToolsetsTab hints={toolsetHints} key={`toolsets-${scope.key}`} onQueryChange={setQuery} profile={scope.profile} query={query} toolsets={toolsets ?? []} />
     ),
     // KouriChat Link device-chain sync for the scoped profile.
-    link: () => <LinkTab key={`link-${scope.key}`} profile={scope.profile} />
+    link: () => (
+      <div className="capabilities-scroll">
+        <div className="capabilities-page">
+          <LinkTab key={`link-${scope.key}`} profile={scope.profile} />
+        </div>
+      </div>
+    )
   } satisfies Record<CapabilityMode, () => React.ReactNode>
 
   return (
@@ -188,7 +194,7 @@ export function CapabilitiesView({
       ]}
       tabsAlign="start"
     >
-      <div className="flex h-full flex-col">{loadGate ?? tabContent[mode]()}</div>
+      <div className="@container flex h-full flex-col">{loadGate ?? tabContent[mode]()}</div>
     </PageSearchShell>
   )
 }

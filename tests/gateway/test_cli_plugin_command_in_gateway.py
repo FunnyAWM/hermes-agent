@@ -34,6 +34,8 @@ def register(ctx):
     ctx.register_command("probe_under", lambda arg: "EXACT_UNDERSCORE", description="Exact name")
     ctx.register_command("probe-under", lambda arg: "HYPHEN_ALIAS", description="Telegram alias form")
     ctx.register_command("probe_only", lambda arg: "UNDERSCORE_ONLY", description="No hyphen twin")
+    from hermes_cli.plugin_command_dispatch import PluginNotice
+    ctx.register_command("probe-notice", lambda arg: PluginNotice(arg, "probe.notice"), description="Transient notice")
 
     def boom(arg):
         raise RuntimeError("probe handler exploded")
@@ -176,6 +178,8 @@ def test_cli_plugin_command_runs_in_the_gateway_and_reaches_its_mcp_registry(tmp
                                                      '/probe-mcp-status deep check') is True
                 out = capsys.readouterr().out
                 calls = list(wire.calls)
+                assert wire.call('slash.exec', session_id=sid, command='probe-notice Transient ticket') == {
+                    'type': 'exec', 'output': ''}
                 typed_outs = {}
                 for typed in ('/probe_under', '/probe_only', '/probe-boom', '/probe-cwd', '/probe-sid',
                               '/probe-args 2026–2027 — x'):

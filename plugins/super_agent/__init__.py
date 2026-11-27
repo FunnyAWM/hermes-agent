@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+import logging
 from pathlib import Path
 import uuid
 from typing import Any
 
 from agent.i18n import t
 from agent.runtime_session_store import is_worker_process
+from hermes_cli.plugin_command_dispatch import PluginNotice
 
 from .runtime import DEFAULT_WATCHDOG_SECONDS, SuperAgentRuntime
 from .sources import MessageSources
 from .store import MAX_RETRIES, SANDBOX_LEVELS, SuperAgentStore
 from .workspace import task_repository
+
+logger = logging.getLogger(__name__)
 
 
 def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id: str = "", **_kwargs: Any):
@@ -62,14 +66,14 @@ def _parse_new(ctx: Any, text: str) -> tuple[str, str]:
     text = text.strip()
     if not text:
         raise ValueError(t("super_agent.no_task"))
-    first, separator, rest = text.partition(" ")
+    first, *parts = text.split(maxsplit=1)
     level = first.lower()
     if level == "full-access":
         raise ValueError(t("super_agent.full_access"))
     if level in SANDBOX_LEVELS:
-        if not separator or not rest.strip():
+        if not parts:
             raise ValueError(t("super_agent.no_sandbox_task"))
-        return level, rest.strip()
+        return level, parts[0]
     return _default_sandbox(ctx), text
 
 
@@ -78,6 +82,26 @@ def _default_sandbox(ctx: Any) -> str:
     if sandbox not in SANDBOX_LEVELS:
         raise ValueError(t("super_agent.invalid_sandbox"))
     return sandbox
+
+
+def _has_destination(ctx: Any, destination: dict | None) -> bool:
+    permissions = MessageSources.from_config(ctx)
+    if not ctx.gateway_injection_allowed():
+        return False
+    bot_chat = bool(destination and destination.get("bot_chat"))
+    writable = bool(destination) and permissions.writes(destination["platform"])
+    if writable and not bot_chat:
+        return True
+    try:
+        platforms = ctx.home_channel_platforms(require_gateway=True)
+        if writable and bot_chat:
+            # A Desktop Bot Chat is delivered through this profile's canonical Bot Chat only,
+            # which is exactly what makes local a home platform.
+            return "local" in platforms
+        return any(permissions.writes(p) and not permissions.reads(p) for p in platforms)
+    except Exception:
+        logger.exception("Could not discover writable Super Agent destinations")
+        return False
 
 
 async def _new_ticket(
@@ -89,24 +113,38 @@ async def _new_ticket(
     source_instance: str = "local",
     external_event_id: str | None = None,
     offer_actor: str | None = None,
+    answer_id: str = "",
     bot_chat: bool = False,
+    natural: bool = False,
 ) -> str:
-    sandbox, task = _parse_new(ctx, text) if offer_actor is None else (_default_sandbox(ctx), text)
+    sandbox, task = _parse_new(ctx, text) if offer_actor is None and not natural else (_default_sandbox(ctx), text)
     snapshot = _source_snapshot(source, offer_actor)
+    local_id = ((source or {}).get("chat_id") if (source or {}).get("platform") == "local"
+                and (offer_actor or source.get("user_id")) else None)
+    destination = snapshot
+    if bot_chat or local_id:
+        destination = {"platform": "local", "actor_id": offer_actor or (source or {}).get("user_id", ""),
+                       **({"bot_chat": True} if bot_chat else {"local_session_id": local_id})}
+    has_destination = await asyncio.to_thread(_has_destination, ctx, destination)
+    paused = await asyncio.to_thread(runtime.store.is_paused)
     ticket, created = await runtime.submit(
         task=task,
         sandbox=sandbox,
         workspace_root=await asyncio.to_thread(_workspace_root, ctx, task),
         source_instance=_source_instance(snapshot, source_instance),
         external_event_id=external_event_id or uuid.uuid4().hex,
-        source=({"platform": "local", "actor_id": offer_actor or (source or {}).get("user_id", ""),
-                 "bot_chat": True} if bot_chat else snapshot),
+        source=destination,
         offer_actor=offer_actor,
+        answer_id=answer_id,
     )
+    if ticket.get("retired"):
+        return PluginNotice(t("super_agent.retired", id=ticket["id"]), "super_agent.queued." + ticket["id"])
     duplicate = t("super_agent.duplicate") if not created else ""
-    paused = await asyncio.to_thread(runtime.store.is_paused)
     waiting = t("super_agent.waiting") if paused else ""
-    return t("super_agent.queued", id=ticket['id'], sandbox=ticket['sandbox'], duplicate=duplicate, waiting=waiting)
+    message = t("super_agent.queued", id=ticket['id'], sandbox=ticket['sandbox'], duplicate=duplicate, waiting=waiting)
+    if not has_destination:
+        message += " " + t("super_agent.no_destination")
+    return PluginNotice(message, "super_agent.queued." + ticket["id"])
 
 
 def _status_text(status: str) -> str:
@@ -129,6 +167,8 @@ def _ticket_text(ticket: dict) -> str:
     lines.append(t("super_agent.budget", retry_count=ticket['retry_count'], limit=MAX_RETRIES))
     if ticket.get("last_error"):
         lines.append(t("super_agent.error", last_error=ticket['last_error']))
+    if ticket.get("notice_denied"):
+        lines.append(t("super_agent.notice_denied"))
     if ticket.get("result"):
         lines.append(t("super_agent.result", result=ticket['result']))
     return "\n".join(lines)
@@ -158,6 +198,10 @@ async def _router_command(runtime: SuperAgentRuntime, command: str) -> str | Non
             t("super_agent.alert", ticket_id=alert['ticket_id'], detail=alert['detail'], suggestion=alert['suggestion'])
             for alert in alerts
         )
+        if error := getattr(runtime, "scheduler_error", None):
+            lines.append(t("super_agent.scheduler_error", error=error))
+        stopping = await asyncio.to_thread(runtime.store.pending_stops)
+        lines.extend(t("super_agent.stop_pending", id=tid) for tid in dict.fromkeys(s["ticket_id"] for s in stopping))
         if events:
             lines.append(t("super_agent.controls") + "; ".join(
                 f"{event['action']} {event['ticket_id'] or 'router'}" for event in events
@@ -174,18 +218,45 @@ async def _router_command(runtime: SuperAgentRuntime, command: str) -> str | Non
     return None
 
 
+async def _ticket_status(runtime: SuperAgentRuntime, ticket_id: str) -> str:
+    ticket = await asyncio.to_thread(runtime.store.get_ticket, ticket_id)
+    if ticket is None:
+        return t("super_agent.unknown", ticket_id=ticket_id)
+    events = await asyncio.to_thread(runtime.store.list_control_events, ticket_id)
+    text = _ticket_text(ticket)
+    details = await asyncio.to_thread(runtime.store.ticket_details, ticket_id)
+    subscriptions = await asyncio.to_thread(runtime.store.list_subscriptions, ticket_id)
+    for sub in subscriptions:
+        text += "\n" + t("super_agent.subscription_row", thread=sub["thread_key"], mode=sub["mode"])
+    for row in details["handbacks"]:
+        text += "\n" + t("super_agent.handback_row", trigger=row["trigger_id"], reason=row["reason"])
+    unavailable = t("super_agent.unavailable")
+    for row in details["turns"]:
+        metrics = row["metrics"]
+        values = {key: metrics[key] if metrics.get(key) is not None else unavailable
+                  for key in ("duration_seconds", "input_tokens", "output_tokens", "cache_read_tokens")}
+        text += "\n" + t("super_agent.turn_row", generation=row["generation"], sequence=row["sequence"],
+                          result=row["result"] or unavailable, **values)
+    for row in ticket.get("deliveries", ()):
+        text += "\n" + t("super_agent.delivery_row", id=row["id"], target=row["target"],
+                          status=row["status"], error=row["error"] or "")
+    if events:
+        text += t("super_agent.recovery") + "; ".join(event["action"] for event in events)
+    return text
+
+
 async def _ticket_command(
     runtime: SuperAgentRuntime, command: str, ticket_id: str, value: str, source_instance: str,
 ) -> str:
     if command == "status":
-        ticket = await asyncio.to_thread(runtime.store.get_ticket, ticket_id)
-        if ticket is None:
-            return t("super_agent.unknown", ticket_id=ticket_id)
-        events = await asyncio.to_thread(runtime.store.list_control_events, ticket_id)
-        text = _ticket_text(ticket)
-        if events:
-            text += t("super_agent.recovery") + "; ".join(event["action"] for event in events)
-        return text
+        return await _ticket_status(runtime, ticket_id)
+    if command == "redeliver":
+        if value and not value.strip().isdecimal():
+            return t("super_agent.usage_redeliver")
+        count = await asyncio.to_thread(runtime.store.redeliver, ticket_id, int(value) if value else None)
+        if count:
+            runtime.wake()
+        return t("super_agent.redelivered", count=count)
     if command in {"stop", "cancel"}:
         return (
             t("super_agent.cancelled", ticket_id=ticket_id)
@@ -233,7 +304,7 @@ async def _ticket_command(
 async def _handoff_command(ctx, runtime, command, rest, *, source, session_key, actor_id, bot_chat, message_id):
     if command == "new":
         reply = await _new_ticket(
-            ctx, runtime, rest, source=source if bot_chat else _source_snapshot(source, actor_id),
+            ctx, runtime, rest, source=_source_snapshot(source, actor_id) or source,
             source_instance=f"slash:{session_key or 'local'}", external_event_id=message_id, bot_chat=bot_chat,
         )
         return True, reply
@@ -278,14 +349,22 @@ async def _command(
             if command in {"new", "tell", "retry"}:
                 ok, reply = await _handoff_command(ctx, runtime, command, rest, source=source, session_key=session_key,
                                                    actor_id=actor_id, bot_chat=bot_chat, message_id=message_id)
-                if ok and not permissions.writes(platform):
-                    return ""
-                if ok and record_exchange:
+                writable = permissions.writes(platform)
+                if ok and writable and record_exchange:
                     await record_exchange(reply)
+                if ok and not writable and not isinstance(reply, PluginNotice):
+                    return ""
                 return reply
         except (OSError, ValueError) as exc:
             return t("super_agent.rejected", exc=exc)
     source_instance = f"gateway:{session_key}" if _source_snapshot(source) else "slash"
+    if command == "observe-log":
+        key = rest.strip()
+        snapshot = _source_snapshot(source)
+        if not key or (snapshot and key != _source_instance(snapshot, "")):
+            return t("super_agent.usage_observe_log")
+        rows = await asyncio.to_thread(runtime.store.thread_observations, source_instance, key)
+        return "\n".join(f"{row['action']}: {row['detail']}" for row in rows) or t("super_agent.none")
     if command == "observe":
         thread_key, _, mode = rest.strip().partition(" ")
         if not thread_key:
@@ -303,6 +382,11 @@ async def _command(
     ticket_id, _, value = rest.strip().partition(" ")
     if not ticket_id:
         return t("super_agent.help")
+    if command in {"status", "redeliver"} and (snapshot := _source_snapshot(source)):
+        visible = await asyncio.to_thread(runtime.store.chat_tickets, _source_instance(snapshot, ""),
+                                          actor_id or snapshot.get("user_id", ""), ticket_id)
+        if not visible:
+            return t("super_agent.unknown", ticket_id=ticket_id)
     return await _ticket_command(runtime, command, ticket_id, value, source_instance)
 
 
@@ -346,7 +430,7 @@ def register(ctx: Any) -> None:
         "super-agent",
         lambda raw_args, **kwargs: _command(ctx, runtime, raw_args, **kwargs),
         description=t("super_agent.description"),
-        args_hint="<new|status|list|tell|stop|retry|takeover|pause|resume|health> ...",
+        args_hint="<new|status|list|tell|stop|retry|takeover|redeliver|observe-log|pause|resume|health> ...",
         argument_mode="text",
     )
     ctx.on_unload(runtime.stop)

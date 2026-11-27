@@ -476,7 +476,7 @@ async def execute_command(connection, ref, params, *, dispatch=False):
         with (_profile_runtime_scope(home), _session_workspace(authority.runner, live.source),
               viewer_choices(live, ref.session_id)):
             output = await _run_runner_command(authority.runner, live, name, arg, *runner_command)
-        return {'type': 'exec', 'output': _text(output)}
+        return {'type': 'exec', 'output': _text(_publish_plugin_notice(live, ref, output))}
     if definition is None:
         def build():  # in the session's folder: its trusted project skills, as its catalog lists them
             with _profile_runtime_scope(home), _session_workspace(authority.runner, live.source):
@@ -524,6 +524,7 @@ async def execute_command(connection, ref, params, *, dispatch=False):
     if canonical in _AUTOMATION_COMMANDS:
         from gateway.session_control_actions import publish
         publish(authority, ref.session_id)
+    output = _publish_plugin_notice(live, ref, output)
     prompt = prompt if prompt is not None else sink.prompt
     if prompt:
         # The client submits the turn with its own durable input id; the gateway never does.
@@ -531,6 +532,14 @@ async def execute_command(connection, ref, params, *, dispatch=False):
         return {'type': 'send', 'message': prompt, 'display': sink.display or typed,
                 **({'notice': notice} if notice else {})}
     return {'type': 'exec', 'output': '\n'.join(filter(None, [*sink.notices, _text(output)]))}
+
+
+def _publish_plugin_notice(live, ref, output):
+    from hermes_cli.plugin_command_dispatch import PluginNotice
+    if isinstance(output, PluginNotice):
+        live.event_stream.publish(ref.session_id, output.payload(), event_type="notification.show")
+        return ""
+    return output
 
 
 def _text(output):

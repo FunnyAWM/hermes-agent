@@ -12,6 +12,7 @@ import type { PluginSettingField, PluginSettingFieldType } from '@/store/agent-p
 
 import { CONTROL_TEXT } from './constants'
 import { PluginCatalogSelect } from './plugin-catalog-select'
+import { isMessageSourcesField, PluginMessageSourcesSelect } from './plugin-message-sources-select'
 import { ListRow, Pill, SectionHeading } from './primitives'
 
 // A plugin manifest's `config_schema` rendered as a form. Every non-secret
@@ -280,6 +281,7 @@ export function collectChanges(fields: PluginSettingField[], draft: PluginSettin
 }
 
 export function PluginSettingsForm({
+  bundledPlugin,
   fields,
   idPrefix,
   disabled,
@@ -288,6 +290,7 @@ export function PluginSettingsForm({
   scope,
   title
 }: {
+  bundledPlugin?: string
   fields: PluginSettingField[]
   scope?: null | string
   idPrefix: string
@@ -376,11 +379,23 @@ export function PluginSettingsForm({
           const Control = FIELD_CONTROLS[field.type]
           const label = fieldLabel(field)
 
+          const sources = isMessageSourcesField(bundledPlugin, field)
+
           const dependentModels = fields.filter(model => model.model_provider_key === field.key)
           const isProvider = dependentModels.length > 0
 
           const control =
-            isProvider || field.model_provider_key ? (
+            sources ? (
+              <PluginMessageSourcesSelect
+                disabled={disabled || saving}
+                id={id}
+                label={label}
+                onChange={raw => setDraft(current => ({ ...current, [field.key]: raw }))}
+                raw={draft[field.key] ?? ''}
+                scope={scope}
+                write={field.key === 'write_message_sources'}
+              />
+            ) : isProvider || field.model_provider_key ? (
               <PluginCatalogSelect
                 disabled={disabled || saving}
                 id={id}
@@ -423,7 +438,7 @@ export function PluginSettingsForm({
 
           // Editors too big for the control column take the full width under
           // the description, as native config rows do.
-          return field.type === 'json' ? (
+          return field.type === 'json' && !sources ? (
             <ListRow
               below={<div className="mt-3">{control}</div>}
               data-tour={`plugin-field-${field.key}`}

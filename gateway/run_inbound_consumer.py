@@ -18,10 +18,21 @@ import asyncio
 import contextlib
 import logging
 from typing import Any, Optional, Tuple
+from hermes_cli.plugin_command_dispatch import PluginNotice
 
 logger = logging.getLogger(__name__)
 
 POST_ADMISSION_HOOK = "post_gateway_admission"
+
+
+def _continue(event, result):
+    if result.get("action") != "continue":
+        return False
+    if isinstance(text := result.get("text"), str) and text.strip():
+        event.text = text
+    if isinstance(name := result.get("routed_by"), str):
+        event._routed_by = (*getattr(event, "_routed_by", ()), name)
+    return True
 
 
 def _routed_scope(runner: Any, source: Any):
@@ -49,6 +60,8 @@ async def run_post_admission_hook(
                 actor_id=event.sender_id(),
             )
             for result in results:
+                if isinstance(result, dict) and _continue(event, result):
+                    continue
                 if isinstance(result, dict) and result.get("action") == "handled":
                     reply = result.get("reply")
                     if result.get("record_exchange") is True and isinstance(reply, str) and reply.strip():
@@ -57,6 +70,9 @@ async def run_post_admission_hook(
                             await record_channel_exchange(runner, event, reply)
                         except Exception:
                             logger.exception("Could not record the handled exchange for %s", session_key)
+                    if isinstance(reply, PluginNotice):
+                        from gateway.platforms.base import EphemeralReply
+                        return True, EphemeralReply(str(reply))
                     return True, reply if isinstance(reply, str) and reply.strip() else None
     except asyncio.CancelledError:
         raise
@@ -70,10 +86,10 @@ def _append_exchange(store, sid, event, reply):
     from persistence.conversation.messages import NewMessage
     if event.message_id and store.messages.has_platform_message_id(sid, event.message_id):
         return
-    store.messages.append_batch(sid, [
-        NewMessage(role="user", content=event.text, platform_message_id=event.message_id),
-        NewMessage(role="assistant", content=reply),
-    ])
+    messages = [NewMessage(role="user", content=event.text, platform_message_id=event.message_id)]
+    if not isinstance(reply, PluginNotice):
+        messages.append(NewMessage(role="assistant", content=reply))
+    store.messages.append_batch(sid, messages)
 
 
 async def record_channel_exchange(runner, event, reply, entry=None):
@@ -129,10 +145,15 @@ async def route_bot_chat(authority, ref, event, policy) -> str | None:
     for result in results:
         if not isinstance(result, dict):
             continue
+        if _continue(event, result):
+            continue
         if result.get("action") == "handled" and isinstance(reply := result.get("reply"), str):
             from gateway.session_runtime_workers import tracked_write
             if reply and result.get("record_exchange", True):
                 await tracked_write(authority, lambda: _append_exchange(store, authority.physical_target(ref), event, reply))
+            if isinstance(reply, PluginNotice):
+                live.event_stream.publish(ref.session_id, reply.payload(), event_type="notification.show")
+                return ""
             return reply
         if isinstance(note := result.get("context"), str) and note.strip():
             event._bot_chat_notes = (*getattr(event, "_bot_chat_notes", ()), note)

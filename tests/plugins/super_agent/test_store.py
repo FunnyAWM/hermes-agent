@@ -123,7 +123,7 @@ def test_turn_identity_submission_and_session_sandbox_survive_reopen(tmp_path):
     ]
 
 
-def test_recover_requeues_known_work_and_quarantines_uncertain_delivery(tmp_path):
+def test_recover_requeues_known_work_and_replays_uncertain_delivery(tmp_path):
     store = _store(tmp_path)
     ticket_a, _ = _submit(store, "event-a")
     ticket_b, _ = _submit(store, "event-b")
@@ -152,8 +152,8 @@ def test_recover_requeues_known_work_and_quarantines_uncertain_delivery(tmp_path
     assert _rows(store, "SELECT status FROM assignments WHERE id=?", (assignment_a["id"],))[0]["status"] == "interrupted"
     assert _rows(store, "SELECT status FROM turns WHERE id=?", (turn_a["id"],))[0]["status"] == "pending"
     assert _rows(store, "SELECT status FROM inbox WHERE ticket_id=?", (ticket_b["id"],))[0]["status"] == "pending"
-    assert _rows(store, "SELECT status FROM outbox WHERE id=?", (sending["id"],))[0]["status"] == "unknown"
-    assert reopened.claim_outbox() is None
+    replay = reopened.claim_outbox()
+    assert replay["id"] == sending["id"] and replay["attempts"] == 2
 
     recovered = reopened.claim_next()
     assert (recovered["id"], recovered["effect_id"]) == (assignment_a["id"], assignment_a["effect_id"])
@@ -218,6 +218,11 @@ def test_followup_blocks_completion_until_messages_are_consumed(tmp_path):
     notice = store.claim_outbox()
     assert notice is not None
     assert json.loads(notice["source_json"])["thread_id"] == "主题-7"
+    assert "initial result" in notice["text"]
+    store.settle_outbox(notice["id"], delivered=True)
+    followup_notice = store.claim_outbox()
+    assert "follow-up result" in followup_notice["text"]
+    store.settle_outbox(followup_notice["id"], delivered=True)
     assert store.claim_outbox() is None
 
 
@@ -244,9 +249,10 @@ def test_outbox_claim_is_atomic_and_settlement_records_outcome(tmp_path):
 
     store.settle_outbox(outbox["id"], delivered=False, error="timeout")
     assert _rows(store, "SELECT status,error FROM outbox WHERE id=?", (outbox["id"],))[0] == {
-        "status": "unknown",
+        "status": "pending",
         "error": "timeout",
     }
+    assert store.claim_outbox() is None
 
 
 def test_pause_is_profile_scoped_persistent_and_blocks_claim_and_delivery(tmp_path):
@@ -360,6 +366,8 @@ def test_takeover_history_and_three_retry_limit_are_immutable(tmp_path):
         (first["id"],),
     )[0]
     assert original["status"] == "taken_over"
+    stop, = store.pending_stops()
+    store.confirm_stopped(stop["id"])
 
     assignments = [first]
     input_ids = [first_turn["input_id"]]

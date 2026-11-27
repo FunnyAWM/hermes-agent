@@ -8,15 +8,21 @@ import logging
 import math
 import os
 from pathlib import Path
+from tempfile import TemporaryFile
+import time
+from contextlib import suppress
 from typing import Any
 
 from agent.i18n import t
 from hermes_cli.gateway_client import connect_gateway
 from tools.environments.local_command_sandbox import resolve_binary, settings
 
+from .delivery import SEND_TIMEOUT_SECONDS
 from .store import SuperAgentStore
 from .sources import MessageSources
 from .workspace import WORKTREE_DIRECTORY, has_checkout_changes
+from .worker_input import initial_prompt, worker_prompt
+from .worker_turn import execute_turn
 
 
 logger = logging.getLogger(__name__)
@@ -24,8 +30,6 @@ MAX_WORKERS = 2
 POLL_SECONDS = 0.5
 DEFAULT_WATCHDOG_SECONDS = 1800
 GIT_TIMEOUT_SECONDS = 60
-INLINE_CHAR_BUDGET = 8000
-SPILL_NOTICE = "[Full content spilled to {ref}; read it from the workspace before continuing.]"
 
 
 class SuperAgentRuntime:
@@ -39,14 +43,28 @@ class SuperAgentRuntime:
         self._watchdog_wake = asyncio.Event()
         self._recovered = asyncio.Event()
         self._closing = False
+        self.scheduler_error = ""
+        self._stopping: set[str] = set()
+        self._last_prune = -math.inf
         get_config = getattr(ctx, "get_config", lambda _name, default=None: default)
         self.watchdog_seconds = float(get_config("watchdog_seconds", DEFAULT_WATCHDOG_SECONDS))
         if not math.isfinite(self.watchdog_seconds) or self.watchdog_seconds <= 0:
             raise ValueError(t("super_agent.watchdog_config"))
+        self.max_workers = self._worker_limit(get_config("max_concurrent_workers", str(MAX_WORKERS)))
+        self._turn_limit(get_config("turn_timeout_seconds", 0))
 
-    @property
-    def max_workers(self) -> int:
-        raw = self.ctx.get_config("max_concurrent_workers", str(MAX_WORKERS))
+    @staticmethod
+    def _turn_limit(raw) -> float:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(t("super_agent.turn_timeout_config")) from exc
+        if isinstance(raw, bool) or not math.isfinite(value) or value < 0:
+            raise ValueError(t("super_agent.turn_timeout_config"))
+        return value
+
+    @staticmethod
+    def _worker_limit(raw) -> int:
         try:
             value = int(raw)
         except (TypeError, ValueError) as exc:
@@ -77,7 +95,12 @@ class SuperAgentRuntime:
             )
 
     def wake(self) -> None:
-        self.start()
+        try:
+            self.start()
+        except Exception as exc:
+            # The request has already committed; a scheduler failure must not hand it to another agent.
+            self.scheduler_error = str(exc)
+            logger.exception("Could not wake Super Agent scheduler")
         self._wake.set()
         self._watchdog_wake.set()
 
@@ -120,8 +143,8 @@ class SuperAgentRuntime:
         self.wake()
         return changed
 
-    async def cancel(self, ticket_id: str) -> dict | None:
-        return await self._stop_ticket(ticket_id, self.store.cancel)
+    async def cancel(self, ticket_id: str, *, withdrawal=None) -> dict | None:
+        return await self._stop_ticket(ticket_id, self.store.cancel, withdrawal=withdrawal)
 
     async def takeover(self, ticket_id: str) -> dict | None:
         return await self._stop_ticket(ticket_id, self.store.takeover)
@@ -167,8 +190,8 @@ class SuperAgentRuntime:
             self.wake()
         return accepted
 
-    async def _stop_ticket(self, ticket_id: str, operation: Any) -> dict | None:
-        assignment = await asyncio.to_thread(operation, ticket_id)
+    async def _stop_ticket(self, ticket_id: str, operation: Any, **kwargs) -> dict | None:
+        assignment = await asyncio.to_thread(operation, ticket_id, **kwargs)
         if assignment is not None:
             self.wake()
             session_id = assignment.get("worker_session_id")
@@ -187,36 +210,94 @@ class SuperAgentRuntime:
         return assignment
 
     async def _run(self) -> None:
-        await asyncio.to_thread(self.store.recover)
-        self._recovered.set()
+        delivery = asyncio.create_task(self._deliver_loop(), name="super-agent:delivery")
         try:
             while not self._closing:
-                self._workers = {task for task in self._workers if not task.done()}
-                launched = False
-                paused = await asyncio.to_thread(self.store.is_paused)
-                if not paused:
-                    while len(self._workers) < self.max_workers:
-                        assignment = await asyncio.to_thread(self.store.claim_next)
-                        if assignment is None:
-                            break
-                        task = asyncio.create_task(
-                            self._run_assignment(assignment),
-                            name=f"super-agent:{assignment['ticket_id']}",
-                        )
-                        self._workers.add(task)
-                        task.add_done_callback(self._worker_done)
-                        launched = True
-                delivered = False if paused else await self._deliver_one()
-                if not launched and not delivered:
-                    self._wake.clear()
-                    try:
-                        await asyncio.wait_for(self._wake.wait(), timeout=POLL_SECONDS)
-                    except TimeoutError:
-                        pass
+                self._wake.clear()
+                try:
+                    if not self._recovered.is_set():
+                        await asyncio.to_thread(self.store.recover)
+                        self._recovered.set()
+                    await self._dispatch()
+                    self.scheduler_error = ""
+                except Exception as exc:
+                    if self.scheduler_error != str(exc):
+                        logger.exception("Super Agent scheduling failed")
+                    self.scheduler_error = str(exc)
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(self._wake.wait(), timeout=POLL_SECONDS if not self.scheduler_error else 2)
         finally:
+            delivery.cancel()
+            with suppress(asyncio.CancelledError):
+                await delivery
             for task in tuple(self._workers):
                 if not task.cancelling():
                     task.cancel()
+            if self._workers:
+                await asyncio.gather(*self._workers, return_exceptions=True)
+
+    async def _dispatch(self) -> None:
+        self._workers = {task for task in self._workers if not task.done()}
+        occupied = {task.get_name() for task in self._workers}
+        for stop in await asyncio.to_thread(self.store.pending_stops):
+            name = f"super-agent:{stop['assignment_id']}"
+            if not stop["admission_id"] and name in occupied:
+                continue  # Let an in-flight submit capture its admission before reconciling the snapshot.
+            key = stop["id"]
+            if key not in self._stopping:
+                self._stopping.add(key)
+                task = asyncio.create_task(self._reconcile_stop(stop), name=name)
+                self._workers.add(task)
+                occupied.add(name)
+                task.add_done_callback(self._worker_done)
+        if await asyncio.to_thread(self.store.is_paused):
+            return
+        while len(occupied) < self.max_workers:
+            assignment = await asyncio.to_thread(self.store.claim_next)
+            if assignment is None:
+                break
+            name = f"super-agent:{assignment['id']}"
+            task = asyncio.create_task(self._run_assignment(assignment), name=name)
+            self._workers.add(task)
+            occupied.add(name)
+            task.add_done_callback(self._worker_done)
+
+    async def _reconcile_stop(self, stop: dict) -> None:
+        try:
+            while not self._closing:
+                try:
+                    async with connect_gateway(purpose="managed-session", subject=f"plugin:{self.ctx.plugin_id}") as client:
+                        snapshot = await client.rpc("session.resume", session_id=stop["worker_session_id"])
+                        admission = stop["admission_id"] or next((row["admission_id"] for row in snapshot["pending"]
+                                                                 if row["input_id"] == stop["input_id"]), None)
+                        if not admission:
+                            await asyncio.to_thread(self.store.confirm_stopped, stop["id"])
+                            return
+                        args = dict(session_id=stop["worker_session_id"], admission_id=admission)
+                        receipt = await client.rpc("prompt.receipt", **args)
+                        if receipt.get("status") not in {"terminal", "unknown"}:
+                            receipt = await client.rpc("prompt.cancel", **args)
+                        while receipt.get("status") != "terminal":
+                            # Unknown needs an owner's resolution. Polling has no side effects.
+                            await asyncio.sleep(5 if receipt.get("status") == "unknown" else POLL_SECONDS)
+                            receipt = await client.rpc("prompt.receipt", **args)
+                    await asyncio.to_thread(self.store.confirm_stopped, stop["id"])
+                    return
+                except Exception:
+                    logger.warning("Awaiting Worker stop confirmation for %s", stop["ticket_id"], exc_info=True)
+                    await asyncio.sleep(2)
+        finally:
+            self._stopping.discard(stop["id"])
+
+    async def _deliver_loop(self) -> None:
+        await self._recovered.wait()
+        while not self._closing:
+            try:
+                if await self._deliver_one():
+                    continue
+            except Exception:
+                logger.exception("Super Agent delivery queue unavailable")
+            await asyncio.sleep(POLL_SECONDS)
 
     async def _run_watchdog(self) -> None:
         await self._recovered.wait()
@@ -232,6 +313,11 @@ class SuperAgentRuntime:
                         "Super Agent Watchdog: %s (%s)",
                         alert["ticket_id"], alert["detail"],
                     )
+                if time.monotonic() - self._last_prune >= 3600:
+                    days = self.ctx.get_config("history_retention_days", 0)
+                    if days:
+                        await asyncio.to_thread(self.store.prune_history, days)
+                    self._last_prune = time.monotonic()
             except Exception:
                 logger.exception("Super Agent Watchdog scan failed")
             try:
@@ -264,7 +350,7 @@ class SuperAgentRuntime:
                         cwd=str(workspace),
                         cwd_explicit=True,
                         toolsets=["terminal"],
-                        title=f"Super Agent {assignment['ticket_id']}",
+                        title=f"Super Agent {assignment['ticket_id']} g{assignment['generation']}",
                         **({"provider": provider} if provider else {}),
                         **({"model": model} if model else {}),
                     )
@@ -272,12 +358,19 @@ class SuperAgentRuntime:
                     await asyncio.to_thread(
                         self.store.bind_worker_session, assignment["id"], session_id
                     )
-                await self._run_turns(client, assignment, session_id)
+                progress = asyncio.create_task(self._consume_progress(client.events, session_id))
+                try:
+                    await self._run_turns(client, assignment, session_id, workspace=workspace)
+                finally:
+                    progress.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await progress
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logger.exception("Super Agent assignment failed for %s", assignment["id"])
-            await asyncio.to_thread(self.store.fail_assignment, assignment["id"], str(exc))
+            await asyncio.to_thread(self.store.fail_assignment, assignment["id"], str(exc),
+                                    home_platforms=self._notification_homes())
             self._wake.set()
             self._watchdog_wake.set()
 
@@ -320,151 +413,133 @@ class SuperAgentRuntime:
 
     @staticmethod
     async def _git(*args: str) -> str:
-        process = await asyncio.create_subprocess_exec(
-            "git",
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=GIT_TIMEOUT_SECONDS
-            )
-        except TimeoutError:
-            process.kill()
+        # Files also work on restricted Windows hosts where asyncio cannot create named pipes.
+        with TemporaryFile() as stdout, TemporaryFile() as stderr:
+            process = await asyncio.create_subprocess_exec("git", *args, stdout=stdout, stderr=stderr)
+            reaped = asyncio.create_task(process.wait())  # health: allow HX006 -- Both callers below time out; the shielded task still reaps a late exit.
             try:
-                await asyncio.wait_for(process.wait(), timeout=5)
-            except TimeoutError:
-                raise RuntimeError(f"git {' '.join(args)} timed out and did not terminate") from None
-            raise RuntimeError(f"git {' '.join(args)} timed out") from None
-        if process.returncode:
-            detail = stderr.decode(errors="replace").strip() or stdout.decode(errors="replace").strip()
-            raise RuntimeError(f"git {' '.join(args)} failed: {detail}")
-        return stdout.decode(errors="replace").strip()
+                await asyncio.wait_for(asyncio.shield(reaped), timeout=GIT_TIMEOUT_SECONDS)
+            except (TimeoutError, asyncio.CancelledError) as exc:
+                if process.returncode is None:
+                    with suppress(ProcessLookupError):
+                        process.kill()
+                try:
+                    await asyncio.wait_for(asyncio.shield(reaped), timeout=5)
+                except TimeoutError:
+                    logger.warning("Git process is still exiting after termination")
+                if isinstance(exc, asyncio.CancelledError):
+                    raise
+                raise RuntimeError(f"git {' '.join(args)} timed out") from None
+            stdout.seek(0)
+            output = stdout.read().decode(errors="replace").strip()
+            if process.returncode:
+                stderr.seek(0)
+                detail = stderr.read().decode(errors="replace").strip() or output
+                raise RuntimeError(f"git {' '.join(args)} failed: {detail}")
+            return output
 
-    async def _run_turns(self, client: Any, assignment: dict, session_id: str) -> None:
-        initial = self._inline_or_spill(
-            assignment["ticket_id"],
-            "Complete the task in the current Git worktree. Work autonomously and return a concise "
-            "summary, validation evidence, and changed files.\n\n"
-            f"Task:\n{assignment['task']}",
-        )
+    def _notification_homes(self):
+        try:
+            return MessageSources.from_config(self.ctx).write_only(self.ctx)
+        except Exception:
+            logger.exception("Cannot select Super Agent notification destinations")
+            return None
+
+    async def _consume_progress(self, events, session_id: str) -> None:
+        last_write = -math.inf
+        while True:
+            item = await events.get()
+            if not isinstance(item, dict):
+                if isinstance(item, Exception):
+                    # The Gateway queues its disconnect error as the stream's last item.
+                    logger.debug("Super Agent progress stream ended: %s", item)
+                    return
+                continue
+            frame = item.get("params") or {}
+            if frame.get("session_id") != session_id or frame.get("type") not in {
+                "tool.start", "tool.complete", "message.delta",
+            }:
+                continue
+            admission = frame.get("admission_id")
+            now = time.monotonic()
+            if admission and now - last_write >= min(5.0, self.watchdog_seconds / 4):
+                try:
+                    await asyncio.to_thread(self.store.note_worker_progress, session_id, admission)
+                except Exception:
+                    logger.warning("Unable to record Worker progress for %s", admission, exc_info=True)
+                last_write = now
+
+    async def _run_turns(self, client: Any, assignment: dict, session_id: str, *, workspace: Path | None = None) -> None:
+        workspace = workspace or Path(assignment["workspace"])
+        initial = initial_prompt(assignment["task"])
         await asyncio.to_thread(self.store.ensure_initial_turn, assignment["id"], initial)
         last_result = ""
         while True:
             turn = await asyncio.to_thread(self.store.pending_turn, assignment["id"])
             if turn is None:
-                try:
-                    homes = MessageSources.from_config(self.ctx).write_only(self.ctx)
-                except ValueError as exc:
-                    # Invalid notification settings must not turn a successful assignment into a failure.
-                    logger.warning("Cannot select Super Agent completion destinations: %s", exc)
-                    homes = ()
-                if await asyncio.to_thread(self.store.complete_if_idle, assignment["id"], last_result, home_platforms=homes):
+                if await asyncio.to_thread(self.store.complete_if_idle, assignment["id"], last_result,
+                                           home_platforms=self._notification_homes()):
                     return
                 turn = await asyncio.to_thread(self.store.create_followup_turn, assignment["id"])
                 if turn is None:
                     return
-            result = await self._execute_turn(client, session_id, turn)
+            timeout = self._turn_limit(await asyncio.to_thread(self.ctx.get_config, "turn_timeout_seconds", 0))
+            turn = await asyncio.to_thread(self.store.start_turn, turn["id"], timeout)
+            if turn is None:
+                return
+            # Recreate a legacy spill even when the Gateway is already running its original prompt.
+            text = await asyncio.to_thread(worker_prompt, workspace, turn, initial, assignment["ticket_id"],
+                                          self.store.record_input)
+            result, metrics = await execute_turn(self.store, client, session_id, turn, text, POLL_SECONDS)
             last_result = result
-            await asyncio.to_thread(self.store.mark_turn_terminal, turn["id"], result)
+            await asyncio.to_thread(self.store.mark_turn_terminal, turn["id"], result,
+                                    home_platforms=self._notification_homes(), metrics=metrics)
             self._watchdog_wake.set()
 
-    def _inline_or_spill(self, ticket_id: str, text: str) -> str:
-        """Keep inline content under budget; spill oversized content to a file reference."""
-        if len(text) <= INLINE_CHAR_BUDGET:
-            return text
-        ref = self.store.spill_content(ticket_id, text)
-        return text[:INLINE_CHAR_BUDGET] + "\n\n" + SPILL_NOTICE.format(ref=ref)
 
-    async def _execute_turn(self, client: Any, session_id: str, turn: dict) -> str:
-        admission_id = turn.get("admission_id")
-        import time as _time
-        turn_start = _time.monotonic()
-        try:
-            if not admission_id:
-                accepted = await client.rpc(
-                    "prompt.submit",
-                    session_id=session_id,
-                    input_id=turn["input_id"],
-                    text=turn["text"],
-                    finite=True,
-                    unattended=True,
-                )
-                admission_id = accepted["admission_id"]
-                await asyncio.to_thread(
-                    self.store.mark_turn_submitted, turn["id"], admission_id
-                )
-            while True:
-                receipt = await client.rpc(
-                    "prompt.receipt",
-                    session_id=session_id,
-                    admission_id=admission_id,
-                    include_result=True,
-                )
-                status = receipt.get("status")
-                if status == "unknown":
-                    raise RuntimeError(
-                        f"Worker turn outcome is unknown for admission {admission_id}; "
-                        "inspect the Session before retrying"
-                    )
-                if status == "terminal":
-                    outcome = receipt.get("outcome")
-                    result = receipt.get("result")
-                    if outcome != "completed" or not isinstance(result, dict):
-                        raise RuntimeError(f"Worker turn ended with outcome {outcome or 'unknown'}")
-                    if result.get("failed") or result.get("interrupted"):
-                        raise RuntimeError(
-                            str(result.get("error") or f"Worker turn ended with outcome {outcome}")
-                        )
-                    usage = result.get("usage") or {}
-                    metrics = {
-                        "input_tokens": usage.get("input_tokens") or usage.get("prompt_tokens"),
-                        "output_tokens": usage.get("output_tokens") or usage.get("completion_tokens"),
-                        "cache_read_tokens": usage.get("cache_read_tokens") or usage.get("cache_read_input_tokens"),
-                        "duration_seconds": round(_time.monotonic() - turn_start, 2),
-                    }
-                    await asyncio.to_thread(self.store.record_turn_metrics, turn["id"], metrics)
-                    return str(result.get("final_response") or "Completed without a final response.")
-                await asyncio.sleep(POLL_SECONDS)
-        except asyncio.CancelledError:
-            if admission_id:
-                try:
-                    await client.rpc(
-                        "prompt.cancel", session_id=session_id, admission_id=admission_id
-                    )
-                except Exception:
-                    logger.exception(
-                        "Super Agent unload cancel failed for admission %s", admission_id
-                    )
-            raise
+    async def _post_report(self, row, source):
+        permissions = MessageSources.from_config(self.ctx)
+        home = source.get("home_channel")
+        platform = home or source["platform"]
+        if not permissions.writes(platform) or permissions.reads(platform) != (home is None):
+            return False, "source_disabled", None, None
+        key = f"{row['ticket_id']}:{row['kind']}"
+        external = {"delivery_id": key}
+        if row["history_checkpoint"]:
+            external["checkpoint"] = json.loads(row["history_checkpoint"])
+        if platform == "local" and source.get("local_session_id"):
+            handle = await self.ctx.apost_local_session(row["text"], session_id=source["local_session_id"],
+                                                        actor_id=source["actor_id"], delivery_id=key)
+        elif platform == "local" and (home or source.get("bot_chat")):
+            handle = await self.ctx.apost_home_channel(row["text"], platform=platform, delivery_id=key)
+        elif home:
+            handle = await self.ctx.apost_home_channel(row["text"], platform=platform, **external)
+        else:
+            handle = await self.ctx.apost_message(row["text"], source=source, editable=False, **external)
+        return (handle.ok, handle.error or "", getattr(handle, "message_id", None),
+                getattr(handle, "result", {}).get("delivery_checkpoint"))
 
     async def _deliver_one(self) -> bool:
         row = await asyncio.to_thread(self.store.claim_outbox)
         if row is None:
             return False
+        checkpoint = None
         try:
             source = json.loads(row["source_json"])
-            permissions = MessageSources.from_config(self.ctx)
-            home = source.get("home_channel")
-            platform = home or source["platform"]
-            is_origin = home is None
-            if not permissions.writes(platform) or permissions.reads(platform) != is_origin:
-                await asyncio.to_thread(self.store.settle_outbox, row["id"], delivered=False, error="source_disabled")
-                return True
-            if home or source.get("bot_chat"):
-                handle = await self.ctx.apost_home_channel(row["text"], platform=platform)
+            if source.get("discover_homes"):
+                platforms = self._notification_homes()
+                if platforms is not None:
+                    await asyncio.to_thread(self.store.expand_outbox_homes, row, platforms)
+                    return True
+                delivered, error, receipt = False, "home_discovery_unavailable", None
             else:
-                handle = await self.ctx.apost_message(row["text"], source=source)
-            await asyncio.to_thread(
-                self.store.settle_outbox,
-                row["id"],
-                delivered=handle.ok,
-                error=handle.error or "",
-            )
+                async with asyncio.timeout(SEND_TIMEOUT_SECONDS):
+                    delivered, error, receipt, checkpoint = await self._post_report(row, source)
+        except TimeoutError:
+            delivered, error, receipt = False, "timeout", None
         except Exception as exc:
             logger.exception("Super Agent outbox delivery failed for %s", row["id"])
-            await asyncio.to_thread(
-                self.store.settle_outbox, row["id"], delivered=False, error=str(exc)
-            )
+            delivered, error, receipt = False, str(exc) or type(exc).__name__, None
+        await asyncio.to_thread(self.store.settle_outbox, row["id"], delivered=delivered,
+                                error=error, receipt=receipt, attempt=row["attempts"], checkpoint=checkpoint)
         return True

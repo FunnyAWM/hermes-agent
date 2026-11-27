@@ -378,6 +378,7 @@ function PluginSchemaSettingsPage({ agentKey, owner }: { agentKey: string; owner
     <SettingsContent>
       <SettingsProfileScope className="mb-5" />
       <PluginSettingsForm
+        bundledPlugin={row.source === 'bundled' ? row.key : undefined}
         disabled={busy}
         fields={row.settings_schema}
         idPrefix={`plugin-settings-${agentKey}`}

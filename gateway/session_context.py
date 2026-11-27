@@ -166,7 +166,8 @@ def bound_chat_input() -> dict | None:
     if not key or is_delegated_child_context() or not is_human_chat_input(event):
         return None
     return {"text": event.text, "message_id": event.message_id or "", "session_key": key,
-            "source": event.source.to_dict(), "actor_id": event.sender_id() or ""}
+            "source": event.source.to_dict(), "actor_id": event.sender_id() or "",
+            "routed_by": getattr(event, "_routed_by", ())}
 
 
 def source_route_metadata(source: Any, metadata: dict | None) -> dict | None:

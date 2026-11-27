@@ -9,10 +9,12 @@ from persistence.sqlite.conversation._store.messages import _bump_session_counte
 from persistence.sqlite.conversation._store.rules import stamp_message_uid
 
 
-_LINEAGE_MATCH_SQL = """WITH RECURSIVE lineage(id) AS (SELECT ? UNION
+_LINEAGE_MATCH_SQL = """WITH RECURSIVE lineage(id) AS ({seeds} UNION
     SELECT s.parent_session_id FROM sessions s JOIN lineage l ON s.id = l.id
     JOIN sessions p ON p.id = s.parent_session_id WHERE p.end_reason = 'compression'
 ) SELECT m.id FROM messages m JOIN lineage l ON m.session_id = l.id WHERE """
+_SESSION_SEED = "SELECT ?1"
+_ROUTE_SEEDS = "SELECT ?1 UNION SELECT id FROM sessions WHERE session_key=(SELECT session_key FROM sessions WHERE id=?1)"
 
 
 _DELEGATION_DELIVERY_MATCH = ("m.display_kind IN ('async_delegation_complete', 'hidden') AND json_extract(m.display_metadata, "
@@ -37,18 +39,27 @@ def append_completion_note(holder: StoreHolder, session_id: str, admission_id: s
         "json_extract(m.display_metadata, '$.completion_admission') = ?", (admission_id,))
 
 
-def _append_detached_result(holder: StoreHolder, session_id: str, content: str, display_kind: str, metadata: dict[str, Any],
-                            match_sql: str, params: tuple) -> int:
+def append_delivery_report(holder: StoreHolder, session_id: str, delivery_id: str, content: str) -> int:
+    """One visible assistant message for the complete logical delivery, irrespective of transport fragments."""
+    if not delivery_id:
+        raise ValueError("A delivery report needs a stable identifier")
+    return _append_detached_result(holder, session_id, content, None, {"delivery_report_id": delivery_id},
+                                   "json_extract(m.display_metadata, '$.delivery_report_id') = ?", (delivery_id,),
+                                   role="assistant", seeds=_ROUTE_SEEDS)
+
+
+def _append_detached_result(holder: StoreHolder, session_id: str, content: str, display_kind: str | None, metadata: dict[str, Any],
+                            match_sql: str, params: tuple, *, role: str = "user", seeds: str = _SESSION_SEED) -> int:
     """Record a result that arrived between turns as a user row once, including replay after rotation: a row
     ``match_sql`` (a condition on ``m``) finds in the compression lineage is returned instead. Check and insert
     share the writer transaction, so independent gateway processes cannot duplicate it; a live turn refuses it."""
     from persistence.sqlite.conversation._store.messages_sql import _INSERT_MESSAGE_SQL
     msg = {"content": content, "display_kind": display_kind, "display_metadata": metadata}
     stamp_message_uid(msg)  # a fresh occurrence: mint its durable id
-    row = _message_row_params(holder, session_id, "user", msg, None, time.time(), keep_reasoning=True)
+    row = _message_row_params(holder, session_id, role, msg, None, time.time(), keep_reasoning=True)
 
     def _do(conn):
-        existing = conn.execute(_LINEAGE_MATCH_SQL + match_sql + " LIMIT 1", (session_id, *params)).fetchone()
+        existing = conn.execute(_LINEAGE_MATCH_SQL.format(seeds=seeds) + match_sql + " LIMIT 1", (session_id, *params)).fetchone()
         if existing is not None:
             return existing[0]
         _check_transcript_write_guards(holder, conn, session_id, None, reject_active_turn_lease=True)

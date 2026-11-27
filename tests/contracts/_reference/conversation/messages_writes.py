@@ -203,13 +203,18 @@ class MessageWritesMixin(MessageBase):
         inserted = iter(insert_rows(self._ns(scope), transcript, fresh))
         return [outcome if outcome is not None else _row_outcome(next(inserted), RowDisposition.APPENDED) for outcome in resolved]
 
-    def _append_detached(self, scope: ProfileScope, session_id: SessionId, content: str, display_kind: str, metadata: Mapping[str, JsonValue],
-                         match: Callable[[NewMessage], bool]) -> MessageId:
+    def _append_detached(self, scope: ProfileScope, session_id: SessionId, content: str, display_kind: str | None, metadata: Mapping[str, JsonValue],
+                         match: Callable[[NewMessage], bool], *, role: str = "user", same_route: bool = False) -> MessageId:
         """A result that arrived between turns recorded once as a user row (``SessionDetachedResultsMixin._append_detached_result``): a row ``match`` finds in the session or its compression ancestors, any visibility, is returned instead; a new insert refuses under a live turn lease or on a session closed by compression."""
-        for _sid, row in rows_of(self._backend, scope, compression_ancestors(self._backend, scope, str(session_id))):
+        seeds = {str(session_id)}
+        sessions = self._sessions(scope)
+        if same_route and (key := sessions.get(str(session_id), {}).get("session_key")):
+            seeds.update(sid for sid, row in sessions.items() if row.get("session_key") == key)
+        lineage = [sid for seed in seeds for sid in compression_ancestors(self._backend, scope, seed)]
+        for _sid, row in rows_of(self._backend, scope, lineage):
             if match(row.message):
                 return MessageId(row.id)
-        message = NewMessage(role="user", content=content, timestamp=time.time(), display_kind=display_kind, display_metadata=dict(metadata))
+        message = NewMessage(role=role, content=content, timestamp=time.time(), display_kind=display_kind, display_metadata=dict(metadata))
         with self._write_transaction(scope):
             self._write_guards(scope, session_id, reject_live=("turn",))
             return MessageId(insert_rows(self._ns(scope), self._created(scope, session_id), [message], keep_reasoning=True)[0].id)
@@ -232,6 +237,13 @@ class MessageWritesMixin(MessageBase):
         scope = self._backend.scope
         return self._append_detached(scope, session_id, content, display_kind, {**metadata, "completion_admission": admission_id},
                                      lambda message: (message.display_metadata or {}).get("completion_admission") == admission_id)
+
+    def append_delivery_report(self, session_id: SessionId, delivery_id: str, content: str) -> MessageId:
+        if not delivery_id:
+            raise ValueError("A delivery report needs a stable identifier")
+        return self._append_detached(self._backend.scope, session_id, content, None, {"delivery_report_id": delivery_id},
+                                     lambda msg: (msg.display_metadata or {}).get("delivery_report_id") == delivery_id,
+                                     role="assistant", same_route=True)
 
     def replace_transcript(self, session_id: SessionId, messages: Sequence[NewMessage], mode: ReplaceMode, *,
                            reject_active_turn_lease: bool = False) -> ReplaceResult:

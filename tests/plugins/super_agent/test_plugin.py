@@ -29,6 +29,12 @@ class _Context:
     def get_config(self, name, default=None):
         return self.config.get(name, default)
 
+    def gateway_injection_allowed(self):
+        return True
+
+    def home_channel_platforms(self, **kwargs):
+        return []
+
     def register_hook(self, name, callback):
         self.hooks[name] = callback
 
@@ -55,8 +61,8 @@ class _Runtime:
     async def tell(self, ticket_id, text, **kwargs):
         return self.store.add_inbox(ticket_id, text, **kwargs)
 
-    async def cancel(self, ticket_id):
-        return self.store.cancel(ticket_id)
+    async def cancel(self, ticket_id, **kwargs):
+        return self.store.cancel(ticket_id, **kwargs)
 
     async def takeover(self, ticket_id):
         return self.store.takeover(ticket_id)
@@ -103,7 +109,7 @@ async def test_admission_is_selective_idempotent_and_preserves_source(rig):
     ordinary = await _post_gateway_admission(
         ctx, runtime, text="ordinary message", source=source, message_id="message-2"
     )
-    assert ordinary is None  # the chat model resolves possible references
+    assert ordinary["action"] == "continue"
     rejected = await _post_gateway_admission(
         ctx, runtime, text="sa:", source=source, message_id="message-3"
     )
@@ -126,7 +132,7 @@ async def test_gateway_subscription_routes_followups_and_honours_observe_and_uns
     await _command(ctx, runtime, f"subscribe {ticket_id} {thread_key}", **channel)
     await _command(ctx, runtime, f"observe {thread_key} observe", **channel)
 
-    assert await _post_gateway_admission(ctx, runtime, text="preview", message_id="2", **channel) is None
+    assert (await _post_gateway_admission(ctx, runtime, text="preview", message_id="2", **channel))["action"] == "continue"
     assert [row["detail"] for row in runtime.store.list_observe_log()] == ["preview"]
     assert runtime.store.create_followup_turn(assignment["id"]) is None
 
@@ -134,7 +140,7 @@ async def test_gateway_subscription_routes_followups_and_honours_observe_and_uns
     other = await _post_gateway_admission(
         ctx, runtime, text="other conversation", message_id="other-3", source=source, session_key="other-session"
     )
-    assert other is None
+    assert other["action"] == "continue"
     assert runtime.store.create_followup_turn(assignment["id"]) is None
     forwarded = await _post_gateway_admission(ctx, runtime, text="count blue items", message_id="3", **channel)
     assert forwarded and forwarded["action"] == "handled"
@@ -143,7 +149,7 @@ async def test_gateway_subscription_routes_followups_and_honours_observe_and_uns
     runtime.store.mark_turn_terminal(turn["id"], "counted")
     await _command(ctx, runtime, f"unsubscribe {ticket_id} {thread_key}", **channel)
     independent = await _post_gateway_admission(ctx, runtime, text="ordinary", message_id="4", **channel)
-    assert independent is None
+    assert independent["action"] == "continue"
     assert runtime.store.create_followup_turn(assignment["id"]) is None
 
 
@@ -159,10 +165,7 @@ async def test_message_source_changes_apply_to_the_next_admission(rig, sources, 
     await _post_gateway_admission(ctx, runtime, text="sa: original", message_id="1", source=source)
     ctx.config["message_sources"] = sources
     ordinary = await _post_gateway_admission(ctx, runtime, text="hello", message_id="2", source=source)
-    if expected == "rejected":
-        assert expected in ordinary["reply"]
-    else:
-        assert ordinary is None
+    assert ordinary is None or ordinary["action"] == "continue"
     reply = await _post_gateway_admission(ctx, runtime, text="sa: next", message_id="3", source=source)
     if expected is None:
         assert reply is None
@@ -250,6 +253,10 @@ async def test_operator_commands_report_router_state_and_control_audit(rig):
     assert "taken_over" in taken_over and "Recovery record: takeover" in taken_over
 
     assert "queued for retry" in await _command(ctx, runtime, f"retry {ticket['id']}")
+    assert runtime.store.claim_next() is None
+    stop, = runtime.store.pending_stops()
+    assert (stop["id"], stop["admission_id"]) == (turn["id"], "admission-1")
+    runtime.store.confirm_stopped(stop["id"])
     current = runtime.store.claim_next()
     current_turn = runtime.store.ensure_initial_turn(current["id"], ticket["task"])
     runtime.store.mark_turn_submitted(current_turn["id"], "admission-2")
@@ -343,10 +350,12 @@ def discovered_super_agent(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_chinese_commands_and_admission(rig, monkeypatch):
     from agent.i18n import reset_language_cache
+    from unittest.mock import AsyncMock
 
     monkeypatch.setenv("HERMES_LANGUAGE", "zh")
     reset_language_cache()
     ctx, runtime = rig
+    ctx.llm = SimpleNamespace(acomplete=AsyncMock(return_value=SimpleNamespace(text="ASK")))
     assert "Super Agent 命令" in await _command(ctx, runtime, "help")
     reply = await _post_gateway_admission(ctx, runtime, text="运行测试", source={"platform": "weixin", "chat_id": "1"})
     assert "转交" in reply["reply"] and runtime.store.list_tickets() == []
@@ -357,7 +366,10 @@ async def test_chinese_commands_and_admission(rig, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_discovered_router_consumes_whatsapp_text_before_channel_agent(discovered_super_agent):
+async def test_discovered_router_consumes_whatsapp_text_before_channel_agent(discovered_super_agent, monkeypatch):
+    from unittest.mock import AsyncMock
+    from agent.plugin_llm import PluginLlm
+    monkeypatch.setattr(PluginLlm, "acomplete", AsyncMock(return_value=SimpleNamespace(text="NEW")))
     from hermes_cli.profiles import get_active_profile_name
     from tests.gateway.test_post_gateway_admission import _event, _runner
 
@@ -368,10 +380,7 @@ async def test_discovered_router_consumes_whatsapp_text_before_channel_agent(dis
     runner = _runner()
     try:
         reply = await runner._handle_message(_event("check the release"))
-        assert "yes or no" in reply and store.list_tickets() == []
-        answer = _event("yes")
-        answer.message_id = "confirmation"
-        assert "queued" in await runner._handle_message(answer)
+        assert "queued" in reply
         ticket, = store.list_tickets()
         assert ticket["task"] == "check the release"
         runner._handle_message_with_agent.assert_not_awaited()
@@ -414,7 +423,10 @@ async def test_local_model_tool_offers_original_input_and_routes_using_briefs(di
     store = SuperAgentStore(db.parent, get_active_profile_name())
     store.set_paused(True)
     loop = asyncio.get_running_loop()
-    monkeypatch.setattr(plugin_messages, "_gateway_loop", lambda: (object(), loop))
+    from unittest.mock import Mock
+    live = SimpleNamespace(event_stream=Mock())
+    runner = SimpleNamespace(_plugin_local_session=lambda *a, **kw: live)
+    monkeypatch.setattr(plugin_messages, "_gateway_loop", lambda: (runner, loop))
     source = SessionSource(platform=Platform.LOCAL, chat_id="desktop", user_id="owner")
     route = "agent:default:local:desktop"
 
@@ -432,7 +444,8 @@ async def test_local_model_tool_offers_original_input_and_routes_using_briefs(di
     assert store.list_tickets() == []
     yes = MessageEvent(text="yes", source=source, message_id="2")
     assert json.loads(await call(yes, "inspect")) == []  # discovery never consumes consent
-    assert "queued" in await call(yes, "answer")
+    assert "accepted" in await call(yes, "answer")
+    assert live.event_stream.publish.call_args.kwargs["event_type"] == "notification.show"
     assert "no pending" in await call(yes, "answer")
     ticket, = store.list_tickets()
     assert ticket["task"] == request.text
@@ -457,7 +470,9 @@ async def test_local_model_tool_offers_original_input_and_routes_using_briefs(di
 
 @pytest.mark.asyncio
 async def test_shared_chat_consent_and_explicit_followup_belong_to_sender(rig):
+    from unittest.mock import AsyncMock
     ctx, runtime = rig
+    ctx.llm = SimpleNamespace(acomplete=AsyncMock(return_value=SimpleNamespace(text="ASK")))
     source = {"platform": "telegram", "chat_id": "group", "chat_type": "group"}
 
     async def send(actor, text, message_id):
@@ -467,7 +482,7 @@ async def test_shared_chat_consent_and_explicit_followup_belong_to_sender(rig):
     assert "yes or no" in (await send("alice", "Fix login", "m1"))["reply"]
     assert await send("bob", "yes", "m2") is None
     assert await send("", "yes", "m3") is None
-    assert "declined" in (await send("alice", "no", "m4"))["reply"]
+    assert (await send("alice", "no", "m4"))["text"] == "Fix login"
     assert runtime.store.list_tickets() == []
     await send("alice", "Fix logout", "m5")
     await send("alice", "yes", "m6")
@@ -478,6 +493,72 @@ async def test_shared_chat_consent_and_explicit_followup_belong_to_sender(rig):
         assert "Follow-up queued" in (await send("alice", followup, "m8"))["reply"]
     assignment = runtime.store.claim_next()
     assert runtime.store.create_followup_turn(assignment["id"])["text"].count(followup) == 1
+
+
+@pytest.mark.asyncio
+async def test_declined_handoff_runs_the_original_gateway_turn(rig):
+    from functools import partial
+    from unittest.mock import AsyncMock
+    from tests.gateway.test_post_gateway_admission import _event, _register, _runner
+
+    ctx, runtime = rig
+    ctx.config["write_message_sources"] = []
+    ctx.llm = SimpleNamespace(acomplete=AsyncMock(return_value=SimpleNamespace(text="ASK")))
+    _register(partial(_post_gateway_admission, ctx, runtime))
+    runner = _runner()
+    request = _event("Can you check the release?")
+    assert "yes or no" in await runner._handle_message(request)
+    decline = _event("no")
+    decline.message_id = "decline"
+    assert await runner._handle_message(decline) == "agent-ok"
+    forwarded = runner._handle_message_with_agent.await_args.args[0]
+    assert forwarded.text == request.text and forwarded._routed_by == ("super_agent",)
+    assert runtime.store.list_tickets() == []
+
+
+@pytest.mark.asyncio
+async def test_setup_hint_uses_the_profile_grant_and_configured_home(rig, monkeypatch):
+    ctx, runtime = rig
+    ctx.config.update(message_sources=["weixin"], write_message_sources=["telegram"])
+    source = {"platform": "weixin", "chat_id": "inbox", "user_id": "owner"}
+    async def submit(identity):
+        result = await _post_gateway_admission(ctx, runtime, text="sa: run tests", source=source, message_id=identity)
+        return result["reply"]
+
+    assert "writable notification" in await submit("no-home")
+    monkeypatch.setattr(ctx, "home_channel_platforms", lambda **kwargs: ["telegram"])
+    assert "writable notification" not in await submit("home-ready")
+    monkeypatch.setattr(ctx, "gateway_injection_allowed", lambda: False)
+    assert "allow_gateway_injection" in await submit("grant-needed")
+
+
+@pytest.mark.asyncio
+async def test_new_task_replay_and_withdrawal_preserve_actor_and_original_question(rig):
+    from unittest.mock import AsyncMock
+    ctx, runtime = rig
+    classify = AsyncMock(return_value=SimpleNamespace(text="NEW"))
+    ctx.llm = SimpleNamespace(acomplete=classify)
+    source = {"platform": "telegram", "chat_type": "group", "chat_id": "room"}
+
+    async def send(actor, text, identity):
+        return await _post_gateway_admission(ctx, runtime, source=source, session_key="g", actor_id=actor,
+                                             text=text, message_id=identity)
+
+    receipt = await send("alice", "Fix the login form", "one")
+    ticket, = runtime.store.list_tickets()
+    assert ticket["id"] in receipt["reply"]
+    await send("alice", "Fix the login form", "one")
+    classify.assert_awaited_once()
+    classify.return_value = SimpleNamespace(text="STOP " + ticket["id"])
+    await send("bob", "Please stop that job", "two")
+    assert runtime.store.get_ticket(ticket["id"])["status"] == "queued"
+    assert ticket["id"] in (await send("alice", "Stop the job", "three"))["reply"]
+    assert runtime.store.get_ticket(ticket["id"])["status"] == "cancelled"
+    classify.return_value = SimpleNamespace(text="NEW")
+    replay = await send("alice", "Stop the job", "three")
+    assert replay["action"] == "handled" and len(runtime.store.list_tickets()) == 1
+    choice = await send("alice", "yes", "four")
+    assert choice["action"] == "continue" and choice["text"] == "Fix the login form"
 
 
 @pytest.mark.asyncio
@@ -496,6 +577,14 @@ async def test_source_permissions_on_real_channel_history(rig, tmp_path, read, w
     runner.session_store = SessionStore(tmp_path / "sessions", runner.config)
     event = _event("sa: check the installer")
     source = event.source
+
+    def history(channel):
+        entry = runner.session_store.lookup_by_session_key(runner._session_key_for_source(channel))
+        if entry is None:
+            return []
+        rows = runner.session_store.persistence.messages.read_transcript(entry.session_id)
+        return [(row.role, row.content) for row in rows]
+
     try:
         response = await runner._handle_message(event)
         tickets = runtime.store.list_tickets()
@@ -508,7 +597,9 @@ async def test_source_permissions_on_real_channel_history(rig, tmp_path, read, w
         else:
             ticket, = tickets
             assert ticket["task"] == "check the installer"
-            assert (response is not None) == write
+            from gateway.platforms.base import EphemeralReply
+            assert isinstance(response, EphemeralReply) and ticket["id"] in response
+            assert ("writable notification" in response) == (not write)
             runner._handle_message_with_agent.assert_not_awaited()
             if not write:
                 ctx.llm = SimpleNamespace(acomplete=AsyncMock(return_value=SimpleNamespace(text=ticket["id"])))
@@ -518,26 +609,24 @@ async def test_source_permissions_on_real_channel_history(rig, tmp_path, read, w
                 assignment = runtime.store.claim_next()
                 assert followup.text in runtime.store.create_followup_turn(assignment["id"])["text"]
                 runner._handle_message_with_agent.assert_not_awaited()
-        entry = runner.session_store.lookup_by_session_key(runner._session_key_for_source(source))
+        expected = [("user", event.text)] if read and write else []
+        assert history(source) == expected
         if read and write:
-            assert [row["content"] for row in runner.session_store.load_transcript(entry.session_id)] == [event.text, response]
             other = _event("sa: check another project")
             other.source.chat_id = "another-chat"
             await runner._handle_message(other)
-            assert len(runner.session_store.load_transcript(entry.session_id)) == 2
-        else:
-            assert entry is None or not runner.session_store.load_transcript(entry.session_id)
+            assert history(other.source) == [("user", other.text)]
+            assert history(source) == expected
         slash = _event("/super-agent new verify the build")
         slash.message_id = "slash-request"
         for _ in range(2):
             reply = await runner._hm_run_plugin_handler(partial(_command, ctx, runtime), slash, source)
         if read:
             assert len(runtime.store.list_tickets()) == 2 + int(write)
+            assert "already queued" in reply
             if write:
-                assert "already queued" in reply
-                assert [row["content"] for row in runner.session_store.load_transcript(entry.session_id)][2::2] == [slash.text]
-            else:
-                assert reply is None
+                expected.append(("user", slash.text))
+            assert history(source) == expected
         else:
             assert "disabled" in reply and not runtime.store.list_tickets()
     finally:

@@ -133,6 +133,7 @@
         "hermes_cli.dashboard_auth",
         "hermes_cli.platform_actions",
         "hermes_cli.plugins:PluginContext",
+        "hermes_cli.plugin_command_dispatch:PluginNotice",
         "hermes_cli.plugins_ledger:PluginRegistration",
         "hermes_cli.plugins_state:PluginState"
       ]

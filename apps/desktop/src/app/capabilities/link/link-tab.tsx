@@ -90,7 +90,7 @@ export function LinkTab({ profile }: LinkTabProps) {
     })
 
   if (!status) {
-    return <p className="text-text-secondary px-1 py-4 text-sm">{t.linkSync.loading}</p>
+    return <p className="text-text-secondary py-4 text-sm">{t.linkSync.loading}</p>
   }
 
   return (

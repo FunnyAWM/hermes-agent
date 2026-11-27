@@ -1225,10 +1225,10 @@ class LocalEnvironment(BaseEnvironment):
             return super()._prepare_command(command)
         return command, None
 
-    def _wrap_command(self, command: str, cwd: str) -> str:
+    def _wrap_command(self, command: str, cwd: str, *, cwd_fallback: bool = False) -> str:
         run = _CONFINED_RUN.get()
         if run is None or run.shell.kind == "posix":
-            return super()._wrap_command(command, cwd)
+            return super()._wrap_command(command, cwd, cwd_fallback=cwd_fallback)
         return local_command_sandbox.powershell_script(command, cwd=cwd, markers=run)
 
     def get_temp_dir(self) -> str:

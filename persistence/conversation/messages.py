@@ -972,6 +972,10 @@ class MessageRepository(Protocol):
         """Record a detached delegation result once as a ``user`` row (display kind ``hidden`` when ``presentation_suppressed`` is set, else ``async_delegation_complete``): a row with the same identity in the session or its compression ancestors is returned instead. A new insert refuses under a live turn lease (``TurnLeaseLost``) or on a session ended by compression (``CompressionClosed``)."""
         ...
 
+    def append_delivery_report(self, session_id: SessionId, delivery_id: str, content: str) -> MessageId:
+        """Append a delivered assistant report between turns, once across the route's sessions and compression lineages."""
+        ...
+
     def append_completion_note(self, session_id: SessionId, admission_id: str, content: str, display_kind: str, metadata: Mapping[str, JsonValue]) -> MessageId:
         """Record an unviewed completion's note once as a ``user`` row, keyed by ``admission_id`` (stored as ``metadata.completion_admission``) over the compression lineage, with the guards of ``append_delegation_delivery``."""
         ...

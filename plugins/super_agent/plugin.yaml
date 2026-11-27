@@ -19,12 +19,12 @@ config_schema:
     default:
       - "*"
     label: Read message sources
-    description: Platform IDs allowed to hand off tasks. Use local for Bot Chat, ["*"] for all, or [] for none.
+    description: Platform IDs allowed to hand off tasks. Use local for Desktop chats including Bot Chat, ["*"] for all, or [] for none.
   write_message_sources:
     type: list
     default: ["same-as-read"]
     label: Write message sources
-    description: Read/write sources keep handoffs in their own chat and receive replies. Write-only sources receive completed tasks in their Home Channel. Use [] for none or ["same-as-read"] to follow read permissions.
+    description: Read/write sources receive each Worker turn's report in their originating chat. Write-only sources receive reports in their Home Channel. Background delivery requires allow_gateway_injection. Use [] for none or ["same-as-read"] to follow read permissions.
   worker_provider:
     type: string
     default: ""
@@ -58,3 +58,13 @@ config_schema:
     default: 1800
     label: Watchdog threshold
     description: Seconds without a persisted Assignment or Turn state change before an alert.
+  turn_timeout_seconds:
+    type: number
+    default: 0
+    label: Hard time limit per turn (seconds)
+    description: Zero disables the limit. All Workers in this profile use this limit when starting a turn.
+  history_retention_days:
+    type: number
+    default: 0
+    label: Keep settled ticket history (days)
+    description: Zero keeps all history. Positive whole days expire closed tickets with settled deliveries. Git worktrees are retained.

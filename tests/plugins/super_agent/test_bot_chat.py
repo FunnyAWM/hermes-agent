@@ -17,6 +17,10 @@ async def test_bot_chat_submit_routes_before_inference_and_keeps_history(tmp_pat
     from hermes_cli import plugins
     from hermes_cli.profiles import get_active_profile_name
     from hermes_cli.sync_sessions_bridge import _bot_messages
+    from agent.plugin_llm import PluginLlm
+    from types import SimpleNamespace
+    classify = AsyncMock(return_value=SimpleNamespace(text="NEW"))
+    monkeypatch.setattr(PluginLlm, "acomplete", classify)
 
     home = tmp_path / "home"
     home.mkdir()
@@ -51,34 +55,33 @@ async def test_bot_chat_submit_routes_before_inference_and_keeps_history(tmp_pat
         tickets.set_paused(True)
         await send(sid, "request", "Review the release")
         runner._handle_message.assert_not_awaited()
-        assert tickets.list_tickets() == []
-        await send(sid, "consent", "yes")
-        await send(sid, "consent", "yes")
+        await send(sid, "request", "Review the release")
         ticket, = tickets.list_tickets()
         assert ticket["task"] == "Review the release"
         followup = ticket["id"] + " include Windows"
         await send(sid, "followup", followup)
         history = [row["content"] for row in _bot_messages(authority.persistence, sid)]
-        assert history[::2] == ["Review the release", "yes", followup]
-        assert "yes or no" in history[1] and ticket["id"] in history[3] and "Follow-up" in history[5]
+        assert history == ["Review the release", followup, history[-1]] and "Follow-up" in history[-1]
         runner._handle_message.assert_not_awaited()
-        await send(sid, "semantic", "Also check the installer")
+        classify.return_value = SimpleNamespace(text="CHAT")
+        await send(sid, "semantic", "What is an installer?")
         runner._handle_message.assert_awaited_once()
         event, = runner._handle_message.await_args.args
-        assert "super_agent_route" in " ".join(event._bot_chat_notes)
+        assert event._routed_by == ("super_agent",)
 
         from hermes_cli import plugin_messages
         ctx = plugins.PluginContext(plugins.PluginManifest(name="super_agent", key="super_agent", source="bundled"),
                                     plugins.get_plugin_manager())
         ctx.set_config("write_message_sources", [])
         await send(sid, "private", followup)
+        await send(sid, "private-new", "sa: compare the packages")
         assert [row["content"] for row in _bot_messages(authority.persistence, sid)] == history
         assert runner._handle_message.await_count == 1
 
         ctx.set_config("message_sources", [])
         ctx.set_config("write_message_sources", ["local"])
         await send(sid, "disabled", "sa: should stay here")
-        assert runner._handle_message.await_count == 2 and len(tickets.list_tickets()) == 1
+        assert runner._handle_message.await_count == 2 and len(tickets.list_tickets()) == 2
         monkeypatch.setattr(plugin_messages, "_gateway_loop", lambda: (runner, asyncio.get_running_loop()))
         runner._session_key_for_source = lambda source: store._generate_session_key(source)
         receipt = await ctx.apost_home_channel("Build completed", platform="local")

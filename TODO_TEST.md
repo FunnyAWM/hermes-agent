@@ -100,7 +100,7 @@
 **断言**：
 
 - running Assignment 变为 interrupted；running Ticket/Effect 回到可领取状态；running Turn 回 pending；delivering inbox 回 pending。
-- sending outbox 变为 unknown，不能被 `claim_outbox()` 自动重发。
+- 升级前未确认的在途记录保留为 unknown，由操作员核对后手动重投。新版 sending 在重启后按原投递标识重试。
 - 恢复领取复用同一 Effect/Assignment 和稳定 input ID，不创建第二个业务动作。
 - 旧 generation 的 `complete_if_idle()`、`fail_assignment()`、turn receipt 均不能覆盖新 generation 的状态或发送通知。
 - recover 重复调用幂等。
@@ -205,7 +205,7 @@
 - success/failure/cancel 各只 enqueue 一条终态通知，携带 Trigger 的原 `source_json`。
 - `claim_outbox()` 原子地把 pending 改为 sending；两个 dispatcher 不能领取同一条。
 - 明确成功后 delivered；明确发送失败后按最终策略回 pending 或 failed，并保留 error。
-- 进程在发送后、receipt 前崩溃：recover 后为 unknown，dispatcher 不盲目重发。
+- 进程在发送后、receipt 前崩溃：新版记录用同一投递标识重试，Hermes 目的会话仅有一条消息；外部 IM 丢回执时可能重复。
 - source 缺失、过期、所属 profile 不符、平台授权撤销时不发送，并记录错误；不得回落到当前绑定会话。
 - source 合法时调用 `ctx.apost_message(text, source=source)`，实际 adapter 收到原 chat/thread/account 目标。
 - Worker 无法直接发送消息；只有 Router/Outbox 路径调用 post_message。
@@ -436,7 +436,7 @@
 - cancel 与 Worker receipt 并发：cancel 胜出后终态不可复活。
 - retry 与迟到旧 receipt 并发：旧 generation 不覆盖新 generation。
 - 两个 Router loop 被意外启动时，SQLite claim 仍保证单次 Assignment；第二个 loop 不突破两槽总约束。
-- outbox settle 与 recover 并发后只能是 delivered/unknown/可重试失败之一，不回到会盲发的 pending。
+- outbox settle 与 recover 并发后，新版待重试通知保持同一投递标识，已确认的回报不被迟到的失败回执覆盖。
 
 ### P1-04 数据库损坏与迁移
 
@@ -496,7 +496,7 @@
 
 **文件**：`tests/plugins/super_agent/test_store.py`、`test_runtime.py`
 
-- unknown Outbox 可被 status/list 明确展示，只有显式人工动作才可重试或标记 delivered。
+- 升级前的 unknown Outbox 可在 status 查看，仅在显式 redeliver 后重试。
 - 长期 interrupted Assignment 可 retry/cancel，不自动获得更高沙箱等级。
 - orphan worktree 扫描只报告 Super Agent 命名空间内目录，绝不删除无法证明归属的目录。
 

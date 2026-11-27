@@ -3,8 +3,11 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
+
+from plugins.super_agent import _command
 
 from plugins.super_agent.runtime import SuperAgentRuntime
 from plugins.super_agent.store import SuperAgentStore
@@ -20,7 +23,9 @@ class _Context:
     def get_config(self, name, default=None):
         return self.config.get(name, default)
 
-    async def apost_message(self, text, *, source):
+    async def apost_message(self, text, *, source, editable, delivery_id):
+        assert delivery_id
+        assert editable is False
         self.posts.append((text, source))
         return SimpleNamespace(ok=True, error=None)
 
@@ -43,9 +48,8 @@ def test_runtime_validates_worker_count_and_model_configuration(tmp_path):
     assert runtime.worker_model() == ("openai", "gpt-test")
 
     for invalid in (0, 9, -1, 2.0, "2.0", "02", "", True, "two"):
-        candidate = SuperAgentRuntime(_Context({"max_concurrent_workers": invalid}), store)
         with pytest.raises(ValueError, match="max_concurrent_workers"):
-            _ = candidate.max_workers
+            SuperAgentRuntime(_Context({"max_concurrent_workers": invalid}), store)
     with pytest.raises(ValueError, match="worker_provider"):
         SuperAgentRuntime(_Context({"worker_provider": 7}), store).worker_model()
 
@@ -96,6 +100,7 @@ class _Gateway:
     def __init__(self, *, session_id="worker-1"):
         self.session_id = session_id
         self.calls = []
+        self.events = asyncio.Queue()
 
     async def rpc(self, method, **params):
         self.calls.append((method, params))
@@ -171,7 +176,7 @@ async def test_assignment_creates_managed_worker_and_submits_stable_finite_turn(
         "cwd": str(workspace),
         "cwd_explicit": True,
         "toolsets": ["terminal"],
-        "title": f"Super Agent {ticket['id']}",
+        "title": f"Super Agent {ticket['id']} g{assignment['generation']}",
         **overrides,
     })
     submit = next(params for method, params in gateway.calls if method == "prompt.submit")
@@ -180,6 +185,16 @@ async def test_assignment_creates_managed_worker_and_submits_stable_finite_turn(
     stored = store.get_ticket(ticket["id"])
     assert stored["status"] == "succeeded"
     assert stored["assignment"]["worker_session_id"] == "worker-1"
+
+
+@pytest.mark.asyncio
+async def test_progress_stream_stops_on_a_gateway_disconnect(tmp_path):
+    from hermes_cli.gateway_client import GatewayClientError
+
+    runtime = SuperAgentRuntime(_Context(), SuperAgentStore(tmp_path / "data", "default"))
+    events = asyncio.Queue()
+    await events.put(GatewayClientError("Gateway disconnected"))
+    await asyncio.wait_for(runtime._consume_progress(events, "worker"), 2)
 
 
 @pytest.mark.asyncio
@@ -215,7 +230,9 @@ async def test_missing_sandbox_backend_fails_ticket_before_gateway_create(tmp_pa
     store = SuperAgentStore(tmp_path / "data", "default")
     ticket = _submit(store, "event")
     assignment = store.claim_next()
-    runtime = SuperAgentRuntime(_Context(), store)
+    ctx = _Context({"message_sources": ["local"], "write_message_sources": ["telegram"]})
+    ctx.apost_home_channel = AsyncMock(return_value=SimpleNamespace(ok=True, error=None))
+    runtime = SuperAgentRuntime(ctx, store)
     connected = []
 
     @asynccontextmanager
@@ -232,6 +249,12 @@ async def test_missing_sandbox_backend_fails_ticket_before_gateway_create(tmp_pa
     assert connected == []
     assert store.get_ticket(ticket["id"])["status"] == "failed"
     assert "sandctl" in store.get_ticket(ticket["id"])["last_error"]
+    assert await runtime._deliver_one()
+    notice, = ctx.apost_home_channel.await_args.args
+    assert ticket["id"] in notice and "sandctl" in notice
+    assert ctx.apost_home_channel.await_args.kwargs["platform"] == "telegram"
+    assert ctx.apost_home_channel.await_args.kwargs["delivery_id"].startswith(ticket["id"] + ":")
+    assert not await runtime._deliver_one()
 
 
 @pytest.mark.asyncio
@@ -281,7 +304,6 @@ async def test_outbox_delivery_uses_original_source_and_records_receipt(tmp_path
 
 @pytest.mark.asyncio
 async def test_completion_delivery_obeys_origin_home_and_revocation(tmp_path):
-    from unittest.mock import AsyncMock
     ctx = _Context({"message_sources": ["telegram"], "write_message_sources": ["telegram", "discord", "slack"]})
     ctx.apost_home_channel = AsyncMock(return_value=SimpleNamespace(ok=True, error=None))
     store = SuperAgentStore(tmp_path, "default")
@@ -299,6 +321,22 @@ async def test_completion_delivery_obeys_origin_home_and_revocation(tmp_path):
     assert [s for _, s in ctx.posts] == [origin]
     assert [call.kwargs["platform"] for call in ctx.apost_home_channel.await_args_list] == ["discord", "discord"]
     assert all("completed" in call.args[0] for call in ctx.apost_home_channel.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_failed_bot_chat_notice_explains_denial_in_ticket_status(tmp_path):
+    store = SuperAgentStore(tmp_path, "default")
+    ticket = _submit(store, "blocked", {"platform": "local", "bot_chat": True})
+    assignment = store.claim_next()
+    assert store.fail_assignment(assignment["id"], "blocked before startup")
+    ctx = _Context()
+    ctx.apost_home_channel = AsyncMock(return_value=SimpleNamespace(ok=False, error="permission_denied"))
+    runtime = SuperAgentRuntime(ctx, store)
+    assert await runtime._deliver_one()
+    status = await _command(ctx, runtime, f"status {ticket['id']}")
+    assert "blocked before startup" in status
+    assert "plugins.entries.super_agent.allow_gateway_injection" in status
+    assert not await runtime._deliver_one()
 
 
 @pytest.mark.asyncio

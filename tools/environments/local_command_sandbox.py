@@ -427,6 +427,27 @@ def _build_cache_dirs() -> list[Path]:
     return [path for path in candidates if path.is_dir()]
 
 
+def _worktree_common_git_dir(cwd: Path) -> Path | None:
+    """The common git dir a linked worktree's ``.git`` file points into, when ``cwd`` is one.
+
+    Git keeps objects, refs and config outside the worktree; without this read grant every
+    git command inside the sandbox reports that the worktree is not a repository."""
+    dot = cwd / ".git"
+    if not dot.is_file():
+        return None
+    try:
+        text = dot.read_text(encoding="utf-8-sig", errors="replace").strip()
+    except OSError:
+        return None
+    if not text.lower().startswith("gitdir:"):
+        return None
+    target = Path(text.split(":", 1)[1].strip())
+    if not target.is_absolute():
+        target = (cwd / target).resolve()
+    common = target.parent.parent
+    return common if (common / "HEAD").is_file() else None
+
+
 def _extra_globs(entries: tuple[str, ...]) -> list[str]:
     """Configured read/write paths (``~`` allowed), keeping only those that exist."""
     kept = []
@@ -485,6 +506,8 @@ def build_policy(
     adds the build caches. Read only grants none. Network stays denied in every preset."""
     profile = profile or SandboxProfile(WORKSPACE_WRITE, WORKSPACE_WRITE)
     read = [_glob(Path(cwd)), _glob(Path(scratch)), _glob(Path(shell.path).parent)]
+    if (common_git := _worktree_common_git_dir(Path(cwd))) is not None:
+        read.append(_glob(common_git))
     read += _toolchain_read_globs() + _interpreter_read_globs() + _extra_globs(profile.read)
     read = list(dict.fromkeys(read))
     writes: list[Path] = [] if profile.preset == READ_ONLY else [Path(cwd), Path(scratch)]
@@ -582,6 +605,10 @@ def powershell_script(command: str, *, cwd: str, markers: ConfinedRun | None) ->
     lines = [
         "$ErrorActionPreference = 'Continue'\n",
         "$ProgressPreference = 'SilentlyContinue'\n",
+        # The sandbox cannot read the host user's global git config (or Git's system file);
+        # point git at the null device and skip the system file so repo-local config applies.
+        "$env:GIT_CONFIG_NOSYSTEM = '1'\n",
+        "$env:GIT_CONFIG_GLOBAL = 'NUL'\n",
         # 5.1 emits its own and native-child output in the console codepage (936 on zh-CN)
         # while the host decodes UTF-8: pin both to UTF-8 or non-ASCII text and paths turn
         # into mojibake (measured).

@@ -32,7 +32,12 @@ def _run_plugin_command(handler, arg: str, session=None, sid: str = "") -> str:
     choices = _tools_mod("hermes_cli.plugin_choices")
     try:
         with choices.bind_asker(choices.clarify_asker(lambda questions: _clarify_block(sid, questions))):
-            return str(plugins.resolve_plugin_command_result(invoke(handler, arg, **context)) or "")
+            result = plugins.resolve_plugin_command_result(invoke(handler, arg, **context))
+            from hermes_cli.plugin_command_dispatch import PluginNotice
+            if isinstance(result, PluginNotice) and sid:
+                _emit("notification.show", sid, result.payload())
+                return ""
+            return str(result or "")
     finally:
         _clear_session_context(tokens)
 

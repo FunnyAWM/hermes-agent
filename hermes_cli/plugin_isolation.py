@@ -48,6 +48,8 @@ HOST_UNSUPPORTED_CTX_METHODS: dict[str, str] = {
     "register_approval_transport": "approval transports hold the live approval request/response channel",
     "post_message": "the returned handle is bound to the gateway's event loop and live adapter",
     "apost_message": "the returned handle is bound to the gateway's event loop and live adapter",
+    "apost_home_channel": "home delivery needs the profile's live gateway transport or local authority",
+    "apost_local_session": "local notice admission needs the profile's live gateway authority",
     "fork_session": "the returned handle tracks a fork thread of the live session agent in the Hermes process",
 }
 
