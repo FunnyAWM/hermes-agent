@@ -108,6 +108,54 @@ def _gateway_loop():
     return runner, loop
 
 
+def _profile_homes(ctx, runner):
+    profile = runner._served_profile_for_home(ctx._manager.home_path)
+    if profile is None:
+        return {}
+    primary = getattr(runner, "_primary_profile_name", None) or "default"
+    return {platform.value: (name, platform) for name, platform, cfg in runner._served_home_channel_configs()
+            if (name or primary) == profile and cfg.enabled and cfg.home_channel and cfg.home_channel.chat_id}
+
+
+def home_platforms(ctx) -> list[str]:
+    runner, _ = _gateway_loop()
+    if runner is None:
+        return []
+    from gateway.session_authorities import authority_for_home
+    platforms = list(_profile_homes(ctx, runner))
+    if authority_for_home(runner, ctx._manager.home_path):
+        platforms.append("local")
+    return platforms
+
+
+async def post_home(ctx, text: str, platform: str) -> PluginMessage:
+    runner, _ = _gateway_loop()
+    result = _err("home_channel_unavailable")
+    if runner is None:
+        result = _err("gateway_unavailable")
+    elif not await asyncio.to_thread(ctx._gateway_injection_allowed):
+        result = _err("permission_denied")
+    elif platform == "local":
+        from gateway.session_authorities import authority_for_home
+        from gateway.session_cron import admit_local_delivery
+        from gateway.session_persistence import authority_persistence
+        from tools.bot_mode_probe import BOT_CHAT_TITLE
+        owner = authority_for_home(runner, ctx._manager.home_path)
+        if owner is not None:
+            row = await asyncio.to_thread(authority_persistence(owner).sessions.get_by_title, BOT_CHAT_TITLE)
+            if row is not None:
+                sent = await admit_local_delivery(owner, row.session_id, text, {}, producer="plugin_notice")
+                result = {"ok": True} if sent else _err("home_channel_unavailable")
+    elif target := _profile_homes(ctx, runner).get(platform):
+        for name, key, _cfg, home, transport in runner._served_home_channel_transports():
+            if (name, key) == target:
+                sent = await runner._send_home_channel_message(key, home, transport, text,
+                                                              "Plugin home delivery to %s/%s failed: %s")
+                result = {"ok": True} if sent else _err("send_failed")
+                break
+    return PluginMessage(ctx.plugin_id, None, result)
+
+
 def _on_gateway_loop() -> bool:
     _runner, loop = _gateway_loop()
     try:

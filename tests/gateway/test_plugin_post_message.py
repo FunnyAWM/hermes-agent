@@ -131,3 +131,33 @@ async def test_background_post_refuses_invalid_or_revoked_source_without_fallbac
     assert (invalid.ok, invalid.error) == (False, "invalid_source")
     assert (revoked.ok, revoked.error) == (False, "permission_denied")
     assert adapter.calls == []
+
+
+@pytest.mark.asyncio
+async def test_home_post_uses_only_granted_profile_home_and_topic(tmp_path):
+    from unittest.mock import AsyncMock
+    from gateway.config import HomeChannel
+
+    adapter = _EditingAdapter()
+    runner, ctx, _entry = _setup(tmp_path, adapter)
+    runner._primary_profile_name = "default"
+    platform = Platform.TELEGRAM
+    primary = HomeChannel(platform=platform, chat_id="primary", name="Home")
+    secondary = HomeChannel(platform=platform, chat_id="project", name="Project", thread_id="topic")
+    runner.config = GatewayConfig(platforms={platform: PlatformConfig(enabled=True, home_channel=primary)})
+    runner._profile_configs = {"beta": GatewayConfig(platforms={
+        platform: PlatformConfig(enabled=True, home_channel=secondary)})}
+    runner._profile_adapters = {"beta": {platform: adapter}}
+    adapter.send = AsyncMock(return_value=SendResult(success=True, message_id="sent"))
+    with patch("gateway.run._gateway_runner_ref", lambda: runner), \
+            patch.object(runner, "_served_profile_for_home", return_value="beta"), \
+            patch.object(ctx, "_gateway_injection_allowed", return_value=False) as grant:
+        assert (await ctx.apost_home_channel("private", platform="telegram")).error == "permission_denied"
+        grant.return_value = True
+        assert "telegram" in ctx.home_channel_platforms()
+        receipt = await ctx.apost_home_channel("done", platform="telegram")
+        assert receipt.ok, receipt.result
+        assert (await ctx.apost_home_channel("private", platform="slack")).error == "home_channel_unavailable"
+    adapter.send.assert_awaited_once()
+    assert adapter.send.await_args.args[:2] == ("project", "done")
+    assert adapter.send.await_args.kwargs["metadata"]["thread_id"] == "topic"

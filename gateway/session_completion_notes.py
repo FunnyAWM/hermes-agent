@@ -29,7 +29,7 @@ from functools import partial
 _NOTED_PRODUCERS = frozenset({'async_delegation', 'completion', 'watch_match', 'watch_disabled'})
 # A cron result for a local chat (``session_cron.deliver_to_local_chat``) is finished text: a note
 # with or without a viewer, since a turn over it would only spend a model call (#143547 CRON-11).
-_ALWAYS_NOTED = frozenset({'cron'})
+_ALWAYS_NOTED = frozenset({'cron', 'plugin_notice'})
 # Failed-delegation wakes one session may run in a row with nobody watching. A woken parent that
 # re-dispatches into the same failure (billing, a usage limit) would otherwise wake itself forever; past
 # the limit the failure is a note again until a viewer attaches or the user sends something.
@@ -122,9 +122,19 @@ async def note_if_unviewed(authority, ref, row):
     metadata.update({key: descriptor[key] for key in ('display_text', 'notification_category') if key in descriptor})
     target = _physical_target(authority, ref.session_id)
     # Keyed by its admission: a claim is never replayed, and this keeps a write retry exact.
-    await tracked_write(authority, partial(
-        authority_persistence(authority).messages.append_completion_note, target, row['admission_id'], row['payload']['text'],
-        descriptor.get('display_kind', 'internal_notification'), metadata))
+    messages = authority_persistence(authority).messages
+    if _producer(descriptor['identity']) == 'plugin_notice':
+        from persistence.conversation.messages import NewMessage
+
+        def append_reply():
+            if not messages.has_platform_message_id(target, row['admission_id']):
+                messages.append(target, NewMessage(role='assistant', content=row['payload']['text'],
+                                                   platform_message_id=row['admission_id']))
+        await tracked_write(authority, append_reply)
+    else:
+        await tracked_write(authority, partial(
+            messages.append_completion_note, target, row['admission_id'], row['payload']['text'],
+            descriptor.get('display_kind', 'internal_notification'), metadata))
     refresh = getattr(authority.runner, '_refresh_agent_cache_message_count', None)
     if refresh is not None:  # the owner's own row: a cached agent stays, as after a turn's writes
         await refresh(live.route, target)

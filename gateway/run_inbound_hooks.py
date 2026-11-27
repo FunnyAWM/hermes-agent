@@ -318,10 +318,19 @@ class GatewayInboundHooksMixin:
         from hermes_cli.plugin_command_dispatch import invoke_plugin_command
         from gateway.plugin_messages import bind_live_source
         from gateway.plugin_command_choice import chat_choices
+        from gateway.run_inbound_consumer import is_bot_chat, record_channel_exchange
+        bot_chat = False
+        if source.platform.value == "local" and session_entry is not None:
+            def canonical():
+                store = self.session_store._persistence_for_key(session_entry.session_key)
+                return store is not None and is_bot_chat(store, session_entry.session_id)
+            bot_chat = await asyncio.to_thread(canonical)
         call = functools.partial(
             invoke_plugin_command, plugin_handler, user_args, source=source,
             session_id=_plugin_context.session_id or "", session_key=_plugin_context.session_key or "",
-            platform=source.platform.value, **({"actor_id": event.user_id} if event.user_id is not None else {}))
+            platform=source.platform.value, message_id=event.message_id, bot_chat=bot_chat,
+            record_exchange=functools.partial(record_channel_exchange, self, event, entry=session_entry),
+            **({"actor_id": event.user_id} if event.user_id is not None else {}))
         # ctx.post_message from the handler reaches this chat even before its session is stored;
         # ctx.ask_choice asks it with the clarify prompt.
         with (self._session_env_scope(_plugin_context), bind_live_source(source),

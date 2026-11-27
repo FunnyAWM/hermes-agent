@@ -40,7 +40,7 @@ def owner_for_home(home):
     return None
 
 
-async def _admit_local_delivery(authority, chat_id, text, metadata):
+async def admit_local_delivery(authority, chat_id, text, metadata, *, producer="cron"):
     from gateway.config import Platform
     from gateway.session_authorities import owner_scope
     from gateway.session_automation import admit_route_wake
@@ -55,11 +55,13 @@ async def _admit_local_delivery(authority, chat_id, text, metadata):
         elif live is None or live.source is None or live.source.platform == Platform.LOCAL:
             restore_local_session(authority, chat_id)  # a chat closed before this fire, as for completions
         source = authority.sessions[chat_id].source
+        if producer == "plugin_notice" and source.platform != Platform.LOCAL:
+            return False
         # Off the chat its app viewers take it (as a note); back on the chat (its /resume) it is that
         # conversation's own turn there.
         adapter = (local_adapter_map(authority)[Platform.LOCAL] if source.platform == Platform.LOCAL
                    else authority.runner._adapter_for_source(source))
-        return await admit_route_wake(authority.runner, adapter, source, text, 'cron', metadata)
+        return await admit_route_wake(authority.runner, adapter, source, text, producer, metadata)
 
 
 def deliver_to_local_chat(home, chat_id, text, *, diagnostic=False):
@@ -74,7 +76,7 @@ def deliver_to_local_chat(home, chat_id, text, *, diagnostic=False):
     metadata = {'notification_category': 'diagnostic'} if diagnostic else {}
     try:
         admitted = asyncio.run_coroutine_threadsafe(
-            _admit_local_delivery(authority, chat_id, text, metadata), loop).result(timeout=60)
+            admit_local_delivery(authority, chat_id, text, metadata), loop).result(timeout=60)
     except (AuthorityRefusal, KeyError, TimeoutError) as exc:  # unknown chat, refused admission, stalled owner
         return f"local chat {chat_id}: delivery not confirmed: {exc!r}"
     return None if admitted else f"local chat {chat_id}: delivery refused: the chat has no committed route"

@@ -451,6 +451,16 @@ class PluginContext(PluginCapabilityCtxMixin, PluginIdleTaskCtxMixin):
         from hermes_cli.plugin_messages import apost
         return await apost(self, text, source=source)
 
+    def home_channel_platforms(self) -> list[str]:
+        """Platform IDs with a configured home in this plugin's profile."""
+        from hermes_cli.plugin_messages import home_platforms
+        return home_platforms(self)
+
+    async def apost_home_channel(self, text: str, *, platform: str) -> Any:
+        """Post to a configured Home Channel (or the canonical local Bot Chat). Requires the injection grant."""
+        from hermes_cli.plugin_messages import post_home
+        return await post_home(self, text, platform)
+
     def ask_choice(self, question: str, choices: list) -> Optional[str]:
         """From a sync slash-command handler: ask its user to pick one of *choices* (``str`` or
         ``{value, label?, description?}``); the value, or None if unanswerable: ``plugin_choices.py``."""
