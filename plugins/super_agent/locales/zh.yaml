@@ -69,6 +69,7 @@ super_agent:
   enable_sandbox: "启动工作代理前须启用 terminal.sandbox.enabled。"
   sandctl: "启动工作代理需要安装 sandctl。"
   git_root: "工作区根目录不是 Git 仓库根目录：{root}"
+  ambiguous_repo: "任务提到了多个 Git 仓库（{names}），请指定本次要使用的一个仓库。"
   dirty: "工作区有未提交的变更，请先提交或暂存：{root}"
   wrong_tree: "工作代理现有目录不是其 Git 工作树根目录：{workspace}"
   watchdog_config: "告警阈值必须大于零。"

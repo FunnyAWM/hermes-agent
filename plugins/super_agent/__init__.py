@@ -14,6 +14,7 @@ from agent.runtime_session_store import is_worker_process
 from .runtime import DEFAULT_WATCHDOG_SECONDS, SuperAgentRuntime
 from .sources import MessageSources
 from .store import MAX_RETRIES, SANDBOX_LEVELS, SuperAgentStore
+from .workspace import task_repository
 
 
 def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id: str = "", **_kwargs: Any):
@@ -28,14 +29,14 @@ def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id
     }
 
 
-def _workspace_root(ctx: Any) -> str:
+def _workspace_root(ctx: Any, task: str) -> str:
     raw = str(ctx.get_config("workspace_root", "") or "").strip()
     if not raw:
         raise ValueError(t("super_agent.set_root", plugin_id=ctx.plugin_id))
     root = Path(raw).expanduser()
     if not root.is_absolute() or not root.is_dir():
         raise ValueError(t("super_agent.invalid_root"))
-    return str(root.resolve())
+    return str(task_repository(root.resolve(), task))
 
 
 def _source_snapshot(source: Any, actor_id: str | None = None) -> dict | None:
@@ -95,7 +96,7 @@ async def _new_ticket(
     ticket, created = await runtime.submit(
         task=task,
         sandbox=sandbox,
-        workspace_root=_workspace_root(ctx),
+        workspace_root=await asyncio.to_thread(_workspace_root, ctx, task),
         source_instance=_source_instance(snapshot, source_instance),
         external_event_id=external_event_id or uuid.uuid4().hex,
         source=({"platform": "local", "actor_id": offer_actor or (source or {}).get("user_id", ""),

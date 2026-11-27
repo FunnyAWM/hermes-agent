@@ -12,6 +12,8 @@ import uuid
 
 from agent.i18n import t
 
+from .workspace import WORKTREE_DIRECTORY
+
 
 TERMINAL_TICKET_STATES = frozenset({"succeeded", "failed", "cancelled", "taken_over"})
 SANDBOX_LEVELS = frozenset({"read-only", "workspace-write", "workspace-exec"})
@@ -31,8 +33,6 @@ class SuperAgentStore:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.data_dir / "super_agent.db"
-        self.worktrees = self.data_dir / "worktrees"
-        self.worktrees.mkdir(exist_ok=True)
         self.profile = profile
         self._migrate()
 
@@ -509,7 +509,7 @@ class SuperAgentStore:
                     (effect["ticket_id"],),
                 ).fetchone()[0]
                 assignment_id = _id("assignment")
-                workspace = str(self.worktrees / f"{effect['ticket_id']}-g{generation}")
+                workspace = str(Path(effect["workspace_root"]) / WORKTREE_DIRECTORY / f"{effect['ticket_id']}-g{generation}")
                 conn.execute(
                     "INSERT INTO assignments("
                     "id,ticket_id,effect_id,generation,sandbox,workspace,status,created_at,updated_at) "

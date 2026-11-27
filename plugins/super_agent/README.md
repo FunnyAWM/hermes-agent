@@ -90,5 +90,13 @@ Set `message_sources: []` to disable task handoff from every source, including c
 also removes the command. Unload best-effort cancels every known active admission; durable
 state is recovered into the queue with an audit record if the plugin is enabled again.
 
+Name a child Git repository in the task (for example, `检查 kourichat-next 的构建`), or give its
+path relative to `workspace_root` for a deeper project. The ticket keeps the selected repository
+for follow-ups and retries. Without a project reference it uses the configured root.
+New assignments start from the selected repository's committed `HEAD`, in
+`<repository>/.super-agent-worktrees/<ticket>-g<generation>`. Local edits in independent nested
+repositories and submodule checkouts do not block their parent. Changes belonging to the selected
+repository, including staged submodule pointers and ordinary untracked files, still need to be committed or stashed.
+
 Worktrees are retained after success, failure, and cancellation so changes remain reviewable. Remove
 them manually with `git worktree remove <path>` after review.

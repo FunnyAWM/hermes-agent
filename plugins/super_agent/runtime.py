@@ -16,6 +16,7 @@ from tools.environments.local_command_sandbox import resolve_binary, settings
 
 from .store import SuperAgentStore
 from .sources import MessageSources
+from .workspace import WORKTREE_DIRECTORY, has_checkout_changes
 
 
 logger = logging.getLogger(__name__)
@@ -291,7 +292,10 @@ class SuperAgentRuntime:
         root = await asyncio.to_thread(
             lambda: Path(assignment["workspace_root"]).expanduser().resolve()
         )
-        workspace = await asyncio.to_thread(lambda: Path(assignment["workspace"]).resolve())
+        assigned_path = Path(assignment["workspace"])
+        workspace = await asyncio.to_thread(assigned_path.resolve)
+        if assigned_path.parent == Path(assignment["workspace_root"]) / WORKTREE_DIRECTORY and workspace != assigned_path:
+            raise RuntimeError(t("super_agent.wrong_tree", workspace=assigned_path))
         top = await self._git("-C", str(root), "rev-parse", "--show-toplevel")
         resolved_top = await asyncio.to_thread(Path(top).resolve)
         if os.path.normcase(str(resolved_top)) != os.path.normcase(str(root)):
@@ -301,8 +305,12 @@ class SuperAgentRuntime:
             resolved_existing = await asyncio.to_thread(Path(existing).resolve)
             if os.path.normcase(str(resolved_existing)) != os.path.normcase(str(workspace)):
                 raise RuntimeError(t("super_agent.wrong_tree", workspace=workspace))
+            common = ("rev-parse", "--path-format=absolute", "--git-common-dir")
+            if Path(await self._git("-C", str(workspace), *common)) != Path(await self._git("-C", str(root), *common)):
+                raise RuntimeError(t("super_agent.wrong_tree", workspace=workspace))
             return workspace
-        if await self._git("-C", str(root), "status", "--porcelain"):
+        status = await self._git("-C", str(root), "status", "--porcelain=v2", "-z", "-uall", "--ignore-submodules=dirty")
+        if has_checkout_changes(status):
             raise RuntimeError(t("super_agent.dirty", root=root))
         await asyncio.to_thread(workspace.parent.mkdir, parents=True, exist_ok=True)
         await self._git(

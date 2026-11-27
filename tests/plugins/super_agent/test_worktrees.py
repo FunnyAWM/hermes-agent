@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from plugins.super_agent import _command
 from plugins.super_agent.runtime import SuperAgentRuntime
 from plugins.super_agent.store import SuperAgentStore
 
@@ -51,7 +52,62 @@ async def test_assignments_get_distinct_reusable_worktrees_with_safe_paths(tmp_p
     assert Path(_git("-C", first_path, "rev-parse", "--show-toplevel")).resolve() == first_path
     assert Path(_git("-C", second_path, "rev-parse", "--show-toplevel")).resolve() == second_path
     assert await runtime._ensure_worktree(first) == first_path
-    assert first_path.parent == second_path.parent == store.worktrees.resolve()
+    assert first_path.parent == second_path.parent
+    assert first_path.is_relative_to(root)
+
+
+@pytest.mark.asyncio
+async def test_parent_ignores_nested_repositories_but_keeps_its_own_changes(tmp_path):
+    root = _repo(tmp_path / "repo")
+    child = _repo(root / "projects" / "nested repo")
+    (child / "tracked.txt").write_text("child edit", encoding="utf-8")
+    store = SuperAgentStore(tmp_path / "data", "default")
+    runtime = SuperAgentRuntime(SimpleNamespace(plugin_id="super_agent"), store)
+    assignment = _assignment(store, root, "parent")
+    loose = child.parent / "parent file.txt"
+    loose.touch()
+    with pytest.raises(RuntimeError, match="dirty"):
+        await runtime._ensure_worktree(assignment)
+    loose.unlink()
+    assert (await runtime._ensure_worktree(assignment) / "tracked.txt").read_text() == "base\n"
+
+    _git("-C", root, "add", "--", child)
+    with pytest.raises(RuntimeError, match="dirty"):
+        await runtime._ensure_worktree(_assignment(store, root, "staged-gitlink"))
+    _git("-C", root, "commit", "-m", "pin child")
+    _git("-C", child, "commit", "-am", "advance child")
+    assert (await runtime._ensure_worktree(_assignment(store, root, "pinned"))).is_dir()
+    _git("-C", root, "add", "--", child)
+    with pytest.raises(RuntimeError, match="dirty"):
+        await runtime._ensure_worktree(_assignment(store, root, "changed-pin"))
+
+
+@pytest.mark.asyncio
+async def test_named_project_uses_its_own_head_and_local_worktree(tmp_path, monkeypatch):
+    root = _repo(tmp_path / "Playground")
+    child = _repo(root / "kourichat-next")
+    (child / "android.txt").touch()
+    _git("-C", child, "add", "android.txt")
+    _git("-C", child, "commit", "-m", "android")
+    (root / "parent-wip").touch()
+    store = SuperAgentStore(tmp_path / "data", "default")
+    ctx = SimpleNamespace(plugin_id="super_agent", get_config={"workspace_root": str(root)}.get)
+    runtime = SuperAgentRuntime(ctx, store)
+    monkeypatch.setattr(runtime, "wake", lambda: None)
+    await _command(ctx, runtime, "new 请检查kourichat-next的构建")
+    assignment = store.claim_next()
+    workspace = await runtime._ensure_worktree(assignment)
+    assert workspace != child and workspace.is_relative_to(child)
+    assert (workspace / "android.txt").exists()
+    assert _git("-C", workspace, "rev-parse", "HEAD") == _git("-C", child, "rev-parse", "HEAD")
+    assert (root / "parent-wip").exists()
+
+    other = _repo(root / "projects" / "other")
+    reply = await _command(ctx, runtime, "new compare kourichat-next and projects/other")
+    assert "kourichat-next" in reply and "projects/other" in reply
+    assert store.claim_next() is None
+    await _command(ctx, runtime, r"new inspect projects\other")
+    assert Path(store.claim_next()["workspace_root"]) == other
 
 
 @pytest.mark.asyncio

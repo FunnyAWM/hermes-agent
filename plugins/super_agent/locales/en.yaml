@@ -69,6 +69,7 @@ super_agent:
   enable_sandbox: "terminal.sandbox.enabled must be true before a Worker can start"
   sandctl: "sandctl is required before a Worker can start"
   git_root: "workspace_root is not a Git repository root: {root}"
+  ambiguous_repo: "Name one target Git repository for this task. The request mentions {names}."
   dirty: "workspace_root has uncommitted changes; commit or stash the dirty checkout: {root}"
   wrong_tree: "existing Worker workspace is not its Git worktree root: {workspace}"
   watchdog_config: "watchdog_seconds must be greater than zero"
