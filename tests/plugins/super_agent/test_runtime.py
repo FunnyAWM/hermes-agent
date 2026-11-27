@@ -122,12 +122,12 @@ async def test_followup_arriving_at_completion_runs_in_the_same_worker(tmp_path,
     gateway = _Gateway()
     attempts = 0
 
-    def complete_with_arrival(assignment_id, result):
+    def complete_with_arrival(assignment_id, result, **kwargs):
         nonlocal attempts
         attempts += 1
         if attempts == 1:
             assert store.add_inbox(ticket["id"], "also check Firefox")
-        return complete(assignment_id, result)
+        return complete(assignment_id, result, **kwargs)
 
     monkeypatch.setattr(store, "complete_if_idle", complete_with_arrival)
     await runtime._run_turns(gateway, assignment, "worker")
@@ -277,6 +277,28 @@ async def test_outbox_delivery_uses_original_source_and_records_receipt(tmp_path
     with store._connect() as conn:
         row = dict(conn.execute("SELECT status FROM outbox").fetchone())
     assert row["status"] == "delivered"
+
+
+@pytest.mark.asyncio
+async def test_completion_delivery_obeys_origin_home_and_revocation(tmp_path):
+    from unittest.mock import AsyncMock
+    ctx = _Context({"message_sources": ["telegram"], "write_message_sources": ["telegram", "discord", "slack"]})
+    ctx.apost_home_channel = AsyncMock(return_value=SimpleNamespace(ok=True, error=None))
+    store = SuperAgentStore(tmp_path, "default")
+    runtime = SuperAgentRuntime(ctx, store)
+    origin = {"platform": "telegram", "chat_id": "private", "thread_id": "thread"}
+    for key, source in (("im", origin), ("local-task", None)):
+        _submit(store, key, source)
+        assignment = store.claim_next()
+        await runtime._run_turns(_Gateway(), assignment, "worker")
+    # Reopen before draining. A revoked destination must not receive already queued results.
+    ctx.config["write_message_sources"].remove("slack")
+    runtime = SuperAgentRuntime(ctx, SuperAgentStore(tmp_path, "default"))
+    while await runtime._deliver_one():
+        pass
+    assert [s for _, s in ctx.posts] == [origin]
+    assert [call.kwargs["platform"] for call in ctx.apost_home_channel.await_args_list] == ["discord", "discord"]
+    assert all("completed" in call.args[0] for call in ctx.apost_home_channel.await_args_list)
 
 
 @pytest.mark.asyncio

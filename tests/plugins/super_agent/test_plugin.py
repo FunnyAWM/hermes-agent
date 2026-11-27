@@ -347,7 +347,7 @@ async def test_chinese_commands_and_admission(rig, monkeypatch):
     monkeypatch.setenv("HERMES_LANGUAGE", "zh")
     reset_language_cache()
     ctx, runtime = rig
-    assert "超级代理命令" in await _command(ctx, runtime, "help")
+    assert "Super Agent 命令" in await _command(ctx, runtime, "help")
     reply = await _post_gateway_admission(ctx, runtime, text="运行测试", source={"platform": "weixin", "chat_id": "1"})
     assert "转交" in reply["reply"] and runtime.store.list_tickets() == []
     reply = await _post_gateway_admission(ctx, runtime, text="确认转交", source={"platform": "weixin", "chat_id": "1"})
@@ -478,3 +478,67 @@ async def test_shared_chat_consent_and_explicit_followup_belong_to_sender(rig):
         assert "Follow-up queued" in (await send("alice", followup, "m8"))["reply"]
     assignment = runtime.store.claim_next()
     assert runtime.store.create_followup_turn(assignment["id"])["text"].count(followup) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("read", "write"), [(False, False), (True, False), (False, True), (True, True)])
+async def test_source_permissions_on_real_channel_history(rig, tmp_path, read, write):
+    from functools import partial
+    from unittest.mock import AsyncMock
+    from gateway.session import SessionStore
+    from plugins.super_agent.chat import route_chat
+    from tests.gateway.test_post_gateway_admission import _event, _register, _runner
+
+    ctx, runtime = rig
+    ctx.config.update(message_sources=["whatsapp"] if read else [], write_message_sources=["whatsapp"] if write else [])
+    _register(partial(_post_gateway_admission, ctx, runtime))
+    runner = _runner()
+    runner.session_store = SessionStore(tmp_path / "sessions", runner.config)
+    event = _event("sa: check the installer")
+    source = event.source
+    try:
+        response = await runner._handle_message(event)
+        tickets = runtime.store.list_tickets()
+        if not read:
+            assert response == "agent-ok" and not tickets
+            assert "disabled" in await _command(ctx, runtime, "new forbidden", source=source)
+            await route_chat(ctx, runtime, dict(source=source.to_dict(), actor_id=source.user_id,
+                                                session_key="test", text="forbidden", message_id="no"), action="offer")
+            assert not runtime.store.list_tickets()
+        else:
+            ticket, = tickets
+            assert ticket["task"] == "check the installer"
+            assert (response is not None) == write
+            runner._handle_message_with_agent.assert_not_awaited()
+            if not write:
+                ctx.llm = SimpleNamespace(acomplete=AsyncMock(return_value=SimpleNamespace(text=ticket["id"])))
+                followup = _event("Also test the offline package")
+                followup.message_id = "m2"
+                assert await runner._handle_message(followup) is None
+                assignment = runtime.store.claim_next()
+                assert followup.text in runtime.store.create_followup_turn(assignment["id"])["text"]
+                runner._handle_message_with_agent.assert_not_awaited()
+        entry = runner.session_store.lookup_by_session_key(runner._session_key_for_source(source))
+        if read and write:
+            assert [row["content"] for row in runner.session_store.load_transcript(entry.session_id)] == [event.text, response]
+            other = _event("sa: check another project")
+            other.source.chat_id = "another-chat"
+            await runner._handle_message(other)
+            assert len(runner.session_store.load_transcript(entry.session_id)) == 2
+        else:
+            assert entry is None or not runner.session_store.load_transcript(entry.session_id)
+        slash = _event("/super-agent new verify the build")
+        slash.message_id = "slash-request"
+        for _ in range(2):
+            reply = await runner._hm_run_plugin_handler(partial(_command, ctx, runtime), slash, source)
+        if read:
+            assert len(runtime.store.list_tickets()) == 2 + int(write)
+            if write:
+                assert "already queued" in reply
+                assert [row["content"] for row in runner.session_store.load_transcript(entry.session_id)][2::2] == [slash.text]
+            else:
+                assert reply is None
+        else:
+            assert "disabled" in reply and not runtime.store.list_tickets()
+    finally:
+        runner.session_store.close_all_db_handles()

@@ -1,7 +1,11 @@
 import type { AgentPluginRow } from '@/store/agent-plugins'
 
 const fields: Record<string, [string, string]> = {
-  message_sources: ['消息来源', '允许提交任务的网关渠道。["*"] 接受所有已配置渠道（含微信），[] 关闭消息接入。'],
+  message_sources: ['读取消息来源', '允许向 Super Agent 转交任务的渠道。local 表示内置机器人，["*"] 表示全部，[] 表示关闭。'],
+  write_message_sources: [
+    '写入消息来源',
+    '读写渠道在原会话记录转交并接收回复；仅写渠道在默认会话（Home Channel）接收完成通知。[] 表示关闭，["same-as-read"] 表示沿用读取设置。'
+  ],
   worker_provider: ['工作代理提供商', '新工作会话使用的模型提供商。可选择沿用当前配置档。'],
   worker_model: ['工作代理模型', '选择该提供商下的模型，或沿用当前配置档的默认模型。'],
   max_concurrent_workers: ['最大并发工作代理数', '路由器同时运行的工作代理数量。每个任务使用一个工作代理。'],
@@ -18,7 +22,7 @@ export function localizeAgentPlugin(row: AgentPluginRow, locale = 'en'): AgentPl
     return row
   }
 
-  const title = '超级代理'
+  const title = 'Super Agent'
 
   return {
     ...row,

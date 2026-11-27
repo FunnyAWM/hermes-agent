@@ -15,6 +15,7 @@ from hermes_cli.gateway_client import connect_gateway
 from tools.environments.local_command_sandbox import resolve_binary, settings
 
 from .store import SuperAgentStore
+from .sources import MessageSources
 
 
 logger = logging.getLogger(__name__)
@@ -345,7 +346,13 @@ class SuperAgentRuntime:
         while True:
             turn = await asyncio.to_thread(self.store.pending_turn, assignment["id"])
             if turn is None:
-                if await asyncio.to_thread(self.store.complete_if_idle, assignment["id"], last_result):
+                try:
+                    homes = MessageSources.from_config(self.ctx).write_only(self.ctx)
+                except ValueError as exc:
+                    # Invalid notification settings must not turn a successful assignment into a failure.
+                    logger.warning("Cannot select Super Agent completion destinations: %s", exc)
+                    homes = ()
+                if await asyncio.to_thread(self.store.complete_if_idle, assignment["id"], last_result, home_platforms=homes):
                     return
                 turn = await asyncio.to_thread(self.store.create_followup_turn, assignment["id"])
                 if turn is None:
@@ -430,7 +437,17 @@ class SuperAgentRuntime:
             return False
         try:
             source = json.loads(row["source_json"])
-            handle = await self.ctx.apost_message(row["text"], source=source)
+            permissions = MessageSources.from_config(self.ctx)
+            home = source.get("home_channel")
+            platform = home or source["platform"]
+            is_origin = home is None
+            if not permissions.writes(platform) or permissions.reads(platform) != is_origin:
+                await asyncio.to_thread(self.store.settle_outbox, row["id"], delivered=False, error="source_disabled")
+                return True
+            if home or source.get("bot_chat"):
+                handle = await self.ctx.apost_home_channel(row["text"], platform=platform)
+            else:
+                handle = await self.ctx.apost_message(row["text"], source=source)
             await asyncio.to_thread(
                 self.store.settle_outbox,
                 row["id"],

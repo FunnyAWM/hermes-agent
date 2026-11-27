@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
-import logging
 from pathlib import Path
 import uuid
 from typing import Any
@@ -13,10 +12,8 @@ from agent.i18n import t
 from agent.runtime_session_store import is_worker_process
 
 from .runtime import DEFAULT_WATCHDOG_SECONDS, SuperAgentRuntime
+from .sources import MessageSources
 from .store import MAX_RETRIES, SANDBOX_LEVELS, SuperAgentStore
-
-
-logger = logging.getLogger(__name__)
 
 
 def _sandbox_hook(store: SuperAgentStore, tool_name: str, args: dict, session_id: str = "", **_kwargs: Any):
@@ -60,15 +57,6 @@ def _source_instance(source: dict | None, fallback: str) -> str:
     return ":".join(str(source.get(key) or "") for key in ("platform", "chat_id", "thread_id"))
 
 
-def _allows_message_source(ctx: Any, source: Mapping[str, Any]) -> bool:
-    raw = ctx.get_config("message_sources", ["*"])
-    if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
-        raise ValueError(t("super_agent.invalid_sources"))
-    allowed = {item.strip().lower() for item in raw if item.strip()}
-    platform = str(source.get("platform") or "").strip().lower()
-    return "*" in allowed or platform in allowed
-
-
 def _parse_new(ctx: Any, text: str) -> tuple[str, str]:
     text = text.strip()
     if not text:
@@ -100,6 +88,7 @@ async def _new_ticket(
     source_instance: str = "local",
     external_event_id: str | None = None,
     offer_actor: str | None = None,
+    bot_chat: bool = False,
 ) -> str:
     sandbox, task = _parse_new(ctx, text) if offer_actor is None else (_default_sandbox(ctx), text)
     snapshot = _source_snapshot(source, offer_actor)
@@ -109,7 +98,8 @@ async def _new_ticket(
         workspace_root=_workspace_root(ctx),
         source_instance=_source_instance(snapshot, source_instance),
         external_event_id=external_event_id or uuid.uuid4().hex,
-        source=snapshot,
+        source=({"platform": "local", "actor_id": offer_actor or (source or {}).get("user_id", ""),
+                 "bot_chat": True} if bot_chat else snapshot),
         offer_actor=offer_actor,
     )
     duplicate = t("super_agent.duplicate") if not created else ""
@@ -195,14 +185,6 @@ async def _ticket_command(
         if events:
             text += t("super_agent.recovery") + "; ".join(event["action"] for event in events)
         return text
-    if command == "tell":
-        if not value.strip():
-            return t("super_agent.usage_tell")
-        return (
-            t("super_agent.followup", ticket_id=ticket_id)
-            if await runtime.tell(ticket_id, value)
-            else t("super_agent.terminal", ticket_id=ticket_id)
-        )
     if command in {"stop", "cancel"}:
         return (
             t("super_agent.cancelled", ticket_id=ticket_id)
@@ -214,12 +196,6 @@ async def _ticket_command(
             t("super_agent.takeover", ticket_id=ticket_id)
             if await runtime.takeover(ticket_id) is not None
             else t("super_agent.terminal", ticket_id=ticket_id)
-        )
-    if command == "retry":
-        return (
-            t("super_agent.retry", ticket_id=ticket_id)
-            if await runtime.retry(ticket_id)
-            else t("super_agent.cannot_retry", ticket_id=ticket_id, limit=MAX_RETRIES)
         )
     if command == "subscribe":
         thread_key, _, mode = value.strip().partition(" ")
@@ -253,6 +229,26 @@ async def _ticket_command(
     return t("super_agent.help")
 
 
+async def _handoff_command(ctx, runtime, command, rest, *, source, session_key, actor_id, bot_chat, message_id):
+    if command == "new":
+        reply = await _new_ticket(
+            ctx, runtime, rest, source=source if bot_chat else _source_snapshot(source, actor_id),
+            source_instance=f"slash:{session_key or 'local'}", external_event_id=message_id, bot_chat=bot_chat,
+        )
+        return True, reply
+    ticket_id, _, value = rest.strip().partition(" ")
+    if not ticket_id:
+        return False, t("super_agent.help")
+    if command == "tell":
+        if not value.strip():
+            return False, t("super_agent.usage_tell")
+        delivery = f"slash:{session_key}:{message_id}" if message_id else ""
+        ok = await runtime.tell(ticket_id, value, message_id=delivery)
+        return ok, t("super_agent.followup" if ok else "super_agent.terminal", ticket_id=ticket_id)
+    ok = await runtime.retry(ticket_id)
+    return ok, t("super_agent.retry" if ok else "super_agent.cannot_retry", ticket_id=ticket_id, limit=MAX_RETRIES)
+
+
 async def _command(
     ctx: Any,
     runtime: SuperAgentRuntime,
@@ -261,17 +257,31 @@ async def _command(
     source: Any = None,
     session_key: str = "",
     actor_id: str | None = None,
+    record_exchange=None,
+    bot_chat: bool = False,
+    message_id: str = "",
     **_kwargs: Any,
 ) -> str:
     command, _, rest = raw_args.strip().partition(" ")
     command = command.lower()
     if command in {"", "help", "-h", "--help"}:
         return t("super_agent.help") + "\n\n" + t("super_agent.chat_help")
-    if command == "new":
+    if hasattr(source, "to_dict"):
+        source = source.to_dict()
+    if command in {"new", "tell", "retry", "subscribe", "observe"}:
+        platform = (source or {}).get("platform", "local")
         try:
-            return await _new_ticket(
-                ctx, runtime, rest, source=_source_snapshot(source, actor_id), source_instance=f"slash:{session_key or 'local'}"
-            )
+            permissions = MessageSources.from_config(ctx)
+            if not permissions.reads(platform):
+                return t("super_agent.chat_disabled")
+            if command in {"new", "tell", "retry"}:
+                ok, reply = await _handoff_command(ctx, runtime, command, rest, source=source, session_key=session_key,
+                                                   actor_id=actor_id, bot_chat=bot_chat, message_id=message_id)
+                if ok and not permissions.writes(platform):
+                    return ""
+                if ok and record_exchange:
+                    await record_exchange(reply)
+                return reply
         except (OSError, ValueError) as exc:
             return t("super_agent.rejected", exc=exc)
     source_instance = f"gateway:{session_key}" if _source_snapshot(source) else "slash"
@@ -310,27 +320,9 @@ async def _post_gateway_admission(
 ):
     if message_type != "text" or not text.strip() or text.lstrip().startswith("/") or not _source_snapshot(source):
         return None
-    prefix, separator, task = text.partition(":")
-    is_sa = separator and prefix.strip().lower() == "sa"
-    try:
-        if not _allows_message_source(ctx, source):
-            return None
-        if is_sa:
-            reply = await _new_ticket(ctx, runtime, task, source=_source_snapshot(source, actor_id), source_instance=f"gateway:{session_key}",
-                                      external_event_id=message_id)
-        else:
-            if not human_chat:
-                return None
-            from .chat import route_chat
-            chat = {"text": text, "source": source, "session_key": session_key, "message_id": message_id,
-                    "actor_id": (source.get("user_id") or "") if actor_id is None else actor_id}
-            reply = await route_chat(ctx, runtime, chat, action="inbound")
-            if reply is None:
-                return None
-    except Exception as exc:
-        logger.exception("Super Agent gateway admission failed")
-        reply = t("super_agent.rejected", exc=exc)
-    return {"action": "handled", "reply": reply}
+    from .chat import admit_chat
+    return await admit_chat(ctx, runtime, text=text, source=source, session_key=session_key, message_id=message_id,
+                            actor_id=actor_id if actor_id is not None else source.get("user_id") or "", human_chat=human_chat)
 
 
 def register(ctx: Any) -> None:

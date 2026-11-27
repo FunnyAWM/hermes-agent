@@ -1,4 +1,5 @@
 super_agent:
+  choose_ticket: "Which ticket should receive this message? Resend it with the ticket ID first. Available tickets: {tickets}"
   chat_help: "In ordinary chat the model checks ticket briefs with super_agent_route. A clear follow-up goes to the matching ticket. For a new task you will be asked to confirm the handoff."
   handoff_question: "Create a Super Agent ticket for “{task}”? Reply yes or no."
   handoff_declined: "Handoff declined. No ticket was created."
@@ -8,7 +9,7 @@ super_agent:
   blocked: "Super Agent Worker has no active sandbox assignment."
   set_root: "Set plugins.entries.{plugin_id}.settings.workspace_root to an absolute Git repository root."
   invalid_root: "Super Agent workspace_root must be an existing absolute directory."
-  invalid_sources: "message_sources must be a JSON list of Gateway platform IDs"
+  invalid_sources: "Read and write message sources must each be a JSON list of platform IDs."
   no_task: "A task is required."
   full_access: "full-access is not available to Super Agent Workers."
   no_sandbox_task: "A task is required after the sandbox level."

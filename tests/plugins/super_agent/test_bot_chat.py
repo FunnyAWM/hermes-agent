@@ -26,7 +26,8 @@ async def test_bot_chat_submit_routes_before_inference_and_keeps_history(tmp_pat
     (home / "config.yaml").write_text(
         'model: {provider: custom, default: test, base_url: "http://127.0.0.1:1/v1"}\n'
         'plugins:\n  enabled: [super_agent]\n  entries:\n    super_agent:\n'
-        '      settings: {workspace_root: "' + home.as_posix() + '", message_sources: []}\n',
+        '      allow_gateway_injection: true\n'
+        '      settings: {workspace_root: "' + home.as_posix() + '", message_sources: [local]}\n',
         encoding="utf-8",
     )
     plugins._reset_plugin_managers_for_tests()
@@ -65,6 +66,28 @@ async def test_bot_chat_submit_routes_before_inference_and_keeps_history(tmp_pat
         runner._handle_message.assert_awaited_once()
         event, = runner._handle_message.await_args.args
         assert "super_agent_route" in " ".join(event._bot_chat_notes)
+
+        from hermes_cli import plugin_messages
+        ctx = plugins.PluginContext(plugins.PluginManifest(name="super_agent", key="super_agent", source="bundled"),
+                                    plugins.get_plugin_manager())
+        ctx.set_config("write_message_sources", [])
+        await send(sid, "private", followup)
+        assert [row["content"] for row in _bot_messages(authority.persistence, sid)] == history
+        assert runner._handle_message.await_count == 1
+
+        ctx.set_config("message_sources", [])
+        ctx.set_config("write_message_sources", ["local"])
+        await send(sid, "disabled", "sa: should stay here")
+        assert runner._handle_message.await_count == 2 and len(tickets.list_tickets()) == 1
+        monkeypatch.setattr(plugin_messages, "_gateway_loop", lambda: (runner, asyncio.get_running_loop()))
+        runner._session_key_for_source = lambda source: store._generate_session_key(source)
+        receipt = await ctx.apost_home_channel("Build completed", platform="local")
+        assert receipt.ok, receipt.result
+        if task := authority.sessions[sid].task:
+            await asyncio.wait_for(asyncio.shield(task), 15)
+        notice = _bot_messages(authority.persistence, sid)[-1]
+        assert (notice["role"], notice["content"]) == ("assistant", "Build completed")
+        assert runner._handle_message.await_count == 2
     finally:
         await owner.close()
         store.close_all_db_handles()

@@ -647,7 +647,7 @@ class SuperAgentStore:
         conn.execute("INSERT INTO inbox(ticket_id,text,status,created_at) VALUES(?,?,'pending',?)",
                      (ticket_id, text, _now()))
 
-    def complete_if_idle(self, assignment_id: str, result: str) -> bool:
+    def complete_if_idle(self, assignment_id: str, result: str, *, home_platforms=()) -> bool:
         now = _now()
         with self._tx() as conn:
             assignment = conn.execute("SELECT * FROM assignments WHERE id=?", (assignment_id,)).fetchone()
@@ -674,7 +674,7 @@ class SuperAgentStore:
             conn.execute("DELETE FROM subscriptions WHERE ticket_id=?", (assignment["ticket_id"],))
             self._enqueue_outbox(
                 conn, ticket, f"assignment:{assignment_id}:succeeded",
-                t("super_agent.completed", id=ticket['id'], result=result), now,
+                t("super_agent.completed", id=ticket['id'], result=result), now, home_platforms=home_platforms,
             )
             return True
 
@@ -703,14 +703,16 @@ class SuperAgentStore:
             return True
 
     @staticmethod
-    def _enqueue_outbox(conn, ticket, kind: str, text: str, now: float) -> None:
+    def _enqueue_outbox(conn, ticket, kind: str, text: str, now: float, *, home_platforms=()) -> None:
         source = conn.execute(
             "SELECT source_json FROM triggers WHERE id=?", (ticket["trigger_id"],)
         ).fetchone()["source_json"]
-        if source:
+        targets = [(kind, source)] if source else []
+        targets.extend((f"{kind}:home:{platform}", json.dumps({"home_channel": platform})) for platform in home_platforms)
+        for delivery_kind, destination in targets:
             conn.execute(
                 "INSERT OR IGNORE INTO outbox(ticket_id,kind,source_json,text,status,created_at,updated_at) "
-                "VALUES(?,?,?,?, 'pending',?,?)", (ticket["id"], kind, source, text, now, now),
+                "VALUES(?,?,?,?, 'pending',?,?)", (ticket["id"], delivery_kind, destination, text, now, now),
             )
 
     @staticmethod

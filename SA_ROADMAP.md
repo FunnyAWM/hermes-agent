@@ -86,7 +86,7 @@ Router 创建的 Worker Session 全部出现在会话列表中，普通用户只
 ### 4.3.1 设置入口
 
 Super Agent 通过原生 `config_schema` 暴露 profile 级设置，并用通用 `settings_page.location: root`
-元数据提升为 Desktop 独立一级菜单「超级代理」。Worker 提供商和模型通过当前配置档的联动下拉列表选择。其他设置包括 Gateway 消息来源、Router
+元数据提升为 Desktop 独立一级菜单「Super Agent」。Worker 提供商和模型通过当前配置档的联动下拉列表选择。其他设置包括 Gateway 消息来源、Router
 最大并发 Worker 数、工作区、默认沙箱和 Watchdog 阈值。当前调度器每个 Ticket 只创建一个
 Worker，因此并发设置控制 Router 全局槽位；单 Ticket 多 Worker 汇聚不在当前实现范围内。
 

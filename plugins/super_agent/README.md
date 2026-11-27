@@ -16,6 +16,7 @@ plugins:
       allow_gateway_injection: true
       settings:
         message_sources: ["*"]
+        write_message_sources: ["same-as-read"]
         worker_provider: ""
         worker_model: ""
         max_concurrent_workers: "2"
@@ -28,9 +29,24 @@ terminal:
     enabled: true
 ```
 
-The Desktop exposes the same values in its first-level **Settings → Super Agent** page. `message_sources`
-contains Gateway platform IDs; `["*"]` accepts every configured robot channel, including Weixin/OpenClaw,
-and `[]` disables Gateway intake while leaving `/super-agent` available. `worker_provider` and
+The Desktop exposes the same values in **Settings → Super Agent**. Use platform IDs such as
+`telegram`, `weixin` or `local` (the phone-synced Bot Chat). Each list accepts `["*"]` for all
+sources and `[]` for none. Older configurations inherit write permissions from `message_sources`,
+equivalent to `write_message_sources: ["same-as-read"]`.
+
+| Read (`message_sources`) | Write (`write_message_sources`) | Behavior |
+| --- | --- | --- |
+| No | No | Chat stays in its own session. |
+| Yes | No | Can hand off tasks. Confirmation and clarification prompts are transient. Forwarded commands stay out of chat history, and the channel receives no task result. |
+| No | Yes | Incoming messages stay in their own session. Finished tickets go to the platform's configured Home Channel and topic. |
+| Yes | Yes | Handoffs and receipts enter the originating chat's context. Results return to that conversation. |
+
+For example, read `["local", "weixin"]` and write `["local", "telegram"]` to keep Bot Chat read/write,
+use Weixin for read-only intake, and notify the Telegram Home Channel on completion. Configure the
+Home Channel in the same profile. Write-only `local` uses that profile's canonical Bot Chat.
+Delivery checks the current permissions again before sending a queued notice.
+
+`worker_provider` and
 `worker_model` affect newly created Worker Sessions; blank values inherit the profile defaults.
 `max_concurrent_workers` is the Router-wide limit. The current scheduler assigns one Worker to each Ticket.
 
@@ -70,7 +86,7 @@ if needed. `/super-agent health` shows
 active alerts and recent pause, resume, recovery, retry, cancel, and takeover records; ticket
 `status` includes its recovery record.
 
-Set `message_sources: []` to return all channels to their own sessions. Disabling the plugin
+Set `message_sources: []` to disable task handoff from every source, including chat commands. Disabling the plugin
 also removes the command. Unload best-effort cancels every known active admission; durable
 state is recovered into the queue with an audit record if the plugin is enabled again.
 

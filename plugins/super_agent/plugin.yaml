@@ -18,8 +18,13 @@ config_schema:
     type: list
     default:
       - "*"
-    label: Message sources
-    description: Gateway platform IDs allowed to submit Super Agent messages. Use ["*"] for every configured robot channel, including Weixin/OpenClaw; use [] to disable message intake.
+    label: Read message sources
+    description: Platform IDs allowed to hand off tasks. Use local for Bot Chat, ["*"] for all, or [] for none.
+  write_message_sources:
+    type: list
+    default: ["same-as-read"]
+    label: Write message sources
+    description: Read/write sources keep handoffs in their own chat and receive replies. Write-only sources receive completed tasks in their Home Channel. Use [] for none or ["same-as-read"] to follow read permissions.
   worker_provider:
     type: string
     default: ""

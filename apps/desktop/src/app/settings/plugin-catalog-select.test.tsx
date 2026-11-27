@@ -42,6 +42,7 @@ it('saves Chinese worker dropdown selections from the owning profile and clears 
   }
 
   const localized = localizeAgentPlugin(row, 'zh')
+  expect(localized.name).toBe('Super Agent')
   const save = vi.fn(async () => true)
   render(
     <I18nProvider configClient={null} initialLocale="zh">
