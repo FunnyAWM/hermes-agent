@@ -10,6 +10,7 @@ settings_page:
 provides_locales: [en, zh]
 provides_tools: [super_agent_route]
 provides_hooks:
+  - pre_bot_chat
   - post_gateway_admission
   - pre_tool_call
 config_schema:

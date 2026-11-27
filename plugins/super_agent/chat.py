@@ -121,17 +121,36 @@ INSTRUCTIONS = (
 )
 
 
+BOT_CHAT_GUIDANCE = (
+    "Super Agent routes tasks for this chat. Before working, call super_agent_route with action inspect. "
+    "If the tool is deferred, find super_agent_route with tool_search and invoke it with tool_call. "
+    "Forward a clear match to the ticket in its brief. If several briefs fit, ask which ticket the user means. "
+    "For a new task, call offer and wait for confirmation."
+)
+
+
+async def _bot_chat(ctx, runtime, *, toolsets, text, source, actor_id, session_key, message_id, **_kwargs):
+    if "super_agent" not in toolsets:
+        return None
+    chat = dict(text=text, source=source, actor_id=actor_id, session_key=session_key, message_id=message_id)
+    try:
+        reply = await route_chat(ctx, runtime, chat, action="inbound")
+    except (OSError, ValueError) as exc:
+        reply = t("super_agent.rejected", exc=exc)
+    if reply:
+        return {"action": "handled", "reply": reply}
+    if text.strip().casefold().rstrip(".!。！").strip() in _DECISIONS:
+        return None
+    return {"context": BOT_CHAT_GUIDANCE}
+
+
 def register_chat_tool(ctx, runtime):
     async def handle(args, **_kwargs):
         callback = partial(route_chat, ctx, runtime, action=args["action"], ticket_id=args.get("ticket_id", ""))
         return await ctx.in_gateway_chat(callback)
 
-    ctx.register_system_prompt_section(
-        "super_agent.routing",
-        "In human chat, when super_agent_route is available, use it before starting work. "
-        "Inspect the ticket briefs, forward clear matches and offer a handoff for new tasks. "
-        "Ask which ticket the user means when ambiguous, and wait for explicit consent to create a ticket.",
-    )
+    ctx.register_hook("pre_bot_chat", partial(_bot_chat, ctx, runtime))
+    ctx.register_system_prompt_section("super_agent.routing", "When super_agent_route is available: " + BOT_CHAT_GUIDANCE)
     ctx.register_tool(
         name="super_agent_route", toolset="super_agent", handler=handle, is_async=True,
         schema={"name": "super_agent_route", "description": INSTRUCTIONS, "parameters": {

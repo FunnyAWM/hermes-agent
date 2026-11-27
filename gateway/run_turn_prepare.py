@@ -812,7 +812,7 @@ class GatewayTurnPrepareMixin:
 
         # Per-turn notes ride the user message via the api_content sidecar, NOT context_prompt
         # (appending to the ephemeral system prompt forced a full agent rebuild).
-        turn_sidecar_notes: list[str] = []
+        turn_sidecar_notes: list[str] = list(getattr(event, "_bot_chat_notes", ()))
         if _was_auto_reset:
             await self._hmwa_deliver_auto_reset_notice(session_entry, source, turn_sidecar_notes)
 

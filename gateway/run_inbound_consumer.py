@@ -59,3 +59,46 @@ async def run_post_admission_hook(
             logger.info("%s: a plugin handled the message for session %s", POST_ADMISSION_HOOK, session_key)
             return True, reply if isinstance(reply, str) and reply.strip() else None
     return False, None
+
+
+async def route_bot_chat(authority, ref, event, policy) -> str | None:
+    """Offer a claimed viewer prompt in the canonical Bot Chat to interested plugins."""
+    from gateway.session_context import is_human_chat_input
+    from hermes_cli.lifecycle import ainvoke_hook, has_hook, hook_known_unused
+
+    hook = "pre_bot_chat"
+    if not is_human_chat_input(event) or hook_known_unused(hook):
+        return None
+    from gateway.session_persistence import authority_persistence
+    from tools.bot_mode_probe import BOT_CHAT_TITLE
+    store = authority_persistence(authority)
+
+    def bot_toolsets():
+        if store.sessions.get_title(ref.session_id) == BOT_CHAT_TITLE and has_hook(hook):
+            return policy.current_toolsets(policy.config(authority, secrets=False))
+        return None
+
+    toolsets = await asyncio.to_thread(bot_toolsets)
+    if toolsets is None:
+        return None
+    live = authority.sessions[ref.session_id]
+    results = await ainvoke_hook(hook, text=event.text, message_id=event.message_id,
+                                 session_key=live.route, actor_id=event.sender_id() or "",
+                                 source=event.source.to_dict(), toolsets=list(toolsets))
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        if result.get("action") == "handled" and isinstance(reply := result.get("reply"), str) and reply.strip():
+            from gateway.session_runtime_workers import tracked_write
+            from persistence.conversation.messages import NewMessage
+
+            def persist_reply():
+                store.messages.append_batch(authority.physical_target(ref), [
+                    NewMessage(role="user", content=event.text, platform_message_id=event.message_id),
+                    NewMessage(role="assistant", content=reply),
+                ])
+            await tracked_write(authority, persist_reply)
+            return reply
+        if isinstance(note := result.get("context"), str) and note.strip():
+            event._bot_chat_notes = (*getattr(event, "_bot_chat_notes", ()), note)
+    return None
